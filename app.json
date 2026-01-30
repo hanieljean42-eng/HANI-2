@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Love App 💕",
+    "slug": "couple-h",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FF6B9D"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.loveapp.couple"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FF6B9D"
+      },
+      "package": "com.loveapp.couple"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "dc4f0955-2522-4ade-abaa-ecff9f38534d"
+      }
+    },
+    "owner": "haniel1952"
+  }
+}
