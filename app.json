@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Love App 💕",
+    "name": "Couple H",
     "slug": "couple-h",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -33,6 +33,9 @@
         "projectId": "dc4f0955-2522-4ade-abaa-ecff9f38534d"
       }
     },
-    "owner": "haniel1952"
+    "owner": "haniel1952",
+    "plugins": [
+      "expo-asset"
+    ]
   }
 }

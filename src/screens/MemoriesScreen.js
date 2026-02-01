@@ -10,13 +10,16 @@ import {
   Image,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
+import { Video, ResizeMode } from 'expo-av';
 import { useData } from '../context/DataContext';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export default function MemoriesScreen() {
   const { memories, addMemory, timeCapsules, addTimeCapsule } = useData();
@@ -25,23 +28,63 @@ export default function MemoriesScreen() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState(null);
   const [addType, setAddType] = useState('memory');
-  const [newMemory, setNewMemory] = useState({ title: '', note: '', date: '', imageUri: null });
+  const [newMemory, setNewMemory] = useState({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Convertir une image/vidéo en base64 pour la synchronisation
+  const convertToBase64 = async (uri) => {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return base64;
+    } catch (error) {
+      console.log('Erreur conversion base64:', error);
+      return null;
+    }
+  };
 
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        allowsEditing: false,  // Désactivé pour garder la qualité originale
+        quality: 1,  // Qualité maximale
       });
 
       if (!result.canceled && result.assets[0]) {
-        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri });
+        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri, mediaType: 'image' });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');
+    }
+  };
+
+  const pickVideo = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['videos'],
+        allowsEditing: false,
+        quality: 1,
+        videoMaxDuration: 60, // 60 secondes max
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        // Vérifier la taille du fichier
+        const fileInfo = await FileSystem.getInfoAsync(result.assets[0].uri);
+        const fileSizeMB = fileInfo.size / (1024 * 1024);
+        
+        if (fileSizeMB > 50) {
+          Alert.alert('Fichier trop volumineux', 'La vidéo ne doit pas dépasser 50 MB');
+          return;
+        }
+        
+        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri, mediaType: 'video' });
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'accéder aux vidéos');
     }
   };
 
@@ -54,13 +97,12 @@ export default function MemoriesScreen() {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        allowsEditing: false,
+        quality: 1,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri });
+        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri, mediaType: 'image' });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     } catch (error) {
@@ -74,22 +116,33 @@ export default function MemoriesScreen() {
       return;
     }
 
+    setIsUploading(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
+    let mediaBase64 = null;
+    if (newMemory.imageUri) {
+      // Convertir en base64 pour la synchronisation
+      mediaBase64 = await convertToBase64(newMemory.imageUri);
+    }
+    
     const memory = {
-      type: newMemory.imageUri ? 'photo' : 'note',
+      type: newMemory.imageUri ? (newMemory.mediaType === 'video' ? 'video' : 'photo') : 'note',
       title: newMemory.title,
       note: newMemory.note,
       date: new Date().toLocaleDateString('fr-FR'),
-      emoji: newMemory.imageUri ? '📸' : '💌',
+      emoji: newMemory.imageUri ? (newMemory.mediaType === 'video' ? '🎬' : '📸') : '💌',
       color: ['#FF6B9D', '#8B5CF6', '#10B981', '#F59E0B'][Math.floor(Math.random() * 4)],
       imageUri: newMemory.imageUri,
+      mediaType: newMemory.mediaType || 'image',
+      // Stocker le base64 pour la synchronisation entre partenaires
+      mediaBase64: mediaBase64,
     };
 
     await addMemory(memory);
-    setNewMemory({ title: '', note: '', date: '', imageUri: null });
+    setNewMemory({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
     setShowAddModal(false);
-    Alert.alert('💖', 'Souvenir ajouté avec succès !');
+    setIsUploading(false);
+    Alert.alert('💖', 'Souvenir ajouté et synchronisé !');
   };
 
   const handleAddCapsule = async () => {
@@ -118,53 +171,87 @@ export default function MemoriesScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const renderGallery = () => (
-    <View style={styles.galleryContainer}>
-      {memories.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>📸</Text>
-          <Text style={styles.emptyTitle}>Aucun souvenir</Text>
-          <Text style={styles.emptyText}>
-            Commencez à capturer vos moments précieux ensemble !
-          </Text>
-          <TouchableOpacity
-            style={styles.emptyButton}
-            onPress={() => {
-              setAddType('memory');
-              setShowAddModal(true);
-            }}
-          >
-            <Text style={styles.emptyButtonText}>Ajouter un souvenir</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.gallery}>
-          {memories.map((memory, index) => (
+  const renderGallery = () => {
+    // Fonction pour obtenir la source de l'image/vidéo
+    const getMediaSource = (memory) => {
+      // Si on a un base64, l'utiliser (pour les médias synchronisés)
+      if (memory.mediaBase64) {
+        const prefix = memory.mediaType === 'video' ? 'data:video/mp4;base64,' : 'data:image/jpeg;base64,';
+        return { uri: prefix + memory.mediaBase64 };
+      }
+      // Sinon utiliser l'URI local
+      if (memory.imageUri) {
+        return { uri: memory.imageUri };
+      }
+      return null;
+    };
+
+    return (
+      <View style={styles.galleryContainer}>
+        {memories.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>📸</Text>
+            <Text style={styles.emptyTitle}>Aucun souvenir</Text>
+            <Text style={styles.emptyText}>
+              Commencez à capturer vos moments précieux ensemble !
+            </Text>
             <TouchableOpacity
-              key={`gallery-${memory.id}-${index}`}
-              style={styles.galleryItem}
-              onPress={() => openMemory(memory)}
+              style={styles.emptyButton}
+              onPress={() => {
+                setAddType('memory');
+                setShowAddModal(true);
+              }}
             >
-              {memory.imageUri ? (
-                <Image source={{ uri: memory.imageUri }} style={styles.galleryImage} />
-              ) : (
-                <LinearGradient
-                  colors={[memory.color || '#FF6B9D', '#C44569']}
-                  style={styles.galleryPlaceholder}
-                >
-                  <Text style={styles.galleryEmoji}>{memory.emoji || '💌'}</Text>
-                </LinearGradient>
-              )}
-              <View style={styles.galleryOverlay}>
-                <Text style={styles.galleryTitle} numberOfLines={1}>{memory.title}</Text>
-                <Text style={styles.galleryDate}>{memory.date}</Text>
-              </View>
+              <Text style={styles.emptyButtonText}>Ajouter un souvenir</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
+          </View>
+        ) : (
+          <View style={styles.gallery}>
+            {memories.map((memory, index) => {
+              const mediaSource = getMediaSource(memory);
+              return (
+                <TouchableOpacity
+                  key={`gallery-${memory.id}-${index}`}
+                  style={styles.galleryItem}
+                  onPress={() => openMemory(memory)}
+                >
+                  {mediaSource ? (
+                    memory.mediaType === 'video' ? (
+                      <View style={styles.galleryImage}>
+                        <Video
+                          source={mediaSource}
+                          style={styles.galleryImage}
+                          resizeMode={ResizeMode.COVER}
+                          shouldPlay={false}
+                          isMuted={true}
+                        />
+                        <View style={styles.videoOverlay}>
+                          <Text style={styles.videoIcon}>▶️</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <Image source={mediaSource} style={styles.galleryImage} />
+                    )
+                  ) : (
+                    <LinearGradient
+                      colors={[memory.color || '#FF6B9D', '#C44569']}
+                      style={styles.galleryPlaceholder}
+                    >
+                      <Text style={styles.galleryEmoji}>{memory.emoji || '💌'}</Text>
+                    </LinearGradient>
+                  )}
+                  <View style={styles.galleryOverlay}>
+                    <Text style={styles.galleryTitle} numberOfLines={1}>{memory.title}</Text>
+                    <Text style={styles.galleryDate}>{memory.date}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const renderJar = () => (
     <View style={styles.jarContainer}>
@@ -375,20 +462,36 @@ export default function MemoriesScreen() {
             {addType === 'memory' && (
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-                  <Text style={styles.photoButtonText}>📁 Galerie</Text>
+                  <Text style={styles.photoButtonText}>📁 Photo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.photoButton} onPress={pickVideo}>
+                  <Text style={styles.photoButtonText}>🎬 Vidéo</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
-                  <Text style={styles.photoButtonText}>📸 Photo</Text>
+                  <Text style={styles.photoButtonText}>📸 Caméra</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {newMemory.imageUri && (
               <View style={styles.imagePreview}>
-                <Image source={{ uri: newMemory.imageUri }} style={styles.previewImage} />
+                {newMemory.mediaType === 'video' ? (
+                  <Video
+                    source={{ uri: newMemory.imageUri }}
+                    style={styles.previewImage}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay={false}
+                    isMuted={true}
+                  />
+                ) : (
+                  <Image source={{ uri: newMemory.imageUri }} style={styles.previewImage} />
+                )}
+                <View style={styles.mediaTypeIndicator}>
+                  <Text style={styles.mediaTypeText}>{newMemory.mediaType === 'video' ? '🎬' : '📸'}</Text>
+                </View>
                 <TouchableOpacity
                   style={styles.removeImage}
-                  onPress={() => setNewMemory({ ...newMemory, imageUri: null })}
+                  onPress={() => setNewMemory({ ...newMemory, imageUri: null, mediaType: 'image' })}
                 >
                   <Text style={styles.removeImageText}>✕</Text>
                 </TouchableOpacity>
@@ -400,18 +503,27 @@ export default function MemoriesScreen() {
                 style={styles.cancelButton}
                 onPress={() => {
                   setShowAddModal(false);
-                  setNewMemory({ title: '', note: '', date: '', imageUri: null });
+                  setNewMemory({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
                 }}
+                disabled={isUploading}
               >
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.saveButton}
+                style={[styles.saveButton, isUploading && styles.saveButtonDisabled]}
                 onPress={addType === 'capsule' ? handleAddCapsule : handleAddMemory}
+                disabled={isUploading}
               >
-                <Text style={styles.saveButtonText}>
-                  {addType === 'capsule' ? 'Créer ⏰' : 'Sauvegarder 💖'}
-                </Text>
+                {isUploading ? (
+                  <View style={styles.uploadingContainer}>
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text style={styles.saveButtonText}> Envoi...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.saveButtonText}>
+                    {addType === 'capsule' ? 'Créer ⏰' : 'Sauvegarder 💖'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -426,19 +538,45 @@ export default function MemoriesScreen() {
         onRequestClose={() => setShowViewModal(false)}
       >
         <View style={styles.viewModalOverlay}>
-          <View style={styles.viewModalContent}>
+          <View style={styles.viewModalContentLarge}>
             {selectedMemory && (
               <>
-                {selectedMemory.imageUri ? (
-                  <Image source={{ uri: selectedMemory.imageUri }} style={styles.viewImage} />
-                ) : (
-                  <LinearGradient
-                    colors={[selectedMemory.color || '#FF6B9D', '#C44569']}
-                    style={styles.viewImagePlaceholder}
-                  >
-                    <Text style={styles.viewEmoji}>{selectedMemory.emoji || '💕'}</Text>
-                  </LinearGradient>
-                )}
+                {(() => {
+                  // Obtenir la source du média
+                  let mediaSource = null;
+                  if (selectedMemory.mediaBase64) {
+                    const prefix = selectedMemory.mediaType === 'video' ? 'data:video/mp4;base64,' : 'data:image/jpeg;base64,';
+                    mediaSource = { uri: prefix + selectedMemory.mediaBase64 };
+                  } else if (selectedMemory.imageUri) {
+                    mediaSource = { uri: selectedMemory.imageUri };
+                  }
+
+                  if (mediaSource) {
+                    if (selectedMemory.mediaType === 'video') {
+                      return (
+                        <Video
+                          source={mediaSource}
+                          style={styles.viewImageLarge}
+                          resizeMode={ResizeMode.CONTAIN}
+                          shouldPlay={true}
+                          isLooping={true}
+                          useNativeControls={true}
+                        />
+                      );
+                    } else {
+                      return <Image source={mediaSource} style={styles.viewImageLarge} resizeMode="contain" />;
+                    }
+                  } else {
+                    return (
+                      <LinearGradient
+                        colors={[selectedMemory.color || '#FF6B9D', '#C44569']}
+                        style={styles.viewImagePlaceholder}
+                      >
+                        <Text style={styles.viewEmoji}>{selectedMemory.emoji || '💕'}</Text>
+                      </LinearGradient>
+                    );
+                  }
+                })()}
                 <View style={styles.viewDetails}>
                   <Text style={styles.viewTitle}>{selectedMemory.title}</Text>
                   <Text style={styles.viewDate}>📅 {selectedMemory.date}</Text>
@@ -869,20 +1007,38 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
+  saveButtonDisabled: {
+    opacity: 0.7,
+  },
+  uploadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   viewModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    backgroundColor: 'rgba(0,0,0,0.95)',
     justifyContent: 'center',
-    padding: 20,
+    padding: 10,
   },
   viewModalContent: {
     backgroundColor: '#fff',
     borderRadius: 25,
     overflow: 'hidden',
   },
+  viewModalContentLarge: {
+    backgroundColor: '#000',
+    borderRadius: 20,
+    overflow: 'hidden',
+    maxHeight: height * 0.9,
+  },
   viewImage: {
     width: '100%',
     height: 300,
+  },
+  viewImageLarge: {
+    width: '100%',
+    height: height * 0.6,
+    backgroundColor: '#000',
   },
   viewImagePlaceholder: {
     width: '100%',
@@ -894,27 +1050,28 @@ const styles = StyleSheet.create({
     fontSize: 80,
   },
   viewDetails: {
-    padding: 25,
+    padding: 20,
+    backgroundColor: '#fff',
   },
   viewTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   viewDate: {
     fontSize: 14,
     color: '#999',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   viewNote: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   closeViewButton: {
     backgroundColor: '#C44569',
-    margin: 20,
+    margin: 15,
     marginTop: 0,
     padding: 15,
     borderRadius: 25,
@@ -923,6 +1080,30 @@ const styles = StyleSheet.create({
   closeViewButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoIcon: {
+    fontSize: 30,
+  },
+  mediaTypeIndicator: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    padding: 5,
+  },
+  mediaTypeText: {
     fontSize: 16,
   },
 });

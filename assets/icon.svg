@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B9D"/>
+      <stop offset="50%" style="stop-color:#C44569"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <!-- White circle -->
+  <circle cx="512" cy="512" r="350" fill="white" opacity="0.95"/>
+  <!-- Letter C -->
+  <text x="280" y="580" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="#C44569">C</text>
+  <!-- Heart emoji (simplified as heart shape) -->
+  <path d="M512 420 C512 380, 560 340, 600 340 C660 340, 700 400, 700 440 C700 520, 512 650, 512 650 C512 650, 324 520, 324 440 C324 400, 364 340, 424 340 C464 340, 512 380, 512 420Z" fill="#FF6B9D"/>
+  <!-- Letter H -->
+  <text x="600" y="580" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="#C44569">H</text>
+</svg>

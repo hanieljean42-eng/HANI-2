@@ -70,7 +70,7 @@ export default function RegisterScreen({ navigation }) {
           </TouchableOpacity>
 
           <Text style={styles.title}>Créer un compte</Text>
-          <Text style={styles.subtitle}>Rejoignez l'aventure amoureuse 💕</Text>
+          <Text style={styles.subtitle}>Rejoignez Couple H 💕</Text>
 
           {/* Avatar Selector */}
           <TouchableOpacity
@@ -131,12 +131,14 @@ export default function RegisterScreen({ navigation }) {
               <Text style={styles.inputIcon}>🎂</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Date de naissance (JJ/MM/AAAA)"
+                placeholder="Date de naissance (ex: 15/06/2000)"
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 value={formData.birthday}
                 onChangeText={(text) => setFormData({ ...formData, birthday: text })}
+                keyboardType="numbers-and-punctuation"
               />
             </View>
+            <Text style={styles.inputHint}>💡 Format : JJ/MM/AAAA</Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputIcon}>🔒</Text>
@@ -262,6 +264,14 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     color: '#fff',
     fontSize: 16,
+  },
+  inputHint: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: -10,
+    marginBottom: 15,
+    marginLeft: 10,
+    fontStyle: 'italic',
   },
   submitButton: {
     backgroundColor: '#fff',

@@ -7,9 +7,13 @@ import {
   Modal,
   Dimensions,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useGame } from '../context/GameContext';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -154,6 +158,26 @@ const WOULD_YOU_RATHER = [
 ];
 
 export default function GamesScreen() {
+  const { user, couple, partner } = useAuth();
+  const { 
+    createGameSession, 
+    joinGameSession, 
+    gameSession, 
+    waitingForPartner, 
+    partnerOnline,
+    endGameSession,
+    submitAnswer,
+    checkBothAnswered,
+    getBothAnswers,
+    nextQuestion: nextGameQuestion,
+    isFirebaseReady,
+    pendingGameInvite,
+    hasActiveSession,
+    updateCoupleId,
+    listenToGameSession,
+    coupleId,
+  } = useGame();
+
   const [activeGame, setActiveGame] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [scores, setScores] = useState({ player1: 0, player2: 0 });
@@ -164,8 +188,97 @@ export default function GamesScreen() {
   const [player1Answer, setPlayer1Answer] = useState(null);
   const [player2Answer, setPlayer2Answer] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(1);
+  
+  // États pour le mode multijoueur à distance
+  const [showLobby, setShowLobby] = useState(false);
+  const [selectedGameForLobby, setSelectedGameForLobby] = useState(null);
+  const [isCreatingGame, setIsCreatingGame] = useState(false);
+  const [isJoiningGame, setIsJoiningGame] = useState(false);
+  const [gameMode, setGameMode] = useState(null); // 'local' ou 'online'
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
-  const startGame = (game) => {
+  // Synchroniser le coupleId avec le couple de l'AuthContext
+  useEffect(() => {
+    if (couple?.id && couple.id !== coupleId) {
+      console.log('🔄 Synchronisation coupleId:', couple.id);
+      updateCoupleId(couple.id);
+    }
+  }, [couple?.id, coupleId, updateCoupleId]);
+
+  // Détecter les invitations de jeu du partenaire
+  useEffect(() => {
+    if (pendingGameInvite && !activeGame && !showLobby) {
+      console.log('📨 Affichage invitation:', pendingGameInvite);
+      setShowInviteModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }, [pendingGameInvite, activeGame, showLobby]);
+
+  // Surveiller les changements de session pour le mode en ligne
+  useEffect(() => {
+    if (gameSession && gameMode === 'online') {
+      if (gameSession.status === 'ready' && !waitingForPartner) {
+        // Les deux joueurs sont là, démarrer le jeu
+        setShowLobby(false);
+        setShowInviteModal(false);
+        setActiveGame(gameSession.gameType);
+      }
+    }
+  }, [gameSession, waitingForPartner, gameMode]);
+
+  const openGameLobby = (gameType) => {
+    setSelectedGameForLobby(gameType);
+    setShowLobby(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const handleCreateGame = async () => {
+    setIsCreatingGame(true);
+    const session = await createGameSession(selectedGameForLobby, user?.name || 'Joueur 1');
+    setIsCreatingGame(false);
+    
+    if (session) {
+      setGameMode('online');
+      // Démarrer l'écoute Firebase
+      listenToGameSession();
+      Alert.alert(
+        '🎮 Partie créée !',
+        'En attente de votre partenaire...\n\nVotre partenaire doit appuyer sur "Rejoindre la partie" dans le même jeu.',
+        [{ text: 'OK' }]
+      );
+    } else {
+      Alert.alert('Erreur', 'Impossible de créer la partie');
+    }
+  };
+
+  const handleJoinGame = async () => {
+    setIsJoiningGame(true);
+    const session = await joinGameSession(user?.name || 'Joueur 2');
+    setIsJoiningGame(false);
+    
+    if (session) {
+      setGameMode('online');
+      // Démarrer l'écoute Firebase
+      listenToGameSession();
+      
+      // Vérifier si le jeu peut démarrer immédiatement
+      if (session.status === 'ready') {
+        setShowLobby(false);
+        setActiveGame(session.gameType);
+      }
+      Alert.alert('🎉 Connecté !', 'Vous avez rejoint la partie !');
+    } else {
+      Alert.alert(
+        'Aucune partie trouvée',
+        'Votre partenaire n\'a pas encore créé de partie.\nDemandez-lui de créer une partie d\'abord.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const startLocalGame = (game) => {
+    setShowLobby(false);
+    setGameMode('local');
     setActiveGame(game);
     setCurrentQuestion(0);
     setScores({ player1: 0, player2: 0 });
@@ -177,6 +290,11 @@ export default function GamesScreen() {
     setPlayer2Answer(null);
     setCurrentPlayer(1);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const startGame = (game) => {
+    // Ouvrir le lobby pour choisir le mode
+    openGameLobby(game);
   };
 
   const nextQuestion = () => {
@@ -280,8 +398,307 @@ export default function GamesScreen() {
     </View>
   );
 
+  const getGameTitle = (gameType) => {
+    const titles = {
+      'quiz': '🧠 Quiz Couple',
+      'truthordare': '🎲 Action ou Vérité',
+      'whoismore': '🏆 Qui est le Plus...',
+      'wouldyourather': '🤔 Tu Préfères...',
+    };
+    return titles[gameType] || 'Jeu';
+  };
+
+  const renderLobbyModal = () => (
+    <Modal
+      visible={showLobby}
+      transparent
+      animationType="slide"
+      onRequestClose={() => {
+        setShowLobby(false);
+        endGameSession();
+      }}
+    >
+      <View style={styles.lobbyOverlay}>
+        <View style={styles.lobbyContent}>
+          <Text style={styles.lobbyTitle}>{getGameTitle(selectedGameForLobby)}</Text>
+          <Text style={styles.lobbySubtitle}>Choisissez comment jouer</Text>
+
+          {/* Mode Local */}
+          <TouchableOpacity
+            style={styles.lobbyOption}
+            onPress={() => startLocalGame(selectedGameForLobby)}
+          >
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.lobbyOptionGradient}>
+              <Text style={styles.lobbyOptionIcon}>👫</Text>
+              <View style={styles.lobbyOptionTextContainer}>
+                <Text style={styles.lobbyOptionTitle}>Jouer ensemble</Text>
+                <Text style={styles.lobbyOptionDesc}>Sur le même téléphone</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Séparateur */}
+          <View style={styles.lobbySeparator}>
+            <View style={styles.lobbySeparatorLine} />
+            <Text style={styles.lobbySeparatorText}>ou à distance</Text>
+            <View style={styles.lobbySeparatorLine} />
+          </View>
+
+          {/* Mode En ligne - Créer */}
+          <TouchableOpacity
+            style={[styles.lobbyOption, waitingForPartner && styles.lobbyOptionActive]}
+            onPress={handleCreateGame}
+            disabled={isCreatingGame || waitingForPartner}
+          >
+            <LinearGradient 
+              colors={waitingForPartner ? ['#F59E0B', '#D97706'] : ['#8B5CF6', '#A855F7']} 
+              style={styles.lobbyOptionGradient}
+            >
+              {isCreatingGame ? (
+                <ActivityIndicator color="#fff" size="large" />
+              ) : (
+                <>
+                  <Text style={styles.lobbyOptionIcon}>{waitingForPartner ? '⏳' : '🎮'}</Text>
+                  <View style={styles.lobbyOptionTextContainer}>
+                    <Text style={styles.lobbyOptionTitle}>
+                      {waitingForPartner ? 'En attente...' : 'Créer une partie'}
+                    </Text>
+                    <Text style={styles.lobbyOptionDesc}>
+                      {waitingForPartner 
+                        ? `${partner?.name || 'Partenaire'} doit rejoindre` 
+                        : 'Votre partenaire rejoint ensuite'}
+                    </Text>
+                  </View>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Mode En ligne - Rejoindre */}
+          <TouchableOpacity
+            style={styles.lobbyOption}
+            onPress={handleJoinGame}
+            disabled={isJoiningGame || waitingForPartner}
+          >
+            <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.lobbyOptionGradient}>
+              {isJoiningGame ? (
+                <ActivityIndicator color="#fff" size="large" />
+              ) : (
+                <>
+                  <Text style={styles.lobbyOptionIcon}>🤝</Text>
+                  <View style={styles.lobbyOptionTextContainer}>
+                    <Text style={styles.lobbyOptionTitle}>Rejoindre la partie</Text>
+                    <Text style={styles.lobbyOptionDesc}>Si votre partenaire a créé une partie</Text>
+                  </View>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Indicateur partenaire */}
+          {partner && (
+            <View style={styles.partnerIndicator}>
+              <Text style={styles.partnerIndicatorText}>
+                {partnerOnline ? '🟢' : '🔴'} {partner.name} {partnerOnline ? 'est disponible' : 'est hors ligne'}
+              </Text>
+            </View>
+          )}
+
+          {/* Bouton Annuler */}
+          <TouchableOpacity
+            style={styles.lobbyCancelButton}
+            onPress={() => {
+              setShowLobby(false);
+              endGameSession();
+            }}
+          >
+            <Text style={styles.lobbyCancelText}>Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Modal pour afficher les invitations de jeu du partenaire
+  const renderInviteModal = () => {
+    if (!pendingGameInvite) return null;
+    
+    return (
+      <Modal
+        visible={showInviteModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowInviteModal(false)}
+      >
+        <View style={styles.lobbyOverlay}>
+          <View style={styles.inviteContent}>
+            <Text style={styles.inviteEmoji}>🎮</Text>
+            <Text style={styles.inviteTitle}>Invitation de jeu !</Text>
+            <Text style={styles.inviteText}>
+              {partner?.name || pendingGameInvite.creatorName} vous invite à jouer à
+            </Text>
+            <Text style={styles.inviteGameName}>
+              {getGameTitle(pendingGameInvite.gameType)}
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.inviteAcceptButton}
+              onPress={async () => {
+                setShowInviteModal(false);
+                setIsJoiningGame(true);
+                const session = await joinGameSession(user?.name || 'Joueur 2');
+                setIsJoiningGame(false);
+                
+                if (session) {
+                  setGameMode('online');
+                  if (session.status === 'ready' || gameSession?.status === 'ready') {
+                    setActiveGame(pendingGameInvite.gameType);
+                  }
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+              }}
+            >
+              <LinearGradient colors={['#10B981', '#059669']} style={styles.inviteAcceptGradient}>
+                {isJoiningGame ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.inviteAcceptText}>🎉 Rejoindre la partie !</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.inviteDeclineButton}
+              onPress={() => setShowInviteModal(false)}
+            >
+              <Text style={styles.inviteDeclineText}>Plus tard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   const renderGameSelector = () => (
     <ScrollView contentContainerStyle={styles.gamesGrid}>
+      {/* Bannière si une invitation est en attente */}
+      {pendingGameInvite && !showInviteModal && (
+        <TouchableOpacity 
+          style={styles.inviteBanner}
+          onPress={() => setShowInviteModal(true)}
+        >
+          <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.inviteBannerGradient}>
+            <Text style={styles.inviteBannerEmoji}>🎮</Text>
+            <View style={styles.inviteBannerTextContainer}>
+              <Text style={styles.inviteBannerTitle}>
+                {partner?.name || 'Partenaire'} vous attend !
+              </Text>
+              <Text style={styles.inviteBannerDesc}>
+                Touchez pour rejoindre {getGameTitle(pendingGameInvite.gameType)}
+              </Text>
+            </View>
+            <Text style={styles.inviteBannerArrow}>→</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+
+      {/* Indicateur de connexion Firebase */}
+      <View style={styles.connectionStatus}>
+        <Text style={styles.connectionStatusText}>
+          {isFirebaseReady ? '🟢 Firebase OK' : '🔴 Hors ligne'}
+        </Text>
+        <Text style={styles.connectionStatusText}>
+          📱 ID Couple: {coupleId ? coupleId.slice(-8) : 'Non défini'}
+        </Text>
+        {partner && (
+          <Text style={styles.connectionStatusText}>
+            👫 {partner.name} {partnerOnline ? '(en ligne)' : ''}
+          </Text>
+        )}
+      </View>
+
+      {/* SECTION JOUER À DISTANCE */}
+      <View style={styles.distanceSection}>
+        <Text style={styles.distanceSectionTitle}>🌐 JOUER À DISTANCE</Text>
+        <Text style={styles.distanceSectionDesc}>
+          Jouez avec votre partenaire même à distance !
+        </Text>
+        
+        <View style={styles.distanceButtonsRow}>
+          {/* Bouton Créer une partie */}
+          <TouchableOpacity 
+            style={styles.distanceButton}
+            onPress={() => {
+              setSelectedGameForLobby('quiz');
+              setShowLobby(true);
+            }}
+          >
+            <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.distanceButtonGradient}>
+              <Text style={styles.distanceButtonIcon}>🎮</Text>
+              <Text style={styles.distanceButtonText}>CRÉER</Text>
+              <Text style={styles.distanceButtonSubtext}>une partie</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Bouton Rejoindre une partie */}
+          <TouchableOpacity 
+            style={styles.distanceButton}
+            onPress={async () => {
+              setIsJoiningGame(true);
+              const session = await joinGameSession(user?.name || 'Joueur 2');
+              setIsJoiningGame(false);
+              
+              if (session) {
+                setGameMode('online');
+                Alert.alert('🎉 Connecté !', `Vous rejoignez ${getGameTitle(session.gameType)}`);
+                if (session.status === 'ready' || gameSession?.status === 'ready') {
+                  setActiveGame(session.gameType);
+                }
+              } else {
+                Alert.alert(
+                  '😕 Aucune partie',
+                  'Votre partenaire n\'a pas encore créé de partie.\n\nDemandez-lui de cliquer sur "CRÉER une partie" d\'abord !',
+                  [{ text: 'OK' }]
+                );
+              }
+            }}
+            disabled={isJoiningGame}
+          >
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.distanceButtonGradient}>
+              {isJoiningGame ? (
+                <ActivityIndicator color="#fff" size="large" />
+              ) : (
+                <>
+                  <Text style={styles.distanceButtonIcon}>🤝</Text>
+                  <Text style={styles.distanceButtonText}>REJOINDRE</Text>
+                  <Text style={styles.distanceButtonSubtext}>la partie</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
+        {/* Indicateur de session active */}
+        {hasActiveSession && gameSession && (
+          <View style={styles.activeSessionBanner}>
+            <Text style={styles.activeSessionText}>
+              ⚡ Session active: {getGameTitle(gameSession.gameType)} 
+              {waitingForPartner ? ' (en attente...)' : ' (prêt!)'}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Séparateur */}
+      <View style={styles.sectionSeparator}>
+        <View style={styles.separatorLine} />
+        <Text style={styles.separatorText}>OU JOUER ENSEMBLE</Text>
+        <View style={styles.separatorLine} />
+      </View>
+
+      {/* SECTION JEUX */}
+      <Text style={styles.gamesSectionTitle}>📱 Jeux sur le même téléphone</Text>
+
       <TouchableOpacity style={styles.gameCard} onPress={() => startGame('quiz')}>
         <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.gameGradient}>
           <Text style={styles.gameIcon}>🧠</Text>
@@ -624,7 +1041,11 @@ export default function GamesScreen() {
     >
       <View style={styles.header}>
         {activeGame ? (
-          <TouchableOpacity onPress={() => setActiveGame(null)}>
+          <TouchableOpacity onPress={() => {
+            setActiveGame(null);
+            endGameSession();
+            setGameMode(null);
+          }}>
             <Text style={styles.backButton}>← Retour</Text>
           </TouchableOpacity>
         ) : (
@@ -637,6 +1058,12 @@ export default function GamesScreen() {
       {activeGame === 'truthordare' && renderTruthOrDare()}
       {activeGame === 'whoismore' && renderWhoIsMore()}
       {activeGame === 'wouldyourather' && renderWouldYouRather()}
+
+      {/* Modal Lobby */}
+      {renderLobbyModal()}
+      
+      {/* Modal Invitation */}
+      {renderInviteModal()}
     </LinearGradient>
   );
 }
@@ -1073,5 +1500,302 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
     marginBottom: 30,
+  },
+  // Styles Lobby
+  lobbyOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  lobbyContent: {
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    padding: 25,
+    alignItems: 'center',
+  },
+  lobbyTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  lobbySubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 25,
+  },
+  lobbyOption: {
+    width: '100%',
+    marginBottom: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  lobbyOptionActive: {
+    borderWidth: 3,
+    borderColor: '#F59E0B',
+  },
+  lobbyOptionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+  },
+  lobbyOptionIcon: {
+    fontSize: 40,
+    marginRight: 15,
+  },
+  lobbyOptionTextContainer: {
+    flex: 1,
+  },
+  lobbyOptionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  lobbyOptionDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  lobbySeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginVertical: 15,
+  },
+  lobbySeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  lobbySeparatorText: {
+    marginHorizontal: 15,
+    color: '#999',
+    fontSize: 14,
+  },
+  partnerIndicator: {
+    backgroundColor: '#f5f5f5',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 15,
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  partnerIndicatorText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  lobbyCancelButton: {
+    marginTop: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+  },
+  lobbyCancelText: {
+    fontSize: 16,
+    color: '#999',
+  },
+  
+  // Styles pour l'invitation
+  inviteContent: {
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    padding: 30,
+    width: width * 0.85,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  inviteEmoji: {
+    fontSize: 60,
+    marginBottom: 15,
+  },
+  inviteTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  inviteText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  inviteGameName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FF6B9D',
+    marginBottom: 25,
+  },
+  inviteAcceptButton: {
+    width: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 15,
+  },
+  inviteAcceptGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  inviteAcceptText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  inviteDeclineButton: {
+    paddingVertical: 10,
+  },
+  inviteDeclineText: {
+    fontSize: 16,
+    color: '#999',
+  },
+  
+  // Bannière d'invitation
+  inviteBanner: {
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  inviteBannerGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+  },
+  inviteBannerEmoji: {
+    fontSize: 30,
+    marginRight: 12,
+  },
+  inviteBannerTextContainer: {
+    flex: 1,
+  },
+  inviteBannerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  inviteBannerDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  inviteBannerArrow: {
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  
+  // Indicateur de connexion
+  connectionStatus: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 15,
+    marginBottom: 20,
+    alignSelf: 'stretch',
+    marginHorizontal: 0,
+  },
+  connectionStatusText: {
+    fontSize: 14,
+    color: '#fff',
+    textAlign: 'center',
+    marginVertical: 2,
+  },
+  
+  // Section jouer à distance
+  distanceSection: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  distanceSectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  distanceSectionDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  distanceButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 15,
+  },
+  distanceButton: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  distanceButtonGradient: {
+    paddingVertical: 25,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  distanceButtonIcon: {
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  distanceButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  distanceButtonSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  activeSessionBanner: {
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 15,
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  activeSessionText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // Séparateur
+  sectionSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  separatorText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginHorizontal: 15,
+  },
+  gamesSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 15,
+    textAlign: 'center',
   },
 });

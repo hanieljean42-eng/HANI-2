@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, remove, update, push, get } from 'firebase/database';
+import { ref, set, onValue, remove, update, push, get, off } from 'firebase/database';
 
 const GameContext = createContext({});
 
@@ -21,6 +21,13 @@ export function GameProvider({ children }) {
   // Mode en ligne / hors ligne
   const [isOnlineMode, setIsOnlineMode] = useState(true);
   const [isConnected, setIsConnected] = useState(true);
+  
+  // État pour détecter une invitation de jeu du partenaire
+  const [pendingGameInvite, setPendingGameInvite] = useState(null);
+  const [hasActiveSession, setHasActiveSession] = useState(false);
+  
+  // Référence pour éviter les doubles listeners
+  const sessionListenerRef = useRef(null);
 
   // Surveiller la connexion réseau
   useEffect(() => {
@@ -36,20 +43,109 @@ export function GameProvider({ children }) {
     generatePlayerId();
     setIsFirebaseReady(isConfigured && database !== null);
   }, []);
+  
+  // Écouter automatiquement les sessions de jeu quand on a un coupleId
+  useEffect(() => {
+    if (!coupleId || !isFirebaseReady || !database || !myPlayerId) return;
+    
+    console.log('🎮 Démarrage écoute permanente des sessions pour:', coupleId);
+    const sessionRef = ref(database, `games/${coupleId}/session`);
+    
+    const unsubscribe = onValue(sessionRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        console.log('📥 Session détectée:', data.gameType, 'status:', data.status);
+        
+        setGameSession(data);
+        setGameData(data);
+        setHasActiveSession(true);
+        
+        // Vérifier les joueurs
+        const players = data.players || {};
+        const playerIds = Object.keys(players);
+        const hasPartner = playerIds.length >= 2;
+        const isMySession = data.createdBy === myPlayerId;
+        const imInSession = playerIds.includes(myPlayerId);
+        
+        setPartnerOnline(hasPartner);
+        setWaitingForPartner(!hasPartner && isMySession);
+        
+        // Détecter une invitation du partenaire (session créée par quelqu'un d'autre et je n'y suis pas)
+        if (!isMySession && !imInSession && data.status === 'waiting') {
+          console.log('📨 Invitation de jeu détectée!');
+          setPendingGameInvite({
+            gameType: data.gameType,
+            createdBy: data.createdBy,
+            creatorName: players[data.createdBy]?.name || 'Partenaire',
+          });
+        } else {
+          setPendingGameInvite(null);
+        }
+        
+        // Si les deux joueurs sont là, mettre à jour le statut
+        if (hasPartner && data.status === 'waiting') {
+          update(sessionRef, { status: 'ready' }).then(() => {
+            console.log('✅ Session prête!');
+          });
+        }
+      } else {
+        console.log('📭 Pas de session active');
+        setGameSession(null);
+        setGameData(null);
+        setHasActiveSession(false);
+        setPendingGameInvite(null);
+        setPartnerOnline(false);
+        setWaitingForPartner(false);
+      }
+    });
+    
+    sessionListenerRef.current = unsubscribe;
+    
+    return () => {
+      console.log('🔕 Arrêt écoute permanente');
+      unsubscribe();
+      sessionListenerRef.current = null;
+    };
+  }, [coupleId, isFirebaseReady, myPlayerId]);
 
   const loadCoupleId = async () => {
     try {
+      // D'abord essayer de récupérer depuis le couple existant
+      const storedCouple = await AsyncStorage.getItem('@couple');
+      if (storedCouple) {
+        const couple = JSON.parse(storedCouple);
+        if (couple.id) {
+          console.log('✅ CoupleId chargé depuis @couple:', couple.id);
+          setCoupleId(couple.id);
+          // Sauvegarder aussi dans @coupleId pour compatibilité
+          await AsyncStorage.setItem('@coupleId', couple.id);
+          return;
+        }
+      }
+      
+      // Sinon essayer @coupleId
       const id = await AsyncStorage.getItem('@coupleId');
       if (id) {
+        console.log('✅ CoupleId chargé depuis @coupleId:', id);
         setCoupleId(id);
       } else {
         // Générer un ID de couple si pas encore créé
         const newId = 'couple_' + Date.now().toString(36) + Math.random().toString(36).substr(2);
         await AsyncStorage.setItem('@coupleId', newId);
         setCoupleId(newId);
+        console.log('🆕 Nouveau coupleId généré:', newId);
       }
     } catch (error) {
       console.error('Erreur chargement coupleId:', error);
+    }
+  };
+  
+  // Mettre à jour le coupleId quand le couple change
+  const updateCoupleId = async (newCoupleId) => {
+    if (newCoupleId && newCoupleId !== coupleId) {
+      console.log('🔄 Mise à jour coupleId:', newCoupleId);
+      setCoupleId(newCoupleId);
+      await AsyncStorage.setItem('@coupleId', newCoupleId);
     }
   };
 
@@ -101,14 +197,22 @@ export function GameProvider({ children }) {
 
   // Créer une session de jeu
   const createGameSession = async (gameType, playerName) => {
-    if (!coupleId) {
-      console.log('Couple ID non disponible');
-      return null;
+    // Recharger le coupleId si nécessaire
+    let currentCoupleId = coupleId;
+    if (!currentCoupleId) {
+      const id = await AsyncStorage.getItem('@coupleId');
+      if (id) {
+        currentCoupleId = id;
+        setCoupleId(id);
+      } else {
+        console.log('❌ Couple ID non disponible');
+        return null;
+      }
     }
 
     // Si Firebase n'est pas configuré, utiliser le mode local
     if (!isFirebaseReady || !database) {
-      console.log('Mode local activé - Firebase non configuré');
+      console.log('⚠️ Mode local activé - Firebase non configuré');
       const localSession = {
         gameType,
         status: 'ready',
@@ -133,7 +237,7 @@ export function GameProvider({ children }) {
     }
 
     try {
-      const sessionRef = ref(database, `games/${coupleId}/session`);
+      const sessionRef = ref(database, `games/${currentCoupleId}/session`);
       const sessionData = {
         gameType,
         status: 'waiting', // waiting, ready, playing, finished
@@ -150,55 +254,79 @@ export function GameProvider({ children }) {
         answers: {},
       };
 
+      console.log('🎮 Création session pour:', currentCoupleId);
       await set(sessionRef, sessionData);
       setCurrentGame(gameType);
       setWaitingForPartner(true);
+      setPartnerOnline(false);
+      setGameSession(sessionData);
+      setGameData(sessionData);
       
-      // Écouter les changements de session
-      listenToGameSession();
-      
+      console.log('✅ Session créée avec succès');
       return sessionData;
     } catch (error) {
-      console.error('Erreur création session:', error);
+      console.error('❌ Erreur création session:', error);
       return null;
     }
   };
 
   // Rejoindre une session de jeu existante
   const joinGameSession = async (playerName) => {
-    if (!coupleId || !database) return null;
+    // Recharger le coupleId si nécessaire
+    let currentCoupleId = coupleId;
+    if (!currentCoupleId) {
+      const id = await AsyncStorage.getItem('@coupleId');
+      if (id) {
+        currentCoupleId = id;
+        setCoupleId(id);
+      } else {
+        console.log('❌ Couple ID non disponible');
+        return null;
+      }
+    }
+
+    if (!database) {
+      console.log('❌ Firebase non disponible');
+      return null;
+    }
 
     try {
-      const sessionRef = ref(database, `games/${coupleId}/session`);
+      const sessionRef = ref(database, `games/${currentCoupleId}/session`);
       const snapshot = await get(sessionRef);
       
       if (snapshot.exists()) {
         const session = snapshot.val();
+        console.log('🎮 Session trouvée:', session.gameType);
         
         // Ajouter ce joueur à la session
-        const playerRef = ref(database, `games/${coupleId}/session/players/${myPlayerId}`);
+        const playerRef = ref(database, `games/${currentCoupleId}/session/players/${myPlayerId}`);
         await set(playerRef, {
           name: playerName,
           ready: true,
           joinedAt: Date.now(),
         });
+        console.log('✅ Joueur ajouté à la session');
 
         // Mettre à jour le statut si les deux joueurs sont là
         const playersCount = Object.keys(session.players || {}).length + 1;
         if (playersCount >= 2) {
           await update(sessionRef, { status: 'ready' });
+          console.log('✅ Statut mis à jour: ready');
+          setWaitingForPartner(false);
+          setPartnerOnline(true);
         }
 
         setCurrentGame(session.gameType);
-        setWaitingForPartner(false);
-        
-        listenToGameSession();
+        setGameSession(session);
+        setGameData(session);
         
         return session;
+      } else {
+        console.log('❌ Aucune session trouvée');
       }
       return null;
     } catch (error) {
-      console.error('Erreur jointure session:', error);
+      console.error('❌ Erreur jointure session:', error);
       return null;
     }
   };
@@ -217,6 +345,7 @@ export function GameProvider({ children }) {
     const unsubscribe = onValue(sessionRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
+        console.log('🎮 Session mise à jour:', data);
         setGameSession(data);
         setGameData(data);
 
@@ -225,22 +354,28 @@ export function GameProvider({ children }) {
         const playerIds = Object.keys(players);
         const hasPartner = playerIds.length >= 2;
         setPartnerOnline(hasPartner);
-
-        // Si les deux joueurs sont prêts, le jeu peut commencer
-        if (hasPartner && data.status === 'waiting') {
-          update(sessionRef, { status: 'ready' });
-        }
-
         setWaitingForPartner(!hasPartner);
+
+        // Si les deux joueurs sont prêts, mettre à jour le statut
+        if (hasPartner && data.status === 'waiting') {
+          update(sessionRef, { status: 'ready' }).then(() => {
+            console.log('✅ Statut mis à jour: ready');
+          });
+        }
       } else {
+        console.log('❌ Session supprimée');
         setGameSession(null);
         setGameData(null);
         setPartnerOnline(false);
+        setWaitingForPartner(false);
       }
     });
 
-    return () => unsubscribe();
-  }, [coupleId, isFirebaseReady]);
+    return () => {
+      console.log('🔕 Arrêt écoute session');
+      unsubscribe();
+    };
+  }, [coupleId, isFirebaseReady, myPlayerId]);
 
   // Soumettre une réponse
   const submitAnswer = async (questionIndex, answer) => {
@@ -443,9 +578,14 @@ export function GameProvider({ children }) {
     isOnlineMode,
     isConnected,
     
+    // Nouveaux états pour invitations
+    pendingGameInvite,
+    hasActiveSession,
+    
     // Fonctions couple
     getCoupleCode,
     joinCouple,
+    updateCoupleId,
     
     // Fonctions jeu
     createGameSession,

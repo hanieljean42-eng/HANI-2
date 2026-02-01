@@ -51,8 +51,12 @@ export default function LoginScreen({ navigation }) {
             <Text style={styles.backText}>← Retour</Text>
           </TouchableOpacity>
 
-          {/* Logo */}
-          <Text style={styles.logo}>💕</Text>
+          {/* Logo Couple H */}
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoText}>C</Text>
+            <Text style={styles.logoHeart}>💕</Text>
+            <Text style={styles.logoText}>H</Text>
+          </View>
           <Text style={styles.title}>Bon retour !</Text>
           <Text style={styles.subtitle}>Connectez-vous pour retrouver votre espace couple</Text>
 
@@ -133,10 +137,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
   },
-  logo: {
-    fontSize: 80,
-    textAlign: 'center',
+  logoCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    alignSelf: 'center',
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#C44569',
+  },
+  logoHeart: {
+    fontSize: 24,
+    marginHorizontal: 2,
   },
   title: {
     fontSize: 32,

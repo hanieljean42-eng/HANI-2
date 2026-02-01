@@ -34,17 +34,19 @@ const QUICK_MESSAGES = [
 const AVATARS = ['😊', '😍', '🥰', '😘', '🤩', '😎', '🤗', '🦊', '🐰', '🐻', '🦁', '🐼', '🦋', '🌸', '⭐', '💖'];
 
 export default function ProfileScreen() {
-  const { user, couple, partner, logout, updateUser } = useAuth();
+  const { user, couple, partner, logout, updateUser, updateCouple } = useAuth();
   const { loveMeter, memories, bucketList, loveNotes, addLoveNote, addBucketItem, toggleBucketItem, updateLoveMeter } = useData();
   const [activeSection, setActiveSection] = useState('profile');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showBucketModal, setShowBucketModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showEditAnniversaryModal, setShowEditAnniversaryModal] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [newBucketItem, setNewBucketItem] = useState('');
   const [showCoupleCode, setShowCoupleCode] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
+  const [editAnniversary, setEditAnniversary] = useState(couple?.anniversary || '');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   const handleSendNote = async () => {
@@ -117,6 +119,34 @@ export default function ProfileScreen() {
     Alert.alert('✅', 'Profil mis à jour !');
   };
 
+  const handleUpdateAnniversary = async () => {
+    // Valider le format de la date (JJ/MM/AAAA)
+    const dateRegex = /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/;
+    const match = editAnniversary.trim().match(dateRegex);
+    
+    if (!match) {
+      Alert.alert('Erreur', 'Format de date invalide.\nUtilisez le format JJ/MM/AAAA\n\nExemple: 14/02/2024');
+      return;
+    }
+    
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    const year = parseInt(match[3], 10);
+    
+    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > 2100) {
+      Alert.alert('Erreur', 'Date invalide. Vérifiez le jour, le mois et l\'année.');
+      return;
+    }
+    
+    // Formater la date correctement
+    const formattedDate = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+    
+    await updateCouple({ anniversary: formattedDate });
+    setShowEditAnniversaryModal(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert('✅', 'Date d\'anniversaire mise à jour !\n\nLe compteur de jours est maintenant actif 💕');
+  };
+
   const handleSelectAvatar = async (avatar) => {
     await updateUser({ avatar });
     setShowAvatarModal(false);
@@ -127,7 +157,7 @@ export default function ProfileScreen() {
     const code = couple?.code || 'LOVE-XXXXX';
     try {
       await Share.share({
-        message: `Rejoins-moi sur Love App ! 💕\n\nUtilise ce code pour nous connecter : ${code}`,
+        message: `Rejoins-moi sur Couple H ! 💕\n\nUtilise ce code pour nous connecter : ${code}`,
       });
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de partager le code');
@@ -396,6 +426,18 @@ export default function ProfileScreen() {
 
         <TouchableOpacity 
           style={styles.settingItem}
+          onPress={() => {
+            setEditAnniversary(couple?.anniversary || '');
+            setShowEditAnniversaryModal(true);
+          }}
+        >
+          <Text style={styles.settingIcon}>📅</Text>
+          <Text style={styles.settingText}>Date d'anniversaire du couple</Text>
+          <Text style={styles.settingArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.settingItem}
           onPress={handleShareCode}
         >
           <Text style={styles.settingIcon}>📤</Text>
@@ -405,7 +447,15 @@ export default function ProfileScreen() {
 
         <TouchableOpacity 
           style={styles.settingItem}
-          onPress={() => Alert.alert('💕 Love App', 'Version 1.0.0\n\nUne application pour les couples qui s\'aiment !\n\nMerci d\'utiliser Love App ❤️')}
+          onPress={() => Alert.alert(
+            '💕 Couple H',
+            'Version 1.0.0\n\n' +
+            '👨‍💻 Créé par Haniel Henoc\n\n' +
+            'Haniel Henoc est un jeune passionné d\'informatique qui a créé Couple H avec une mission simple : aider les couples à mieux se divertir, renforcer leurs liens et créer des souvenirs inoubliables ensemble.\n\n' +
+            '💡 Cette application est née de l\'envie de proposer aux amoureux un espace privé et ludique pour partager des moments uniques, relever des défis amusants et cultiver leur complicité au quotidien.\n\n' +
+            'Merci d\'utiliser Couple H ! ❤️\n\n' +
+            '📧 Contact : djeble.haniel@gmail.com'
+          )}
         >
           <Text style={styles.settingIcon}>❓</Text>
           <Text style={styles.settingText}>À propos</Text>
@@ -429,7 +479,7 @@ export default function ProfileScreen() {
         <Text style={styles.logoutButtonText}>🚪 Se déconnecter</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>Love App v1.0.0 💕</Text>
+      <Text style={styles.version}>Couple H v1.0.0 - by Haniel Henoc 💕</Text>
     </View>
   );
 
@@ -617,6 +667,48 @@ export default function ProfileScreen() {
             >
               <Text style={styles.cancelButtonText}>Fermer</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Anniversary Modal */}
+      <Modal
+        visible={showEditAnniversaryModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditAnniversaryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>📅 Date d'anniversaire</Text>
+            <Text style={styles.modalSubtitle}>
+              Entrez la date où vous vous êtes mis en couple
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="JJ/MM/AAAA (ex: 14/02/2024)"
+              placeholderTextColor="#999"
+              value={editAnniversary}
+              onChangeText={setEditAnniversary}
+              keyboardType="numbers-and-punctuation"
+            />
+            <Text style={styles.modalHint}>
+              💡 Cette date sera utilisée pour calculer le nombre de jours d'amour affiché sur l'écran d'accueil
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowEditAnniversaryModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={handleUpdateAnniversary}
+              >
+                <Text style={styles.confirmButtonText}>Enregistrer 💕</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -989,6 +1081,21 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    marginTop: -10,
+  },
+  modalHint: {
+    fontSize: 13,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
   modalInput: {
     backgroundColor: '#f5f5f5',

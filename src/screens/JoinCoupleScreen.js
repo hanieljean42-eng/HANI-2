@@ -36,9 +36,11 @@ export default function JoinCoupleScreen() {
 
     if (result.success) {
       setGeneratedCode(result.code);
-      
-      // Auto-join après création
-      await joinCouple(result.code, formData);
+      Alert.alert(
+        '✅ Espace créé !',
+        `Votre code couple est:\n\n${result.code}\n\nPartagez ce code avec votre partenaire pour qu'il/elle puisse vous rejoindre.\n\n📱 Les données seront synchronisées automatiquement !`,
+        [{ text: 'Super !', onPress: () => joinCouple(result.code, formData) }]
+      );
     } else {
       Alert.alert('Erreur', result.error);
     }
@@ -51,8 +53,15 @@ export default function JoinCoupleScreen() {
     }
 
     const result = await joinCouple(coupleCode, formData);
-    if (!result.success) {
-      Alert.alert('Erreur', result.error || 'Code invalide');
+    if (result.success) {
+      if (result.synced) {
+        Alert.alert(
+          '🎉 Connectés !',
+          'Vous êtes maintenant connecté(e) avec votre partenaire !\n\nToutes vos données seront synchronisées en temps réel. 💕'
+        );
+      }
+    } else {
+      Alert.alert('Erreur', result.error || 'Code invalide. Vérifiez que votre partenaire a bien créé l\'espace couple et que vous êtes connecté(e) à Internet.');
     }
   };
 
@@ -145,12 +154,14 @@ export default function JoinCoupleScreen() {
               <Text style={styles.inputIcon}>📅</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Date de votre mise en couple (JJ/MM/AAAA)"
+                placeholder="Ex: 14/02/2024"
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 value={formData.anniversary}
                 onChangeText={(text) => setFormData({ ...formData, anniversary: text })}
+                keyboardType="numbers-and-punctuation"
               />
             </View>
+            <Text style={styles.dateHint}>💡 Entrez la date au format JJ/MM/AAAA</Text>
           </View>
 
           {generatedCode ? (
@@ -222,12 +233,14 @@ export default function JoinCoupleScreen() {
               <Text style={styles.inputIcon}>📅</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Date de votre mise en couple (JJ/MM/AAAA)"
+                placeholder="Ex: 14/02/2024"
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 value={formData.anniversary}
                 onChangeText={(text) => setFormData({ ...formData, anniversary: text })}
+                keyboardType="numbers-and-punctuation"
               />
             </View>
+            <Text style={styles.dateHint}>💡 Entrez la date au format JJ/MM/AAAA</Text>
           </View>
 
           <TouchableOpacity
@@ -348,6 +361,14 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     color: '#fff',
     fontSize: 16,
+  },
+  dateHint: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    marginTop: -5,
+    marginBottom: 15,
+    marginLeft: 10,
+    fontStyle: 'italic',
   },
   codeContainer: {
     backgroundColor: 'rgba(255,255,255,0.2)',

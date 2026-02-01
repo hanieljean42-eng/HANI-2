@@ -14,41 +14,74 @@ import { useData } from '../context/DataContext';
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }) {
-  const { user, couple, partner } = useAuth();
+  const { user, couple, partner, isOnline, isSynced } = useAuth();
   const { loveMeter, challenges, memories } = useData();
   const [daysCount, setDaysCount] = useState(0);
   const [timeTogetherText, setTimeTogetherText] = useState('');
+  const [hasValidDate, setHasValidDate] = useState(false);
 
   useEffect(() => {
-    if (couple?.anniversary) {
-      calculateDaysTogether();
-      const interval = setInterval(calculateDaysTogether, 60000);
-      return () => clearInterval(interval);
-    }
+    calculateDaysTogether();
+    const interval = setInterval(calculateDaysTogether, 60000);
+    return () => clearInterval(interval);
   }, [couple]);
 
   const calculateDaysTogether = () => {
-    if (!couple?.anniversary) return;
-    
-    const parts = couple.anniversary.split('/');
-    if (parts.length === 3) {
-      const anniversaryDate = new Date(parts[2], parts[1] - 1, parts[0]);
-      const now = new Date();
-      const diff = now - anniversaryDate;
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      setDaysCount(days);
-      
-      const years = Math.floor(days / 365);
-      const months = Math.floor((days % 365) / 30);
-      const remainingDays = days % 30;
-      
-      let text = '';
-      if (years > 0) text += `${years} an${years > 1 ? 's' : ''} `;
-      if (months > 0) text += `${months} mois `;
-      if (remainingDays > 0) text += `${remainingDays} jour${remainingDays > 1 ? 's' : ''}`;
-      
-      setTimeTogetherText(text.trim());
+    if (!couple?.anniversary) {
+      setHasValidDate(false);
+      setDaysCount(0);
+      setTimeTogetherText('');
+      return;
     }
+    
+    // Essayer différents formats de date
+    let anniversaryDate = null;
+    const dateStr = couple.anniversary.trim();
+    
+    // Format JJ/MM/AAAA ou JJ-MM-AAAA
+    const parts = dateStr.split(/[\/\-\.]/);
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      
+      // Valider les valeurs
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+        anniversaryDate = new Date(year, month, day);
+      }
+    }
+    
+    if (!anniversaryDate || isNaN(anniversaryDate.getTime())) {
+      setHasValidDate(false);
+      setDaysCount(0);
+      setTimeTogetherText('');
+      return;
+    }
+    
+    setHasValidDate(true);
+    const now = new Date();
+    const diff = now - anniversaryDate;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    // Si la date est dans le futur, afficher 0
+    if (days < 0) {
+      setDaysCount(0);
+      setTimeTogetherText('Votre aventure commence bientôt !');
+      return;
+    }
+    
+    setDaysCount(days);
+    
+    const years = Math.floor(days / 365);
+    const months = Math.floor((days % 365) / 30);
+    const remainingDays = days % 30;
+    
+    let text = '';
+    if (years > 0) text += `${years} an${years > 1 ? 's' : ''} `;
+    if (months > 0) text += `${months} mois `;
+    if (remainingDays > 0 || text === '') text += `${remainingDays} jour${remainingDays > 1 ? 's' : ''}`;
+    
+    setTimeTogetherText(text.trim());
   };
 
   const completedChallenges = challenges.filter(c => c.completed).length;
@@ -66,7 +99,17 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Bonjour {user?.name} 💖</Text>
-            <Text style={styles.coupleName}>{couple?.name || 'Votre Couple'}</Text>
+            <Text style={styles.coupleName}>{couple?.name || 'Couple H'}</Text>
+            {/* Indicateur de synchronisation */}
+            <View style={styles.syncIndicator}>
+              <Text style={styles.syncDot}>{isOnline ? '🟢' : '🔴'}</Text>
+              <Text style={styles.syncText}>
+                {isOnline ? (isSynced ? 'Synchronisé' : 'En ligne') : 'Hors ligne'}
+              </Text>
+              {partner?.name && (
+                <Text style={styles.partnerName}> • avec {partner.name}</Text>
+              )}
+            </View>
           </View>
           <View style={styles.avatarContainer}>
             <Text style={styles.avatar}>{user?.avatar || '😊'}</Text>
@@ -77,10 +120,22 @@ export default function HomeScreen({ navigation }) {
         {/* Days Counter */}
         <View style={styles.counterCard}>
           <Text style={styles.counterEmoji}>💕</Text>
-          <Text style={styles.counterNumber}>{daysCount}</Text>
-          <Text style={styles.counterLabel}>jours d'amour</Text>
-          {timeTogetherText && (
-            <Text style={styles.counterDetail}>{timeTogetherText}</Text>
+          {hasValidDate ? (
+            <>
+              <Text style={styles.counterNumber}>{daysCount}</Text>
+              <Text style={styles.counterLabel}>jours d'amour</Text>
+              {timeTogetherText && (
+                <Text style={styles.counterDetail}>{timeTogetherText}</Text>
+              )}
+            </>
+          ) : (
+            <>
+              <Text style={styles.counterNumber}>∞</Text>
+              <Text style={styles.counterLabel}>jours d'amour</Text>
+              <Text style={styles.counterDetail}>
+                Ajoutez votre date d'anniversaire dans les paramètres !
+              </Text>
+            </>
           )}
         </View>
 
@@ -190,6 +245,24 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  syncDot: {
+    fontSize: 8,
+    marginRight: 5,
+  },
+  syncText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  partnerName: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
   },
   avatarContainer: {
     flexDirection: 'row',

@@ -13,9 +13,13 @@ export default function WelcomeScreen({ navigation }) {
       end={{ x: 1, y: 1 }}
     >
       <View style={styles.content}>
-        {/* Logo/Icône */}
+        {/* Logo Couple H */}
         <View style={styles.logoContainer}>
-          <Text style={styles.logoEmoji}>💕</Text>
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoText}>C</Text>
+            <Text style={styles.logoHeart}>💕</Text>
+            <Text style={styles.logoText}>H</Text>
+          </View>
           <View style={styles.hearts}>
             <Text style={styles.floatingHeart}>❤️</Text>
             <Text style={[styles.floatingHeart, styles.heart2]}>💜</Text>
@@ -24,7 +28,7 @@ export default function WelcomeScreen({ navigation }) {
         </View>
 
         {/* Titre */}
-        <Text style={styles.title}>Love App</Text>
+        <Text style={styles.title}>Couple H</Text>
         <Text style={styles.subtitle}>Votre espace couple privé</Text>
 
         {/* Description */}
@@ -53,7 +57,7 @@ export default function WelcomeScreen({ navigation }) {
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>Fait avec ❤️ pour les amoureux</Text>
+        <Text style={styles.footer}>Créé avec ❤️ par Haniel Henoc</Text>
       </View>
     </LinearGradient>
   );
@@ -72,10 +76,30 @@ const styles = StyleSheet.create({
   logoContainer: {
     position: 'relative',
     marginBottom: 20,
+    alignItems: 'center',
   },
-  logoEmoji: {
-    fontSize: 100,
-    textAlign: 'center',
+  logoCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 15,
+  },
+  logoText: {
+    fontSize: 42,
+    fontWeight: 'bold',
+    color: '#C44569',
+  },
+  logoHeart: {
+    fontSize: 36,
+    marginHorizontal: 2,
   },
   hearts: {
     position: 'absolute',
