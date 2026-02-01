@@ -24,22 +24,23 @@ export default function JoinCoupleScreen() {
   const [generatedCode, setGeneratedCode] = useState('');
 
   const handleCreateCouple = async () => {
-    if (!formData.coupleName || !formData.partnerName) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+    if (!formData.coupleName) {
+      Alert.alert('Erreur', 'Veuillez entrer un nom pour votre couple');
       return;
     }
 
     const result = await createCouple({
       name: formData.coupleName,
       anniversary: formData.anniversary,
+      partnerName: formData.partnerName, // Sauvegarder le nom du partenaire attendu
     });
 
     if (result.success) {
       setGeneratedCode(result.code);
       Alert.alert(
         '✅ Espace créé !',
-        `Votre code couple est:\n\n${result.code}\n\nPartagez ce code avec votre partenaire pour qu'il/elle puisse vous rejoindre.\n\n📱 Les données seront synchronisées automatiquement !`,
-        [{ text: 'Super !', onPress: () => joinCouple(result.code, formData) }]
+        `Votre code couple est:\n\n${result.code}\n\nPartagez ce code avec ${formData.partnerName || 'votre partenaire'} pour qu'il/elle puisse vous rejoindre.\n\n📱 Les données seront synchronisées automatiquement dès que votre partenaire rejoindra !`,
+        [{ text: 'Super !' }]
       );
     } else {
       Alert.alert('Erreur', result.error);
