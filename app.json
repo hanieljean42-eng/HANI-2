@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Couple Game",
+    "name": "Couple Game V4",
     "slug": "couple-h",
-    "version": "3.0.0",
+    "version": "4.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,14 +16,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.couplegame.app2026"
+      "bundleIdentifier": "com.couplegame.version4"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF6B9D"
       },
-      "package": "com.couplegame.app2026"
+      "package": "com.couplegame.version4"
     },
     "web": {
       "favicon": "./assets/favicon.png"
