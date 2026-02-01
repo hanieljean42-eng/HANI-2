@@ -9,14 +9,14 @@ import { getDatabase } from 'firebase/database';
 // 5. Réglez les règles de sécurité sur "test mode" pour commencer
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDf2kl-QrVROEnc1lyLIoo9yb-X6jdESlg",
-  authDomain: "couple-app-ac19e.firebaseapp.com",
-  databaseURL: "https://couple-app-ac19e-default-rtdb.firebaseio.com",
-  projectId: "couple-app-ac19e",
-  storageBucket: "couple-app-ac19e.firebasestorage.app",
-  messagingSenderId: "28681990481",
-  appId: "1:28681990481:web:489c5f351b43fc4cd32370",
-  measurementId: "G-31LZH2V5JW"
+  apiKey: "AIzaSyAPv_oeczlvXMvY_77UgHDuMtYXm6L07XQ",
+  authDomain: "h-couple.firebaseapp.com",
+  databaseURL: "https://h-couple-default-rtdb.firebaseio.com",
+  projectId: "h-couple",
+  storageBucket: "h-couple.firebasestorage.app",
+  messagingSenderId: "692477466695",
+  appId: "1:692477466695:web:4a588a7a7a4ae0ba92b962",
+  measurementId: "G-ZG0BXRWMTC"
 };
 
 // Initialiser Firebase
