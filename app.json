@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Couple H",
+    "name": "Couple Game",
     "slug": "couple-h",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,14 +16,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.loveapp.couple"
+      "bundleIdentifier": "com.couplegame.app2026"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF6B9D"
       },
-      "package": "com.loveapp.couple"
+      "package": "com.couplegame.app2026"
     },
     "web": {
       "favicon": "./assets/favicon.png"
