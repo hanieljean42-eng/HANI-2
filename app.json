@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Couple Game V5",
-    "slug": "couple-h",
-    "version": "5.0.0",
+    "name": "Love App 2026",
+    "slug": "loveapp2026",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,26 +16,26 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.couplegame.version4"
+      "bundleIdentifier": "com.loveapp.couple2026"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF6B9D"
       },
-      "package": "com.couplegame.version4"
+      "package": "com.loveapp.couple2026"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "extra": {
-      "eas": {
-        "projectId": "dc4f0955-2522-4ade-abaa-ecff9f38534d"
-      }
-    },
-    "owner": "haniel1952",
     "plugins": [
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b4856e88-6753-4d5e-9ec9-2f9bbaaa76ec"
+      }
+    },
+    "owner": "haniel1952"
   }
 }
