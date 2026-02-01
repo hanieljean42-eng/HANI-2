@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Couple Game V4",
+    "name": "Couple Game V5",
     "slug": "couple-h",
-    "version": "4.0.0",
+    "version": "5.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

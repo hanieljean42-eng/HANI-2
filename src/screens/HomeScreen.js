@@ -91,6 +91,10 @@ export default function HomeScreen({ navigation }) {
       colors={['#FF6B9D', '#C44569', '#8B5CF6']}
       style={styles.container}
     >
+      {/* BANDEAU VERSION 5.0.0 */}
+      <View style={styles.versionBanner}>
+        <Text style={styles.versionText}>🎉 VERSION 5.0.0 - NOUVELLE INSTALLATION 🎉</Text>
+      </View>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -224,6 +228,19 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  versionBanner: {
+    backgroundColor: '#FF0000',
+    padding: 15,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: '#FFFFFF',
+  },
+  versionText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
   container: {
     flex: 1,
   },
