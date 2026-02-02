@@ -13,12 +13,12 @@ export default function WelcomeScreen({ navigation }) {
       end={{ x: 1, y: 1 }}
     >
       <View style={styles.content}>
-        {/* Logo Couple H */}
+        {/* Logo HANI 2 */}
         <View style={styles.logoContainer}>
           <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>C</Text>
-            <Text style={styles.logoHeart}>💕</Text>
             <Text style={styles.logoText}>H</Text>
+            <Text style={styles.logoHeart}>💕</Text>
+            <Text style={styles.logoText}>2</Text>
           </View>
           <View style={styles.hearts}>
             <Text style={styles.floatingHeart}>❤️</Text>
@@ -28,7 +28,7 @@ export default function WelcomeScreen({ navigation }) {
         </View>
 
         {/* Titre */}
-        <Text style={styles.title}>Couple H</Text>
+        <Text style={styles.title}>HANI 2</Text>
         <Text style={styles.subtitle}>Votre espace couple privé</Text>
 
         {/* Description */}

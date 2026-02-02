@@ -28,9 +28,14 @@ export default function RegisterScreen({ navigation }) {
   const [showAvatars, setShowAvatars] = useState(false);
 
   const handleRegister = async () => {
-    if (!formData.name || !formData.email || !formData.password) {
+    if (!formData.name || !formData.password) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
       return;
+    }
+    
+    // Construire la date de naissance si fournie
+    if (formData.birthDay && formData.birthMonth && formData.birthYear) {
+      formData.birthday = `${formData.birthDay.padStart(2, '0')}/${formData.birthMonth.padStart(2, '0')}/${formData.birthYear}`;
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -70,7 +75,7 @@ export default function RegisterScreen({ navigation }) {
           </TouchableOpacity>
 
           <Text style={styles.title}>Créer un compte</Text>
-          <Text style={styles.subtitle}>Rejoignez Couple H 💕</Text>
+          <Text style={styles.subtitle}>Rejoignez HANI 2 💕</Text>
 
           {/* Avatar Selector */}
           <TouchableOpacity
@@ -114,31 +119,49 @@ export default function RegisterScreen({ navigation }) {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputIcon}>📧</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor="rgba(255,255,255,0.6)"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={formData.email}
-                onChangeText={(text) => setFormData({ ...formData, email: text })}
-              />
+            <View style={styles.birthdaySection}>
+              <Text style={styles.birthdayLabel}>🎂 Date de naissance</Text>
+              <View style={styles.birthdayRow}>
+                <TextInput
+                  style={styles.birthdayInput}
+                  placeholder="JJ"
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                  value={formData.birthDay || ''}
+                  onChangeText={(text) => {
+                    const num = text.replace(/[^0-9]/g, '').slice(0, 2);
+                    setFormData({ ...formData, birthDay: num });
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <Text style={styles.birthdaySeparator}>/</Text>
+                <TextInput
+                  style={styles.birthdayInput}
+                  placeholder="MM"
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                  value={formData.birthMonth || ''}
+                  onChangeText={(text) => {
+                    const num = text.replace(/[^0-9]/g, '').slice(0, 2);
+                    setFormData({ ...formData, birthMonth: num });
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <Text style={styles.birthdaySeparator}>/</Text>
+                <TextInput
+                  style={[styles.birthdayInput, styles.birthdayYear]}
+                  placeholder="AAAA"
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                  value={formData.birthYear || ''}
+                  onChangeText={(text) => {
+                    const num = text.replace(/[^0-9]/g, '').slice(0, 4);
+                    setFormData({ ...formData, birthYear: num });
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={4}
+                />
+              </View>
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputIcon}>🎂</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Date de naissance (ex: 15/06/2000)"
-                placeholderTextColor="rgba(255,255,255,0.6)"
-                value={formData.birthday}
-                onChangeText={(text) => setFormData({ ...formData, birthday: text })}
-                keyboardType="numbers-and-punctuation"
-              />
-            </View>
-            <Text style={styles.inputHint}>💡 Format : JJ/MM/AAAA</Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputIcon}>🔒</Text>
@@ -298,5 +321,37 @@ const styles = StyleSheet.create({
   loginLinkBold: {
     fontWeight: 'bold',
     color: '#fff',
+  },
+  birthdaySection: {
+    marginBottom: 15,
+  },
+  birthdayLabel: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    marginBottom: 10,
+    marginLeft: 5,
+  },
+  birthdayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  birthdayInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 15,
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    width: 70,
+  },
+  birthdaySeparator: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 20,
+    marginHorizontal: 5,
+  },
+  birthdayYear: {
+    width: 100,
   },
 });

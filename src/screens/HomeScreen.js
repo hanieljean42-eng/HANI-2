@@ -91,33 +91,43 @@ export default function HomeScreen({ navigation }) {
       colors={['#FF6B9D', '#C44569', '#8B5CF6']}
       style={styles.container}
     >
-      {/* BANDEAU VERSION 5.0.0 */}
-      <View style={styles.versionBanner}>
-        <Text style={styles.versionText}>🎉 VERSION 5.0.0 - NOUVELLE INSTALLATION 🎉</Text>
-      </View>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Message de bienvenue */}
+        <View style={styles.welcomeCard}>
+          <Text style={styles.welcomeEmoji}>💑</Text>
+          <Text style={styles.welcomeText}>Bienvenue dans votre espace couple !</Text>
+          <Text style={styles.welcomeSubtext}>Cultivez votre amour chaque jour ✨</Text>
+        </View>
+
         {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Bonjour {user?.name} 💖</Text>
-            <Text style={styles.coupleName}>{couple?.name || 'Couple H'}</Text>
-            {/* Indicateur de synchronisation */}
-            <View style={styles.syncIndicator}>
-              <Text style={styles.syncDot}>{isOnline ? '🟢' : '🔴'}</Text>
-              <Text style={styles.syncText}>
-                {isOnline ? (isSynced ? 'Synchronisé' : 'En ligne') : 'Hors ligne'}
-              </Text>
-              {partner?.name && (
+            {/* Nom du couple - seulement si partenaire a rejoint */}
+            {partner?.name ? (
+              <Text style={styles.coupleName}>{couple?.name || 'Notre Couple'}</Text>
+            ) : (
+              <Text style={styles.waitingText}>En attente de votre partenaire...</Text>
+            )}
+            {/* Indicateur de synchronisation - seulement si partenaire a rejoint */}
+            {partner?.name && (
+              <View style={styles.syncIndicator}>
+                <Text style={styles.syncDot}>{isOnline ? '🟢' : '🔴'}</Text>
+                <Text style={styles.syncText}>
+                  {isOnline ? (isSynced ? 'Synchronisé' : 'En ligne') : 'Hors ligne'}
+                </Text>
                 <Text style={styles.partnerName}> • avec {partner.name}</Text>
-              )}
-            </View>
+              </View>
+            )}
           </View>
           <View style={styles.avatarContainer}>
             <Text style={styles.avatar}>{user?.avatar || '😊'}</Text>
-            <Text style={styles.partnerAvatar}>{partner?.avatar || '💕'}</Text>
+            {partner?.name && (
+              <Text style={styles.partnerAvatar}>{partner?.avatar || '💕'}</Text>
+            )}
           </View>
         </View>
 
@@ -228,18 +238,30 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  versionBanner: {
-    backgroundColor: '#FF0000',
-    padding: 15,
+  welcomeCard: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    padding: 20,
     alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: '#FFFFFF',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  versionText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  welcomeEmoji: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  welcomeText: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#fff',
     textAlign: 'center',
+  },
+  welcomeSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginTop: 5,
   },
   container: {
     flex: 1,
@@ -262,6 +284,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  waitingText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+    fontStyle: 'italic',
+    marginTop: 5,
   },
   syncIndicator: {
     flexDirection: 'row',

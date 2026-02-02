@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Love App 2026",
-    "slug": "loveapp2026",
+    "name": "HANI 2",
+    "slug": "hani2",
     "version": "5.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,14 +16,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.loveapp.couple2026"
+      "bundleIdentifier": "com.hani2.couple"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF6B9D"
       },
-      "package": "com.loveapp.couple2026"
+      "package": "com.hani2.couple"
     },
     "web": {
       "favicon": "./assets/favicon.png"

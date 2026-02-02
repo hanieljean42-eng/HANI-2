@@ -152,7 +152,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (name, password) => {
     try {
       // Chercher dans la liste des utilisateurs enregistrés
       const storedUsers = await AsyncStorage.getItem('@registeredUsers');
@@ -160,7 +160,7 @@ export function AuthProvider({ children }) {
       if (storedUsers) {
         const users = JSON.parse(storedUsers);
         const foundUser = users.find(u => 
-          u.email.toLowerCase() === email.toLowerCase() && u.password === password
+          u.name.toLowerCase() === name.toLowerCase() && u.password === password
         );
         
         if (foundUser) {
@@ -189,7 +189,7 @@ export function AuthProvider({ children }) {
         }
       }
       
-      return { success: false, error: 'Email ou mot de passe incorrect' };
+      return { success: false, error: 'Nom ou mot de passe incorrect' };
     } catch (error) {
       return { success: false, error: error.message };
     }

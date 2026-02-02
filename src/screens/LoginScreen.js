@@ -14,18 +14,18 @@ import { useAuth } from '../context/AuthContext';
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!name || !password) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
 
     setLoading(true);
-    const result = await login(email, password);
+    const result = await login(name, password);
     setLoading(false);
 
     if (!result.success) {
@@ -51,11 +51,11 @@ export default function LoginScreen({ navigation }) {
             <Text style={styles.backText}>← Retour</Text>
           </TouchableOpacity>
 
-          {/* Logo Couple H */}
+          {/* Logo HANI 2 */}
           <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>C</Text>
-            <Text style={styles.logoHeart}>💕</Text>
             <Text style={styles.logoText}>H</Text>
+            <Text style={styles.logoHeart}>💕</Text>
+            <Text style={styles.logoText}>2</Text>
           </View>
           <Text style={styles.title}>Bon retour !</Text>
           <Text style={styles.subtitle}>Connectez-vous pour retrouver votre espace couple</Text>
@@ -63,15 +63,14 @@ export default function LoginScreen({ navigation }) {
           {/* Form */}
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputIcon}>📧</Text>
+              <Text style={styles.inputIcon}>�</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder="Ton prénom"
                 placeholderTextColor="rgba(255,255,255,0.6)"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onChangeText={setEmail}
+                autoCapitalize="words"
+                value={name}
+                onChangeText={setName}
               />
             </View>
 

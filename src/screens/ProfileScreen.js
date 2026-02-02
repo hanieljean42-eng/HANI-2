@@ -229,7 +229,7 @@ export default function ProfileScreen() {
     const code = couple?.code || 'LOVE-XXXXX';
     try {
       await Share.share({
-        message: `Rejoins-moi sur Couple H ! 💕\n\nUtilise ce code pour nous connecter : ${code}`,
+        message: `Rejoins-moi sur HANI 2 ! 💕\n\nUtilise ce code pour nous connecter : ${code}`,
       });
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de partager le code');
@@ -306,16 +306,21 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Partner Card */}
-      <View style={styles.partnerCard}>
-        <View style={styles.partnerHeader}>
-          <Text style={styles.partnerAvatar}>{partner?.avatar || '💕'}</Text>
-          <View>
-            <Text style={styles.partnerLabel}>Mon/Ma Partenaire</Text>
-            <Text style={styles.partnerName}>{partner?.name || couple?.name}</Text>
+      {/* Partner Card - seulement si partenaire a rejoint */}
+      {partner?.name ? (
+        <View style={styles.partnerCard}>
+          <View style={styles.partnerHeader}>
+            <Text style={styles.partnerAvatar}>{partner?.avatar || '💕'}</Text>
+            <Text style={styles.partnerNameOnly}>{partner.name}</Text>
           </View>
         </View>
-      </View>
+      ) : (
+        <View style={styles.waitingPartnerCard}>
+          <Text style={styles.waitingEmoji}>⏳</Text>
+          <Text style={styles.waitingTitle}>En attente de votre partenaire</Text>
+          <Text style={styles.waitingDesc}>Partagez votre code couple pour qu'il/elle vous rejoigne</Text>
+        </View>
+      )}
 
       {/* Couple Info */}
       <View style={styles.coupleInfo}>
@@ -542,12 +547,12 @@ export default function ProfileScreen() {
         <TouchableOpacity 
           style={styles.settingItem}
           onPress={() => Alert.alert(
-            '💕 Couple H',
-            'Version 1.0.0\n\n' +
+            '💕 HANI 2',
+            'Version 5.0.0\n\n' +
             '👨‍💻 Créé par Haniel Henoc\n\n' +
-            'Haniel Henoc est un jeune passionné d\'informatique qui a créé Couple H avec une mission simple : aider les couples à mieux se divertir, renforcer leurs liens et créer des souvenirs inoubliables ensemble.\n\n' +
+            'Haniel Henoc est un jeune passionné d\'informatique qui a créé HANI 2 avec une mission simple : aider les couples à mieux se divertir, renforcer leurs liens et créer des souvenirs inoubliables ensemble.\n\n' +
             '💡 Cette application est née de l\'envie de proposer aux amoureux un espace privé et ludique pour partager des moments uniques, relever des défis amusants et cultiver leur complicité au quotidien.\n\n' +
-            'Merci d\'utiliser Couple H ! ❤️\n\n' +
+            'Merci d\'utiliser HANI 2 ! ❤️\n\n' +
             '📧 Contact : djeble.haniel@gmail.com'
           )}
         >
@@ -573,7 +578,7 @@ export default function ProfileScreen() {
         <Text style={styles.logoutButtonText}>🚪 Se déconnecter</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>Couple H v1.0.0 - by Haniel Henoc 💕</Text>
+      <Text style={styles.version}>HANI 2 v5.0.0 - by Haniel Henoc 💕</Text>
     </View>
   );
 
@@ -1012,6 +1017,31 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 15,
   },
+  waitingPartnerCard: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    padding: 25,
+    marginBottom: 15,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    borderStyle: 'dashed',
+  },
+  waitingEmoji: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  waitingTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  waitingDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
   partnerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1028,6 +1058,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  partnerNameOnly: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    paddingVertical: 5,
   },
   coupleInfo: {
     marginBottom: 25,

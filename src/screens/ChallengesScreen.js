@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useData } from '../context/DataContext';
 import { useGame } from '../context/GameContext';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -172,6 +173,7 @@ const WOULD_YOU_RATHER = [
 
 export default function ChallengesScreen() {
   const { loveMeter, updateLoveMeter } = useData();
+  const { partner } = useAuth();
   const { 
     coupleId,
     gameSession, 
@@ -211,15 +213,8 @@ export default function ChallengesScreen() {
   
   const pulseAnim = useState(new Animated.Value(1))[0];
 
-  // ========== ALERTE VERSION - TEST ==========
-  useEffect(() => {
-    Alert.alert(
-      '🚀 VERSION 5.0.0',
-      'NOUVELLE VERSION !\n\n✅ Boutons CRÉER / REJOINDRE partie\n✅ Status de connexion\n✅ Session active visible\n✅ 40 Vérités + 39 Actions (18+)\n✅ Jeux à distance Firebase',
-      [{ text: 'Super !', style: 'default' }]
-    );
-  }, []);
-  // ============================================
+  // Message de bienvenue au premier lancement (désactivé)
+  // L'alerte de version a été supprimée pour une meilleure expérience utilisateur
 
   useEffect(() => {
     const randomIndex = Math.floor(Math.random() * DAILY_CHALLENGES.length);
@@ -1022,13 +1017,23 @@ export default function ChallengesScreen() {
         <Text style={styles.sectionTitle}>🎮 Jeux à Deux (En Temps Réel)</Text>
         
         {/* ========== SECTION JEUX À DISTANCE ========== */}
+        {!partner?.name ? (
+          /* Message si partenaire n'a pas rejoint */
+          <View style={styles.noPartnerCard}>
+            <Text style={styles.noPartnerEmoji}>💑</Text>
+            <Text style={styles.noPartnerTitle}>En attente de votre partenaire</Text>
+            <Text style={styles.noPartnerDesc}>
+              Les jeux à distance seront disponibles une fois que votre partenaire aura rejoint votre espace couple avec le code.
+            </Text>
+          </View>
+        ) : (
         <View style={styles.distanceGamingSection}>
           {/* Status de connexion */}
           <View style={styles.connectionStatusBar}>
             <View style={styles.connectionDot}>
               <View style={[styles.dot, coupleId ? styles.dotOnline : styles.dotOffline]} />
               <Text style={styles.connectionText}>
-                {coupleId ? '🟢 Connecté' : '🔴 Non connecté'}
+                {coupleId ? `🟢 Connecté avec ${partner.name}` : '🔴 Non connecté'}
               </Text>
             </View>
             <Text style={styles.coupleIdText}>
@@ -1158,8 +1163,11 @@ export default function ChallengesScreen() {
             </Text>
           </View>
         </View>
+        )}
         {/* ========== FIN SECTION JEUX À DISTANCE ========== */}
 
+        {partner?.name && (
+        <>
         <Text style={styles.gamesSectionHint}>📱 Ou choisissez directement un jeu :</Text>
         <ScrollView 
           horizontal 
@@ -1186,6 +1194,8 @@ export default function ChallengesScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+        </>
+        )}
 
         {/* More Daily Challenges */}
         <Text style={styles.sectionTitle}>📋 Plus de Défis</Text>
@@ -2289,6 +2299,34 @@ const styles = StyleSheet.create({
   resultsExitText: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
+  },
+  // ========== CARTE PAS DE PARTENAIRE ==========
+  noPartnerCard: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    padding: 25,
+    marginBottom: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    borderStyle: 'dashed',
+  },
+  noPartnerEmoji: {
+    fontSize: 50,
+    marginBottom: 15,
+  },
+  noPartnerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  noPartnerDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   // ========== STYLES JEUX À DISTANCE ==========
   distanceGamingSection: {
