@@ -260,6 +260,16 @@ export default function GamesScreen() {
   const [gameMode, setGameMode] = useState(null); // 'local' ou 'online'
   const [showInviteModal, setShowInviteModal] = useState(false);
 
+  // ========== ALERTE VERSION - TEST ==========
+  useEffect(() => {
+    Alert.alert(
+      '🚀 VERSION 3.0.0',
+      'Cette popup confirme que vous avez la NOUVELLE version !\n\n✅ Jeux à distance\n✅ 35 Vérités + 39 Actions\n✅ Contenu adulte',
+      [{ text: 'Super !', style: 'default' }]
+    );
+  }, []);
+  // ============================================
+
   // Synchroniser le coupleId avec le couple de l'AuthContext
   useEffect(() => {
     if (couple?.id && couple.id !== coupleId) {
