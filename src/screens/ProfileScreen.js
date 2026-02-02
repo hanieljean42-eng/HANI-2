@@ -12,9 +12,11 @@ import {
   Switch,
   Share,
   Clipboard,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
@@ -42,12 +44,82 @@ export default function ProfileScreen() {
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showEditAnniversaryModal, setShowEditAnniversaryModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showCouplePhotoModal, setShowCouplePhotoModal] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [newBucketItem, setNewBucketItem] = useState('');
   const [showCoupleCode, setShowCoupleCode] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
   const [editAnniversary, setEditAnniversary] = useState(couple?.anniversary || '');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  // Fonction pour choisir une photo de profil
+  const pickProfilePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await updateUser({ profilePhoto: result.assets[0].uri });
+        setShowPhotoModal(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('✅', 'Photo de profil mise à jour !');
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');
+    }
+  };
+
+  // Fonction pour prendre une photo de profil
+  const takeProfilePhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await updateUser({ profilePhoto: result.assets[0].uri });
+        setShowPhotoModal(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('✅', 'Photo de profil mise à jour !');
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'accéder à la caméra');
+    }
+  };
+
+  // Fonction pour choisir une photo du couple
+  const pickCouplePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await updateCouple({ couplePhoto: result.assets[0].uri });
+        setShowCouplePhotoModal(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('✅', 'Photo de couple mise à jour !');
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');
+    }
+  };
 
   const handleSendNote = async () => {
     if (!newNote.trim()) return;
@@ -191,12 +263,34 @@ export default function ProfileScreen() {
 
   const renderProfile = () => (
     <View style={styles.section}>
+      {/* Photo du couple en haut */}
+      <TouchableOpacity 
+        style={styles.couplePhotoContainer}
+        onPress={() => setShowCouplePhotoModal(true)}
+      >
+        {couple?.couplePhoto ? (
+          <Image source={{ uri: couple.couplePhoto }} style={styles.couplePhoto} />
+        ) : (
+          <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.couplePhotoPlaceholder}>
+            <Text style={styles.couplePhotoPlaceholderText}>💑</Text>
+            <Text style={styles.couplePhotoAddText}>Ajouter une photo de couple</Text>
+          </LinearGradient>
+        )}
+        <View style={styles.editCouplePhotoBadge}>
+          <Text style={styles.editPhotoBadgeText}>📷</Text>
+        </View>
+      </TouchableOpacity>
+
       {/* User Card */}
       <View style={styles.userCard}>
-        <TouchableOpacity onPress={() => setShowAvatarModal(true)}>
-          <Text style={styles.userAvatar}>{user?.avatar || '😊'}</Text>
+        <TouchableOpacity onPress={() => setShowPhotoModal(true)}>
+          {user?.profilePhoto ? (
+            <Image source={{ uri: user.profilePhoto }} style={styles.userPhoto} />
+          ) : (
+            <Text style={styles.userAvatar}>{user?.avatar || '😊'}</Text>
+          )}
           <View style={styles.editAvatarBadge}>
-            <Text style={styles.editAvatarText}>✏️</Text>
+            <Text style={styles.editAvatarText}>📷</Text>
           </View>
         </TouchableOpacity>
         <Text style={styles.userName}>{user?.name}</Text>
@@ -709,6 +803,129 @@ export default function ProfileScreen() {
                 <Text style={styles.confirmButtonText}>Enregistrer 💕</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Photo de profil Modal */}
+      <Modal
+        visible={showPhotoModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPhotoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>📷 Photo de profil</Text>
+            <Text style={styles.modalSubtitle}>
+              Choisissez votre photo de profil
+            </Text>
+            
+            {/* Aperçu actuel */}
+            <View style={styles.photoPreviewContainer}>
+              {user?.profilePhoto ? (
+                <Image source={{ uri: user.profilePhoto }} style={styles.photoPreview} />
+              ) : (
+                <View style={styles.photoPreviewPlaceholder}>
+                  <Text style={styles.photoPreviewEmoji}>{user?.avatar || '😊'}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.photoOptionsRow}>
+              <TouchableOpacity style={styles.photoOptionButton} onPress={pickProfilePhoto}>
+                <Text style={styles.photoOptionIcon}>🖼️</Text>
+                <Text style={styles.photoOptionText}>Galerie</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.photoOptionButton} onPress={takeProfilePhoto}>
+                <Text style={styles.photoOptionIcon}>📸</Text>
+                <Text style={styles.photoOptionText}>Caméra</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.photoOptionButton} 
+                onPress={() => {
+                  setShowPhotoModal(false);
+                  setShowAvatarModal(true);
+                }}
+              >
+                <Text style={styles.photoOptionIcon}>😊</Text>
+                <Text style={styles.photoOptionText}>Emoji</Text>
+              </TouchableOpacity>
+            </View>
+
+            {user?.profilePhoto && (
+              <TouchableOpacity 
+                style={styles.removePhotoButton}
+                onPress={async () => {
+                  await updateUser({ profilePhoto: null });
+                  setShowPhotoModal(false);
+                  Alert.alert('✅', 'Photo supprimée');
+                }}
+              >
+                <Text style={styles.removePhotoText}>🗑️ Supprimer la photo</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.cancelButtonFull}
+              onPress={() => setShowPhotoModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Photo du couple Modal */}
+      <Modal
+        visible={showCouplePhotoModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCouplePhotoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>💑 Photo de couple</Text>
+            <Text style={styles.modalSubtitle}>
+              Ajoutez une photo de vous deux !
+            </Text>
+            
+            {/* Aperçu actuel */}
+            <View style={styles.couplePhotoPreviewContainer}>
+              {couple?.couplePhoto ? (
+                <Image source={{ uri: couple.couplePhoto }} style={styles.couplePhotoPreview} />
+              ) : (
+                <View style={styles.couplePhotoPreviewPlaceholder}>
+                  <Text style={styles.couplePhotoPreviewEmoji}>💑</Text>
+                  <Text style={styles.couplePhotoPreviewText}>Aucune photo</Text>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.pickCouplePhotoButton} onPress={pickCouplePhoto}>
+              <Text style={styles.pickCouplePhotoIcon}>🖼️</Text>
+              <Text style={styles.pickCouplePhotoText}>Choisir depuis la galerie</Text>
+            </TouchableOpacity>
+
+            {couple?.couplePhoto && (
+              <TouchableOpacity 
+                style={styles.removePhotoButton}
+                onPress={async () => {
+                  await updateCouple({ couplePhoto: null });
+                  setShowCouplePhotoModal(false);
+                  Alert.alert('✅', 'Photo supprimée');
+                }}
+              >
+                <Text style={styles.removePhotoText}>🗑️ Supprimer la photo</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.cancelButtonFull}
+              onPress={() => setShowCouplePhotoModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Fermer</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1250,5 +1467,156 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ddd',
     alignItems: 'center',
+  },
+  // Styles pour photo de couple
+  couplePhotoContainer: {
+    width: '100%',
+    height: 150,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  couplePhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  couplePhotoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  couplePhotoPlaceholderText: {
+    fontSize: 50,
+  },
+  couplePhotoAddText: {
+    color: '#fff',
+    marginTop: 5,
+    fontSize: 12,
+  },
+  editCouplePhotoBadge: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  editPhotoBadgeText: {
+    fontSize: 20,
+  },
+  // Styles pour photo de profil
+  userPhoto: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  photoPreviewContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  photoPreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: '#C44569',
+  },
+  photoPreviewPlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#C44569',
+  },
+  photoPreviewEmoji: {
+    fontSize: 60,
+  },
+  photoOptionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 20,
+  },
+  photoOptionButton: {
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 15,
+    minWidth: 80,
+  },
+  photoOptionIcon: {
+    fontSize: 30,
+    marginBottom: 5,
+  },
+  photoOptionText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  removePhotoButton: {
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 20,
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  removePhotoText: {
+    color: '#EF4444',
+    fontWeight: '600',
+  },
+  // Photo de couple modal
+  couplePhotoPreviewContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  couplePhotoPreview: {
+    width: '100%',
+    height: 150,
+    borderRadius: 15,
+  },
+  couplePhotoPreviewPlaceholder: {
+    width: '100%',
+    height: 150,
+    borderRadius: 15,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  couplePhotoPreviewEmoji: {
+    fontSize: 50,
+  },
+  couplePhotoPreviewText: {
+    color: '#999',
+    marginTop: 5,
+  },
+  pickCouplePhotoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#C44569',
+    padding: 15,
+    borderRadius: 25,
+    marginVertical: 10,
+  },
+  pickCouplePhotoIcon: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  pickCouplePhotoText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

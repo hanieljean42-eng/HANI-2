@@ -22,7 +22,7 @@ import { useData } from '../context/DataContext';
 const { width, height } = Dimensions.get('window');
 
 export default function MemoriesScreen() {
-  const { memories, addMemory, timeCapsules, addTimeCapsule } = useData();
+  const { memories, addMemory, timeCapsules, addTimeCapsule, deleteMemory } = useData();
   const [activeTab, setActiveTab] = useState('gallery');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -584,12 +584,39 @@ export default function MemoriesScreen() {
                     <Text style={styles.viewNote}>{selectedMemory.note}</Text>
                   )}
                 </View>
-                <TouchableOpacity
-                  style={styles.closeViewButton}
-                  onPress={() => setShowViewModal(false)}
-                >
-                  <Text style={styles.closeViewButtonText}>Fermer 💕</Text>
-                </TouchableOpacity>
+                <View style={styles.viewButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.deleteViewButton}
+                    onPress={() => {
+                      Alert.alert(
+                        '🗑️ Supprimer',
+                        'Voulez-vous vraiment supprimer ce souvenir ?',
+                        [
+                          { text: 'Annuler', style: 'cancel' },
+                          {
+                            text: 'Supprimer',
+                            style: 'destructive',
+                            onPress: async () => {
+                              await deleteMemory(selectedMemory.id);
+                              setShowViewModal(false);
+                              setSelectedMemory(null);
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                              Alert.alert('✅', 'Souvenir supprimé');
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.deleteViewButtonText}>🗑️ Supprimer</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.closeViewButton}
+                    onPress={() => setShowViewModal(false)}
+                  >
+                    <Text style={styles.closeViewButtonText}>Fermer 💕</Text>
+                  </TouchableOpacity>
+                </View>
               </>
             )}
           </View>
@@ -1071,13 +1098,30 @@ const styles = StyleSheet.create({
   },
   closeViewButton: {
     backgroundColor: '#C44569',
-    margin: 15,
-    marginTop: 0,
+    flex: 1,
     padding: 15,
     borderRadius: 25,
     alignItems: 'center',
   },
   closeViewButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  viewButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    margin: 15,
+    marginTop: 0,
+  },
+  deleteViewButton: {
+    backgroundColor: '#EF4444',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  deleteViewButtonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
