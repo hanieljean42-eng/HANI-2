@@ -58,24 +58,91 @@ const QUIZ_QUESTIONS = [
 
 const TRUTH_OR_DARE = {
   truths: [
-    "Quel a été ton premier sentiment quand tu m'as vu(e) ?",
-    "Quelle est la chose la plus romantique que tu aies faite en secret ?",
-    "Y a-t-il quelque chose que tu n'oses pas me dire ?",
+    // Vérités Classiques Couple
     "Qu'est-ce que tu préfères le plus chez moi ?",
-    "Quel moment ensemble voudrais-tu revivre ?",
-    "As-tu déjà eu peur de me perdre ?",
-    "Comment imagines-tu notre vie dans 10 ans ?",
-    "Quel surnom secret tu me donnes dans ta tête ?",
+    "Quel moment avec moi t'a le plus marqué ?",
+    "C'est quoi ton souvenir le plus drôle de nous deux ?",
+    "Qu'est-ce que je fais qui te fait craquer direct ?",
+    "Si tu pouvais changer une chose dans notre couple, ce serait quoi ?",
+    "Tu te souviens de notre premier moment gênant ?",
+    "Quelle est ta plus grande peur dans notre relation ?",
+    "Qu'est-ce que tu veux qu'on fasse ensemble cette année ?",
+    "Quel surnom tu préfères que je te donne ?",
+    "Tu es fier/fière de quoi chez moi ?",
+    "Quel est ton moment préféré quand on est seuls ?",
+    "Qu'est-ce que je fais mieux que tout le monde pour toi ?",
+    "Tu préfères qu'on sorte ou qu'on reste à la maison ensemble ?",
+    "Quel est ton rêve de couple idéal ?",
+    "Qu'est-ce que tu aimerais que je fasse plus souvent ?",
+    "Quel est le plus beau compliment que tu m'as jamais fait ?",
+    "Si on partait demain, tu voudrais aller où avec moi ?",
+    "Qu'est-ce qui te rassure le plus chez moi ?",
+    "Tu te vois avec moi dans 5 ans ?",
+    "Quelle est la chose la plus romantique que je pourrais faire ?",
+    "C'est quoi ton moment préféré quand je suis jaloux/jalouse ?",
+    "Tu préfères qu'on se taquine ou qu'on soit sérieux ?",
+    "Quelle habitude chez moi te fait sourire ?",
+    "Tu aimerais qu'on vive où ensemble ?",
+    "Quel est ton plus grand objectif avec moi ?",
+    // Vérités Intimes (18+)
+    "Quel est ton fantasme secret avec moi ?",
+    "Qu'est-ce qui t'excite le plus chez moi ?",
+    "Quel est l'endroit le plus fou où tu voudrais qu'on soit intimes ?",
+    "Quelle tenue tu voudrais me voir porter ?",
+    "Quel est ton meilleur souvenir intime avec moi ?",
+    "Qu'est-ce que tu n'as jamais osé me demander au lit ?",
+    "Quel moment de la journée tu préfères pour les câlins intimes ?",
+    "Tu préfères la tendresse ou la passion ?",
+    "Qu'est-ce qui te fait le plus d'effet quand je te touche ?",
+    "Quel est le geste intime que tu préfères que je fasse ?",
+    "As-tu déjà pensé à moi de façon coquine au travail/en cours ?",
+    "Quel est ton point sensible préféré ?",
+    "Tu préfères les préliminaires longs ou aller droit au but ?",
+    "Quelle est ta position préférée avec moi ?",
+    "Qu'est-ce qui t'a le plus surpris(e) chez moi intimement ?",
   ],
   dares: [
-    "Envoie-moi une photo de toi faisant une grimace",
-    "Chante-moi une chanson d'amour en vocal",
-    "Écris-moi un petit poème maintenant",
-    "Dis-moi 5 choses que tu aimes chez moi",
-    "Envoie-moi un cœur fait avec tes mains",
-    "Fais une déclaration d'amour en 30 secondes",
-    "Envoie-moi la dernière photo de ta galerie",
-    "Imite-moi dans un vocal de 30 secondes",
+    // Actions Classiques Couple
+    "Fais-moi un câlin de 20 secondes.",
+    "Dis-moi 3 choses que tu aimes chez moi.",
+    "Fais-moi un bisou sur le front.",
+    "Danse avec moi 30 secondes, même sans musique.",
+    "Fais une déclaration d'amour version drôle.",
+    "Donne-moi un surnom nouveau maintenant.",
+    "Écris 'je t'aime' d'une manière originale.",
+    "Fais-moi rire tout de suite.",
+    "Regarde-moi dans les yeux 15 secondes sans parler.",
+    "Fais un compliment très précis sur moi.",
+    "Fais semblant de me demander en mariage (juste pour rire).",
+    "Prends une photo de nous deux maintenant.",
+    "Choisis notre prochaine sortie en amoureux.",
+    "Fais-moi une promesse mignonne.",
+    "Fais une imitation de moi.",
+    "Dis-moi une phrase romantique comme dans un film.",
+    "Donne-moi un bisou surprise.",
+    "Chuchote-moi un truc gentil.",
+    "Fais un petit massage des épaules 1 minute.",
+    "Mets une chanson qui nous représente.",
+    "Fais une mini scène 'couple de film' pendant 20 sec.",
+    "Dis-moi ton meilleur souvenir de nous en 1 phrase.",
+    "Fais un bisou sur la main.",
+    "Dis 'je suis chanceux(se) de t'avoir' avec sérieux.",
+    // Actions Intimes (18+)
+    "Fais-moi un bisou dans le cou.",
+    "Murmure-moi quelque chose de coquin à l'oreille.",
+    "Enlève un vêtement au choix.",
+    "Fais-moi un massage sensuel de 2 minutes.",
+    "Embrasse-moi comme si c'était notre premier baiser.",
+    "Caresse-moi le visage pendant 30 secondes.",
+    "Dis-moi ce que tu vas me faire ce soir.",
+    "Fais-moi un slow très collé-serré.",
+    "Embrasse une partie de mon corps de ton choix.",
+    "Déshabille-moi du regard pendant 20 secondes.",
+    "Montre-moi comment tu aimes être embrassé(e).",
+    "Fais-moi un câlin très serré en me caressant le dos.",
+    "Dis-moi ton plus grand désir avec moi ce soir.",
+    "Mordille-moi légèrement l'oreille.",
+    "Guide ma main où tu veux.",
   ],
 };
 
@@ -141,6 +208,16 @@ export default function ChallengesScreen() {
   const [truthOrDare, setTruthOrDare] = useState(null);
   
   const pulseAnim = useState(new Animated.Value(1))[0];
+
+  // ========== ALERTE VERSION - TEST ==========
+  useEffect(() => {
+    Alert.alert(
+      '🚀 VERSION 4.0.0 - DÉFIS',
+      'NOUVELLE VERSION !\n\n✅ 40 Vérités (dont 15 intimes)\n✅ 39 Actions (dont 15 intimes)\n✅ Jeux à distance Firebase',
+      [{ text: 'Super !', style: 'default' }]
+    );
+  }, []);
+  // ============================================
 
   useEffect(() => {
     const randomIndex = Math.floor(Math.random() * DAILY_CHALLENGES.length);
