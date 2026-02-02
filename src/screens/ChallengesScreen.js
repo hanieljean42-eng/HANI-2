@@ -189,6 +189,8 @@ export default function ChallengesScreen() {
     getPartnerInfo,
     getMyInfo,
     listenToGameSession,
+    pendingGameInvite,
+    hasActiveSession,
   } = useGame();
 
   const [dailyChallenge, setDailyChallenge] = useState(null);
@@ -212,8 +214,8 @@ export default function ChallengesScreen() {
   // ========== ALERTE VERSION - TEST ==========
   useEffect(() => {
     Alert.alert(
-      '🚀 VERSION 4.0.0 - DÉFIS',
-      'NOUVELLE VERSION !\n\n✅ 40 Vérités (dont 15 intimes)\n✅ 39 Actions (dont 15 intimes)\n✅ Jeux à distance Firebase',
+      '🚀 VERSION 5.0.0',
+      'NOUVELLE VERSION !\n\n✅ Boutons CRÉER / REJOINDRE partie\n✅ Status de connexion\n✅ Session active visible\n✅ 40 Vérités + 39 Actions (18+)\n✅ Jeux à distance Firebase',
       [{ text: 'Super !', style: 'default' }]
     );
   }, []);
@@ -1018,7 +1020,147 @@ export default function ChallengesScreen() {
 
         {/* Couple Games */}
         <Text style={styles.sectionTitle}>🎮 Jeux à Deux (En Temps Réel)</Text>
-        <Text style={styles.gamesSectionHint}>📱 Jouez ensemble à distance, chacun sur son téléphone !</Text>
+        
+        {/* ========== SECTION JEUX À DISTANCE ========== */}
+        <View style={styles.distanceGamingSection}>
+          {/* Status de connexion */}
+          <View style={styles.connectionStatusBar}>
+            <View style={styles.connectionDot}>
+              <View style={[styles.dot, coupleId ? styles.dotOnline : styles.dotOffline]} />
+              <Text style={styles.connectionText}>
+                {coupleId ? '🟢 Connecté' : '🔴 Non connecté'}
+              </Text>
+            </View>
+            <Text style={styles.coupleIdText}>
+              Code: {coupleId ? coupleId.slice(-6).toUpperCase() : '------'}
+            </Text>
+          </View>
+
+          {/* Bannière d'invitation si partenaire attend */}
+          {pendingGameInvite && (
+            <TouchableOpacity 
+              style={styles.inviteBanner}
+              onPress={() => {
+                startGame(pendingGameInvite.gameType);
+              }}
+            >
+              <LinearGradient colors={['#10B981', '#059669']} style={styles.inviteBannerGradient}>
+                <Text style={styles.inviteBannerEmoji}>🎉</Text>
+                <View style={styles.inviteBannerContent}>
+                  <Text style={styles.inviteBannerTitle}>
+                    {pendingGameInvite.creatorName || 'Ton/Ta partenaire'} t'attend !
+                  </Text>
+                  <Text style={styles.inviteBannerDesc}>
+                    Appuie ici pour rejoindre la partie
+                  </Text>
+                </View>
+                <Text style={styles.inviteBannerArrow}>→</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {/* Session active */}
+          {hasActiveSession && gameSession && !pendingGameInvite && (
+            <View style={styles.activeSessionBar}>
+              <Text style={styles.activeSessionIcon}>⚡</Text>
+              <Text style={styles.activeSessionText}>
+                Partie en cours: {gameSession.gameType}
+              </Text>
+              <TouchableOpacity 
+                style={styles.quitSessionBtn}
+                onPress={async () => {
+                  Alert.alert(
+                    'Quitter la partie ?',
+                    'Voulez-vous vraiment quitter cette partie ?',
+                    [
+                      { text: 'Non', style: 'cancel' },
+                      { 
+                        text: 'Oui, quitter', 
+                        style: 'destructive',
+                        onPress: async () => {
+                          await endGameSession();
+                          Alert.alert('✅', 'Partie terminée');
+                        }
+                      }
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.quitSessionText}>Quitter</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Boutons principaux CRÉER / REJOINDRE */}
+          <View style={styles.mainActionsRow}>
+            {/* Bouton CRÉER une partie */}
+            <TouchableOpacity 
+              style={styles.mainActionBtn}
+              onPress={() => {
+                Alert.alert(
+                  '🎮 Créer une partie',
+                  'Choisissez un jeu pour créer une partie que votre partenaire pourra rejoindre.',
+                  [
+                    { text: '🧠 Quiz', onPress: () => startGame('quiz') },
+                    { text: '🎲 Action/Vérité', onPress: () => startGame('truthordare') },
+                    { text: '🏆 Qui est le plus...', onPress: () => startGame('whoismore') },
+                    { text: '🤔 Tu préfères...', onPress: () => startGame('wouldyourather') },
+                    { text: 'Annuler', style: 'cancel' },
+                  ]
+                );
+              }}
+            >
+              <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.mainActionGradient}>
+                <Text style={styles.mainActionIcon}>🎮</Text>
+                <Text style={styles.mainActionTitle}>CRÉER</Text>
+                <Text style={styles.mainActionSubtitle}>une partie</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Bouton REJOINDRE une partie */}
+            <TouchableOpacity 
+              style={styles.mainActionBtn}
+              onPress={async () => {
+                const session = await checkActiveSession();
+                if (session) {
+                  Alert.alert(
+                    '🎉 Partie trouvée !',
+                    `Une partie de ${session.gameType} vous attend !`,
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      { text: 'Rejoindre !', onPress: () => startGame(session.gameType) },
+                    ]
+                  );
+                } else {
+                  Alert.alert(
+                    '😕 Aucune partie',
+                    'Votre partenaire n\'a pas encore créé de partie.\n\nDemandez-lui de cliquer sur "CRÉER une partie" d\'abord !',
+                    [{ text: 'OK' }]
+                  );
+                }
+              }}
+            >
+              <LinearGradient colors={['#10B981', '#059669']} style={styles.mainActionGradient}>
+                <Text style={styles.mainActionIcon}>🤝</Text>
+                <Text style={styles.mainActionTitle}>REJOINDRE</Text>
+                <Text style={styles.mainActionSubtitle}>une partie</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* Instructions */}
+          <View style={styles.instructionsBox}>
+            <Text style={styles.instructionsTitle}>📱 Comment jouer à distance ?</Text>
+            <Text style={styles.instructionsText}>
+              1️⃣ L'un de vous crée une partie{'\n'}
+              2️⃣ L'autre clique sur "REJOINDRE"{'\n'}
+              3️⃣ Jouez ensemble en temps réel ! 💕
+            </Text>
+          </View>
+        </View>
+        {/* ========== FIN SECTION JEUX À DISTANCE ========== */}
+
+        <Text style={styles.gamesSectionHint}>📱 Ou choisissez directement un jeu :</Text>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -2147,5 +2289,154 @@ const styles = StyleSheet.create({
   resultsExitText: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
+  },
+  // ========== STYLES JEUX À DISTANCE ==========
+  distanceGamingSection: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    padding: 15,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  connectionStatusBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
+  },
+  connectionDot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  dotOnline: {
+    backgroundColor: '#10B981',
+  },
+  dotOffline: {
+    backgroundColor: '#EF4444',
+  },
+  connectionText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  coupleIdText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+  inviteBanner: {
+    marginBottom: 15,
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  inviteBannerGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+  },
+  inviteBannerEmoji: {
+    fontSize: 30,
+    marginRight: 12,
+  },
+  inviteBannerContent: {
+    flex: 1,
+  },
+  inviteBannerTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  inviteBannerDesc: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+  },
+  inviteBannerArrow: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  activeSessionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 15,
+  },
+  activeSessionIcon: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  activeSessionText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  quitSessionBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.8)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  quitSessionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  mainActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  mainActionBtn: {
+    flex: 1,
+    marginHorizontal: 5,
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  mainActionGradient: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 10,
+  },
+  mainActionIcon: {
+    fontSize: 35,
+    marginBottom: 8,
+  },
+  mainActionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  mainActionSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+  },
+  instructionsBox: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    padding: 15,
+  },
+  instructionsTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  instructionsText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    lineHeight: 22,
   },
 });

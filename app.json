@@ -2,7 +2,7 @@
   "expo": {
     "name": "Love App 2026",
     "slug": "loveapp2026",
-    "version": "4.0.0",
+    "version": "5.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -31,11 +31,11 @@
     "plugins": [
       "expo-asset"
     ],
+    "owner": "ddaq",
     "extra": {
       "eas": {
-        "projectId": "b4856e88-6753-4d5e-9ec9-2f9bbaaa76ec"
+        "projectId": "87b635c7-a516-44d2-a9b4-8783d45c6cf4"
       }
-    },
-    "owner": "haniel1952"
+    }
   }
 }
