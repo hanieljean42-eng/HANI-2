@@ -603,9 +603,9 @@ export default function GamesScreen() {
       )}
 
       {/* VERSION BANNER - TRÈS VISIBLE */}
-      <View style={{backgroundColor: '#FF0000', padding: 15, borderRadius: 10, marginBottom: 15, alignItems: 'center'}}>
-        <Text style={{color: '#FFFFFF', fontSize: 20, fontWeight: 'bold'}}>🚀 VERSION 5.0.0 🚀</Text>
-        <Text style={{color: '#FFFFFF', fontSize: 14}}>Nouvelles fonctionnalités activées !</Text>
+      <View style={{backgroundColor: '#00AA00', padding: 15, borderRadius: 10, marginBottom: 15, alignItems: 'center'}}>
+        <Text style={{color: '#FFFFFF', fontSize: 20, fontWeight: 'bold'}}>✅ JEUX V2.0.0 ✅</Text>
+        <Text style={{color: '#FFFFFF', fontSize: 14}}>Jeux à distance activés !</Text>
       </View>
 
       {/* Indicateur de connexion Firebase */}
