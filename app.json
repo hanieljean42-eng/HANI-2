@@ -16,21 +16,45 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.loveapp.couple2026"
+      "bundleIdentifier": "com.loveapp.couple2026",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserNotificationsUsageDescription": "Nous utilisons les notifications pour vous alerter des messages de votre partenaire."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF6B9D"
       },
-      "package": "com.loveapp.couple2026"
+      "package": "com.loveapp.couple2026",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FF6B9D",
+          "sounds": [],
+          "mode": "production"
+        }
+      ]
     ],
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#FF6B9D",
+      "androidMode": "default",
+      "androidCollapsedTitle": "HANI 2 💕"
+    },
     "owner": "ddaq",
     "extra": {
       "eas": {

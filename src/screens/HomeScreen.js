@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,27 +6,30 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  AppState,
+  Alert,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useNotifyPartner } from '../hooks/useNotifyPartner';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }) {
+  const { theme } = useTheme();
   const { user, couple, partner, isOnline, isSynced } = useAuth();
   const { loveMeter, challenges, memories } = useData();
+  const { notifyMissYou, notifyLoveNote, sendCustomNotification } = useNotifyPartner();
   const [daysCount, setDaysCount] = useState(0);
   const [timeTogetherText, setTimeTogetherText] = useState('');
   const [hasValidDate, setHasValidDate] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date().toDateString());
 
-  useEffect(() => {
-    calculateDaysTogether();
-    const interval = setInterval(calculateDaysTogether, 60000);
-    return () => clearInterval(interval);
-  }, [couple]);
-
-  const calculateDaysTogether = () => {
+  // Fonction pour calculer les jours ensemble
+  const calculateDaysTogether = useCallback(() => {
     if (!couple?.anniversary) {
       setHasValidDate(false);
       setDaysCount(0);
@@ -59,9 +62,16 @@ export default function HomeScreen({ navigation }) {
     }
     
     setHasValidDate(true);
+    
+    // Utiliser la date système actuelle de l'appareil
     const now = new Date();
-    const diff = now - anniversaryDate;
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    // Calculer la différence en jours (basé sur les dates, pas les timestamps)
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfAnniversary = new Date(anniversaryDate.getFullYear(), anniversaryDate.getMonth(), anniversaryDate.getDate());
+    
+    const diffTime = startOfToday.getTime() - startOfAnniversary.getTime();
+    const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     
     // Si la date est dans le futur, afficher 0
     if (days < 0) {
@@ -82,13 +92,87 @@ export default function HomeScreen({ navigation }) {
     if (remainingDays > 0 || text === '') text += `${remainingDays} jour${remainingDays > 1 ? 's' : ''}`;
     
     setTimeTogetherText(text.trim());
-  };
+    
+    // Mettre à jour la date courante pour détecter le changement de jour
+    setCurrentDate(now.toDateString());
+  }, [couple?.anniversary]);
+
+  // Effet principal - calcul initial et intervalle
+  useEffect(() => {
+    calculateDaysTogether();
+    
+    // Vérifier toutes les minutes si on a changé de jour
+    const interval = setInterval(() => {
+      const newDate = new Date().toDateString();
+      if (newDate !== currentDate) {
+        console.log('📅 Nouveau jour détecté ! Mise à jour du compteur...');
+        calculateDaysTogether();
+      }
+    }, 60000); // Vérifier toutes les minutes
+    
+    return () => clearInterval(interval);
+  }, [couple?.anniversary, currentDate, calculateDaysTogether]);
+
+  // Écouter quand l'app revient au premier plan pour recalculer
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        console.log('📱 App revenue au premier plan - recalcul des jours');
+        calculateDaysTogether();
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [calculateDaysTogether]);
+
+  // Recalculer quand la date anniversaire change
+  useEffect(() => {
+    calculateDaysTogether();
+  }, [couple?.anniversary, calculateDaysTogether]);
 
   const completedChallenges = challenges.filter(c => c.completed).length;
 
+  // "Ce jour-là" - Souvenirs d'il y a un an
+  const onThisDay = useMemo(() => {
+    if (!memories || memories.length === 0) return [];
+    
+    const today = new Date();
+    const currentDay = today.getDate();
+    const currentMonth = today.getMonth() + 1;
+    
+    return memories.filter(memory => {
+      if (!memory.date) return false;
+      const parts = memory.date.split('/');
+      if (parts.length !== 3) return false;
+      
+      const memDay = parseInt(parts[0], 10);
+      const memMonth = parseInt(parts[1], 10);
+      const memYear = parseInt(parts[2], 10);
+      
+      // Même jour et mois, mais pas cette année
+      return memDay === currentDay && 
+             memMonth === currentMonth && 
+             memYear < today.getFullYear();
+    }).sort((a, b) => {
+      // Trier par année la plus récente d'abord
+      const yearA = parseInt(a.date.split('/')[2], 10);
+      const yearB = parseInt(b.date.split('/')[2], 10);
+      return yearB - yearA;
+    });
+  }, [memories]);
+
+  const getYearsAgo = (dateStr) => {
+    const year = parseInt(dateStr.split('/')[2], 10);
+    const yearsAgo = new Date().getFullYear() - year;
+    if (yearsAgo === 1) return 'Il y a 1 an';
+    return `Il y a ${yearsAgo} ans`;
+  };
+
   return (
     <LinearGradient
-      colors={['#FF6B9D', '#C44569', '#8B5CF6']}
+      colors={theme.primary}
       style={styles.container}
     >
       <ScrollView 
@@ -157,11 +241,11 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.loveMeterCard}>
           <View style={styles.loveMeterHeader}>
             <Text style={styles.loveMeterTitle}>💗 Love Meter</Text>
-            <Text style={styles.loveMeterValue}>{loveMeter}%</Text>
+            <Text style={[styles.loveMeterValue, { color: theme.accent }]}>{loveMeter}%</Text>
           </View>
           <View style={styles.loveMeterBar}>
             <LinearGradient
-              colors={['#FF6B9D', '#C44569']}
+              colors={theme.primary}
               style={[styles.loveMeterFill, { width: `${loveMeter}%` }]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -171,7 +255,7 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>Actions rapides</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Actions rapides</Text>
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={styles.actionCard}
@@ -199,10 +283,21 @@ export default function HomeScreen({ navigation }) {
 
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => {}}
+            onPress={async () => {
+              await notifyMissYou();
+              Alert.alert('💕', `Un petit message d'amour a été envoyé à ${partner?.name || 'ton partenaire'} !`);
+            }}
           >
-            <Text style={styles.actionIcon}>💌</Text>
-            <Text style={styles.actionLabel}>Love Note</Text>
+            <Text style={styles.actionIcon}>💭</Text>
+            <Text style={styles.actionLabel}>Tu me manques</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('Widgets')}
+          >
+            <Text style={styles.actionIcon}>📱</Text>
+            <Text style={styles.actionLabel}>Widgets</Text>
           </TouchableOpacity>
         </View>
 
@@ -222,6 +317,46 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.statLabel}>Jours</Text>
           </View>
         </View>
+
+        {/* "Ce jour-là" - Souvenirs d'il y a un an */}
+        {onThisDay.length > 0 && (
+          <View style={styles.onThisDaySection}>
+            <View style={styles.onThisDayHeader}>
+              <Text style={styles.onThisDayIcon}>📅</Text>
+              <Text style={styles.onThisDayTitle}>Ce jour-là...</Text>
+            </View>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.onThisDayScroll}
+            >
+              {onThisDay.map((memory, index) => (
+                <TouchableOpacity 
+                  key={`otd-${memory.id || index}`}
+                  style={styles.onThisDayCard}
+                  onPress={() => navigation.navigate('Memories')}
+                >
+                  {memory.photos && memory.photos.length > 0 ? (
+                    <Image 
+                      source={{ uri: memory.photos[0] }} 
+                      style={styles.onThisDayImage}
+                    />
+                  ) : (
+                    <View style={styles.onThisDayImagePlaceholder}>
+                      <Text style={styles.onThisDayEmoji}>{memory.emoji || '💕'}</Text>
+                    </View>
+                  )}
+                  <View style={styles.onThisDayOverlay}>
+                    <Text style={styles.onThisDayYears}>{getYearsAgo(memory.date)}</Text>
+                    <Text style={styles.onThisDayText} numberOfLines={2}>
+                      {memory.title || memory.description}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Daily Quote */}
         <View style={styles.quoteCard}>
@@ -370,7 +505,6 @@ const styles = StyleSheet.create({
   loveMeterValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#C44569',
   },
   loveMeterBar: {
     height: 12,
@@ -384,7 +518,7 @@ const styles = StyleSheet.create({
   },
   loveMeterHint: {
     fontSize: 12,
-    color: '#999',
+    color: '#666',
     marginTop: 8,
     textAlign: 'center',
   },
@@ -459,5 +593,68 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     lineHeight: 24,
+  },
+  // "Ce jour-là" styles
+  onThisDaySection: {
+    marginBottom: 25,
+  },
+  onThisDayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  onThisDayIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  onThisDayTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  onThisDayScroll: {
+    marginHorizontal: -10,
+    paddingHorizontal: 10,
+  },
+  onThisDayCard: {
+    width: 180,
+    height: 220,
+    marginRight: 15,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  onThisDayImage: {
+    width: '100%',
+    height: '100%',
+  },
+  onThisDayImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  onThisDayEmoji: {
+    fontSize: 60,
+  },
+  onThisDayOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 15,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  onThisDayYears: {
+    fontSize: 12,
+    color: '#FFD700',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  onThisDayText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '600',
   },
 });

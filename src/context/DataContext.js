@@ -20,6 +20,8 @@ export function DataProvider({ children }) {
   const [bucketList, setBucketList] = useState([]);
   const [loveNotes, setLoveNotes] = useState([]);
   const [timeCapsules, setTimeCapsules] = useState([]);
+  const [scheduledLetters, setScheduledLetters] = useState([]);
+  const [sharedDiary, setSharedDiary] = useState([]);
   const [isDataSynced, setIsDataSynced] = useState(false);
 
   // Référence pour éviter les boucles
@@ -55,32 +57,44 @@ export function DataProvider({ children }) {
         console.log('📥 Données couple reçues de Firebase');
         
         // Mettre à jour tous les états avec les données Firebase
-        if (data.memories) {
-          const memoriesArray = Object.values(data.memories);
+        if (data.memories && typeof data.memories === 'object') {
+          const memoriesArray = Object.values(data.memories).filter(Boolean);
           setMemories(memoriesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
           AsyncStorage.setItem('@memories', JSON.stringify(memoriesArray));
         }
         
-        if (data.bucketList) {
-          const bucketArray = Object.values(data.bucketList);
+        if (data.bucketList && typeof data.bucketList === 'object') {
+          const bucketArray = Object.values(data.bucketList).filter(Boolean);
           setBucketList(bucketArray);
           AsyncStorage.setItem('@bucketList', JSON.stringify(bucketArray));
         }
         
-        if (data.loveNotes) {
-          const notesArray = Object.values(data.loveNotes);
+        if (data.loveNotes && typeof data.loveNotes === 'object') {
+          const notesArray = Object.values(data.loveNotes).filter(Boolean);
           setLoveNotes(notesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
           AsyncStorage.setItem('@loveNotes', JSON.stringify(notesArray));
         }
         
-        if (data.timeCapsules) {
-          const capsulesArray = Object.values(data.timeCapsules);
+        if (data.timeCapsules && typeof data.timeCapsules === 'object') {
+          const capsulesArray = Object.values(data.timeCapsules).filter(Boolean);
           setTimeCapsules(capsulesArray);
           AsyncStorage.setItem('@timeCapsules', JSON.stringify(capsulesArray));
         }
         
-        if (data.challenges) {
-          const challengesArray = Object.values(data.challenges);
+        if (data.scheduledLetters && typeof data.scheduledLetters === 'object') {
+          const lettersArray = Object.values(data.scheduledLetters).filter(Boolean);
+          setScheduledLetters(lettersArray.sort((a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate)));
+          AsyncStorage.setItem('@scheduledLetters', JSON.stringify(lettersArray));
+        }
+        
+        if (data.sharedDiary && typeof data.sharedDiary === 'object') {
+          const diaryArray = Object.values(data.sharedDiary).filter(Boolean);
+          setSharedDiary(diaryArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+          AsyncStorage.setItem('@sharedDiary', JSON.stringify(diaryArray));
+        }
+        
+        if (data.challenges && typeof data.challenges === 'object') {
+          const challengesArray = Object.values(data.challenges).filter(Boolean);
           setChallenges(challengesArray);
           AsyncStorage.setItem('@challenges', JSON.stringify(challengesArray));
         }
@@ -113,21 +127,28 @@ export function DataProvider({ children }) {
     try {
       const keys = [
         '@memories', '@challenges', '@quizScores', '@loveMeter',
-        '@bucketList', '@loveNotes', '@timeCapsules'
+        '@bucketList', '@loveNotes', '@timeCapsules', '@scheduledLetters', '@sharedDiary'
       ];
       const results = await AsyncStorage.multiGet(keys);
       
       results.forEach(([key, value]) => {
         if (value) {
-          const data = JSON.parse(value);
-          switch(key) {
-            case '@memories': setMemories(data); break;
-            case '@challenges': setChallenges(data); break;
-            case '@quizScores': setQuizScores(data); break;
-            case '@loveMeter': setLoveMeter(data); break;
-            case '@bucketList': setBucketList(data); break;
-            case '@loveNotes': setLoveNotes(data); break;
-            case '@timeCapsules': setTimeCapsules(data); break;
+          try {
+            const data = JSON.parse(value);
+            if (!data) return;
+            switch(key) {
+              case '@memories': if (Array.isArray(data)) setMemories(data); break;
+              case '@challenges': if (Array.isArray(data)) setChallenges(data); break;
+              case '@quizScores': setQuizScores(data); break;
+              case '@loveMeter': setLoveMeter(data); break;
+              case '@bucketList': if (Array.isArray(data)) setBucketList(data); break;
+              case '@loveNotes': if (Array.isArray(data)) setLoveNotes(data); break;
+              case '@timeCapsules': if (Array.isArray(data)) setTimeCapsules(data); break;
+              case '@scheduledLetters': if (Array.isArray(data)) setScheduledLetters(data); break;
+              case '@sharedDiary': if (Array.isArray(data)) setSharedDiary(data); break;
+            }
+          } catch (parseError) {
+            console.error(`Erreur parsing ${key}:`, parseError);
           }
         }
       });
@@ -180,6 +201,34 @@ export function DataProvider({ children }) {
     }
   };
 
+  // Modifier un souvenir
+  const updateMemory = async (memoryId, updates) => {
+    const updated = memories.map(m => 
+      m.id === memoryId ? { 
+        ...m, 
+        ...updates, 
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.name
+      } : m
+    );
+    setMemories(updated);
+    await AsyncStorage.setItem('@memories', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    const updatedMemory = updated.find(m => m.id === memoryId);
+    if (updatedMemory && couple?.id && isConfigured && database) {
+      try {
+        const memoryRef = ref(database, `couples/${couple.id}/data/memories/${memoryId}`);
+        await set(memoryRef, updatedMemory);
+        console.log('✅ Souvenir modifié');
+      } catch (e) {
+        console.log('⚠️ Erreur update souvenir:', e.message);
+      }
+    }
+    
+    return updatedMemory;
+  };
+
   // Challenges - avec sync Firebase
   const completeChallenge = async (challengeId) => {
     const updated = challenges.map(c => 
@@ -212,8 +261,9 @@ export function DataProvider({ children }) {
     const newChallenge = {
       id: Date.now().toString(),
       ...challenge,
-      completed: false,
+      completed: true,
       createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
       addedBy: user?.name
     };
     
@@ -232,6 +282,52 @@ export function DataProvider({ children }) {
     }
     
     return newChallenge;
+  };
+
+  // Modifier un défi
+  const updateChallenge = async (challengeId, updates) => {
+    const updated = challenges.map(c => 
+      c.id === challengeId ? { 
+        ...c, 
+        ...updates, 
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.name
+      } : c
+    );
+    setChallenges(updated);
+    await AsyncStorage.setItem('@challenges', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    const updatedChallenge = updated.find(c => c.id === challengeId);
+    if (updatedChallenge && couple?.id && isConfigured && database) {
+      try {
+        const challengeRef = ref(database, `couples/${couple.id}/data/challenges/${challengeId}`);
+        await set(challengeRef, updatedChallenge);
+        console.log('✅ Défi modifié');
+      } catch (e) {
+        console.log('⚠️ Erreur update défi:', e.message);
+      }
+    }
+    
+    return updatedChallenge;
+  };
+
+  // Supprimer un défi
+  const deleteChallenge = async (challengeId) => {
+    const updated = challenges.filter(c => c.id !== challengeId);
+    setChallenges(updated);
+    await AsyncStorage.setItem('@challenges', JSON.stringify(updated));
+    
+    // Supprimer sur Firebase
+    if (couple?.id && isConfigured && database) {
+      try {
+        const challengeRef = ref(database, `couples/${couple.id}/data/challenges/${challengeId}`);
+        await set(challengeRef, null);
+        console.log('✅ Défi supprimé');
+      } catch (e) {
+        console.log('⚠️ Erreur suppression défi:', e.message);
+      }
+    }
   };
 
   // Love Meter - avec sync Firebase
@@ -324,6 +420,34 @@ export function DataProvider({ children }) {
     }
   };
 
+  // Modifier un item de bucket list
+  const updateBucketItem = async (itemId, updates) => {
+    const updated = bucketList.map(item => 
+      item.id === itemId ? { 
+        ...item, 
+        ...updates, 
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.name
+      } : item
+    );
+    setBucketList(updated);
+    await AsyncStorage.setItem('@bucketList', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    const updatedItem = updated.find(i => i.id === itemId);
+    if (updatedItem && couple?.id && isConfigured && database) {
+      try {
+        const itemRef = ref(database, `couples/${couple.id}/data/bucketList/${itemId}`);
+        await set(itemRef, updatedItem);
+        console.log('✅ Bucket item modifié');
+      } catch (e) {
+        console.log('⚠️ Erreur update bucket:', e.message);
+      }
+    }
+    
+    return updatedItem;
+  };
+
   // Love Notes - avec sync Firebase
   const addLoveNote = async (note) => {
     const newNote = { 
@@ -368,6 +492,33 @@ export function DataProvider({ children }) {
     }
   };
 
+  // Modifier une love note
+  const updateLoveNote = async (noteId, updates) => {
+    const updated = loveNotes.map(n => 
+      n.id === noteId ? { 
+        ...n, 
+        ...updates, 
+        updatedAt: new Date().toISOString()
+      } : n
+    );
+    setLoveNotes(updated);
+    await AsyncStorage.setItem('@loveNotes', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    const updatedNote = updated.find(n => n.id === noteId);
+    if (updatedNote && couple?.id && isConfigured && database) {
+      try {
+        const noteRef = ref(database, `couples/${couple.id}/data/loveNotes/${noteId}`);
+        await set(noteRef, updatedNote);
+        console.log('✅ Note modifiée');
+      } catch (e) {
+        console.log('⚠️ Erreur update note:', e.message);
+      }
+    }
+    
+    return updatedNote;
+  };
+
   // Time Capsules - avec sync Firebase
   const addTimeCapsule = async (capsule) => {
     const newCapsule = { 
@@ -394,6 +545,228 @@ export function DataProvider({ children }) {
     }
     
     return newCapsule;
+  };
+
+  // Supprimer une capsule temporelle
+  const deleteTimeCapsule = async (capsuleId) => {
+    const updated = timeCapsules.filter(c => c.id !== capsuleId);
+    setTimeCapsules(updated);
+    await AsyncStorage.setItem('@timeCapsules', JSON.stringify(updated));
+    
+    // Supprimer de Firebase
+    if (couple?.id && isConfigured && database) {
+      try {
+        const capsuleRef = ref(database, `couples/${couple.id}/data/timeCapsules/${capsuleId}`);
+        await set(capsuleRef, null);
+        console.log('✅ Capsule supprimée de Firebase');
+      } catch (e) {
+        console.log('⚠️ Erreur suppression capsule:', e.message);
+      }
+    }
+  };
+
+  // Modifier une capsule temporelle
+  const updateTimeCapsule = async (capsuleId, updates) => {
+    const updated = timeCapsules.map(c => 
+      c.id === capsuleId ? { 
+        ...c, 
+        ...updates, 
+        updatedAt: new Date().toISOString()
+      } : c
+    );
+    setTimeCapsules(updated);
+    await AsyncStorage.setItem('@timeCapsules', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    const updatedCapsule = updated.find(c => c.id === capsuleId);
+    if (updatedCapsule && couple?.id && isConfigured && database) {
+      try {
+        const capsuleRef = ref(database, `couples/${couple.id}/data/timeCapsules/${capsuleId}`);
+        await set(capsuleRef, updatedCapsule);
+        console.log('✅ Capsule modifiée');
+      } catch (e) {
+        console.log('⚠️ Erreur update capsule:', e.message);
+      }
+    }
+    
+    return updatedCapsule;
+  };
+
+  // ===== LETTRES D'AMOUR PROGRAMMÉES =====
+  const addScheduledLetter = async (letter) => {
+    const newLetter = {
+      id: Date.now().toString(),
+      ...letter,
+      createdAt: new Date().toISOString(),
+      from: user?.name || 'Anonyme',
+      fromId: user?.id,
+      isDelivered: false,
+      isRead: false,
+    };
+    
+    const updated = [...scheduledLetters, newLetter];
+    setScheduledLetters(updated);
+    await AsyncStorage.setItem('@scheduledLetters', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    if (couple?.id && isConfigured && database) {
+      try {
+        const letterRef = ref(database, `couples/${couple.id}/data/scheduledLetters/${newLetter.id}`);
+        await set(letterRef, newLetter);
+        console.log('✅ Lettre programmée synchronisée');
+      } catch (e) {
+        console.log('⚠️ Erreur sync lettre:', e.message);
+      }
+    }
+    
+    return newLetter;
+  };
+
+  const markLetterAsRead = async (letterId) => {
+    const updated = scheduledLetters.map(l => 
+      l.id === letterId ? { ...l, isRead: true } : l
+    );
+    setScheduledLetters(updated);
+    await AsyncStorage.setItem('@scheduledLetters', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    if (couple?.id && isConfigured && database) {
+      try {
+        const letterRef = ref(database, `couples/${couple.id}/data/scheduledLetters/${letterId}/isRead`);
+        await set(letterRef, true);
+      } catch (e) {
+        console.log('⚠️ Erreur update lettre:', e.message);
+      }
+    }
+  };
+
+  const deleteScheduledLetter = async (letterId) => {
+    const updated = scheduledLetters.filter(l => l.id !== letterId);
+    setScheduledLetters(updated);
+    await AsyncStorage.setItem('@scheduledLetters', JSON.stringify(updated));
+    
+    // Supprimer de Firebase
+    if (couple?.id && isConfigured && database) {
+      try {
+        const letterRef = ref(database, `couples/${couple.id}/data/scheduledLetters/${letterId}`);
+        await set(letterRef, null);
+        console.log('✅ Lettre supprimée de Firebase');
+      } catch (e) {
+        console.log('⚠️ Erreur suppression lettre:', e.message);
+      }
+    }
+  };
+
+  // Modifier une lettre programmée
+  const updateScheduledLetter = async (letterId, updates) => {
+    const updated = scheduledLetters.map(l => 
+      l.id === letterId ? { 
+        ...l, 
+        ...updates, 
+        updatedAt: new Date().toISOString()
+      } : l
+    );
+    setScheduledLetters(updated);
+    await AsyncStorage.setItem('@scheduledLetters', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    const updatedLetter = updated.find(l => l.id === letterId);
+    if (updatedLetter && couple?.id && isConfigured && database) {
+      try {
+        const letterRef = ref(database, `couples/${couple.id}/data/scheduledLetters/${letterId}`);
+        await set(letterRef, updatedLetter);
+        console.log('✅ Lettre modifiée');
+      } catch (e) {
+        console.log('⚠️ Erreur update lettre:', e.message);
+      }
+    }
+    
+    return updatedLetter;
+  };
+
+  // Vérifier si des lettres sont prêtes à être délivrées
+  const getDeliverableLetters = () => {
+    const now = new Date();
+    return scheduledLetters.filter(letter => {
+      if (letter.isDelivered) return false;
+      if (letter.fromId === user?.id) return false; // Pas ses propres lettres
+      
+      const deliveryDate = new Date(letter.deliveryDate);
+      return now >= deliveryDate;
+    });
+  };
+
+  // ===== JOURNAL INTIME PARTAGÉ =====
+  const addDiaryEntry = async (entry) => {
+    const newEntry = {
+      id: Date.now().toString(),
+      ...entry,
+      createdAt: new Date().toISOString(),
+      author: user?.name || 'Anonyme',
+      authorId: user?.id,
+      date: new Date().toLocaleDateString('fr-FR'),
+    };
+    
+    const updated = [newEntry, ...sharedDiary];
+    setSharedDiary(updated);
+    await AsyncStorage.setItem('@sharedDiary', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    if (couple?.id && isConfigured && database) {
+      try {
+        const entryRef = ref(database, `couples/${couple.id}/data/sharedDiary/${newEntry.id}`);
+        await set(entryRef, newEntry);
+        console.log('✅ Entrée du journal synchronisée');
+      } catch (e) {
+        console.log('⚠️ Erreur sync journal:', e.message);
+      }
+    }
+    
+    return newEntry;
+  };
+
+  const deleteDiaryEntry = async (entryId) => {
+    const updated = sharedDiary.filter(e => e.id !== entryId);
+    setSharedDiary(updated);
+    await AsyncStorage.setItem('@sharedDiary', JSON.stringify(updated));
+    
+    // Supprimer de Firebase
+    if (couple?.id && isConfigured && database) {
+      try {
+        const entryRef = ref(database, `couples/${couple.id}/data/sharedDiary/${entryId}`);
+        await set(entryRef, null);
+        console.log('✅ Entrée du journal supprimée');
+      } catch (e) {
+        console.log('⚠️ Erreur suppression journal:', e.message);
+      }
+    }
+  };
+
+  // Modifier une entrée de journal
+  const updateDiaryEntry = async (entryId, updates) => {
+    const updated = sharedDiary.map(e => 
+      e.id === entryId ? { 
+        ...e, 
+        ...updates, 
+        updatedAt: new Date().toISOString()
+      } : e
+    );
+    setSharedDiary(updated);
+    await AsyncStorage.setItem('@sharedDiary', JSON.stringify(updated));
+    
+    // Sync vers Firebase
+    const updatedEntry = updated.find(e => e.id === entryId);
+    if (updatedEntry && couple?.id && isConfigured && database) {
+      try {
+        const entryRef = ref(database, `couples/${couple.id}/data/sharedDiary/${entryId}`);
+        await set(entryRef, updatedEntry);
+        console.log('✅ Entrée du journal modifiée');
+      } catch (e) {
+        console.log('⚠️ Erreur update journal:', e.message);
+      }
+    }
+    
+    return updatedEntry;
   };
 
   // Quiz Scores - avec sync Firebase
@@ -440,12 +813,20 @@ export function DataProvider({ children }) {
       const challengesObj = {};
       challenges.forEach(c => { challengesObj[c.id] = c; });
 
+      const lettersObj = {};
+      scheduledLetters.forEach(l => { lettersObj[l.id] = l; });
+
+      const diaryObj = {};
+      sharedDiary.forEach(d => { diaryObj[d.id] = d; });
+
       await set(dataRef, {
         memories: memoriesObj,
         bucketList: bucketObj,
         loveNotes: notesObj,
         timeCapsules: capsulesObj,
         challenges: challengesObj,
+        scheduledLetters: lettersObj,
+        sharedDiary: diaryObj,
         loveMeter: loveMeter,
         quizScores: quizScores,
         lastSync: new Date().toISOString()
@@ -469,19 +850,46 @@ export function DataProvider({ children }) {
     bucketList,
     loveNotes,
     timeCapsules,
+    scheduledLetters,
+    sharedDiary,
     isDataSynced,
+    // Memories
     addMemory,
     deleteMemory,
+    updateMemory,
+    // Challenges
     completeChallenge,
     addChallenge,
+    updateChallenge,
+    deleteChallenge,
+    // Love Meter
     updateLoveMeter,
+    // Bucket List
     addBucketItem,
     toggleBucketItem,
     deleteBucketItem,
+    updateBucketItem,
+    // Love Notes
     addLoveNote,
     deleteLoveNote,
+    updateLoveNote,
+    // Time Capsules
     addTimeCapsule,
+    deleteTimeCapsule,
+    updateTimeCapsule,
+    // Scheduled Letters
+    addScheduledLetter,
+    markLetterAsRead,
+    deleteScheduledLetter,
+    updateScheduledLetter,
+    getDeliverableLetters,
+    // Shared Diary
+    addDiaryEntry,
+    deleteDiaryEntry,
+    updateDiaryEntry,
+    // Quiz
     setQuizScores: updateQuizScores,
+    // Sync
     forceSyncAll,
   };
 

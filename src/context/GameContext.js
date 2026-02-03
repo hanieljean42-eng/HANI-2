@@ -110,7 +110,7 @@ export function GameProvider({ children }) {
 
   const loadCoupleId = async () => {
     try {
-      // D'abord essayer de récupérer depuis le couple existant
+      // D'abord essayer de récupérer depuis le couple existant (priorité)
       const storedCouple = await AsyncStorage.getItem('@couple');
       if (storedCouple) {
         const couple = JSON.parse(storedCouple);
@@ -119,7 +119,7 @@ export function GameProvider({ children }) {
           setCoupleId(couple.id);
           // Sauvegarder aussi dans @coupleId pour compatibilité
           await AsyncStorage.setItem('@coupleId', couple.id);
-          return;
+          return couple.id;
         }
       }
       
@@ -128,15 +128,15 @@ export function GameProvider({ children }) {
       if (id) {
         console.log('✅ CoupleId chargé depuis @coupleId:', id);
         setCoupleId(id);
-      } else {
-        // Générer un ID de couple si pas encore créé
-        const newId = 'couple_' + Date.now().toString(36) + Math.random().toString(36).substr(2);
-        await AsyncStorage.setItem('@coupleId', newId);
-        setCoupleId(newId);
-        console.log('🆕 Nouveau coupleId généré:', newId);
+        return id;
       }
+      
+      // NE PAS générer un nouvel ID - attendre que l'utilisateur crée/rejoigne un couple
+      console.log('⚠️ Aucun coupleId trouvé - en attente de création/jonction de couple');
+      return null;
     } catch (error) {
       console.error('Erreur chargement coupleId:', error);
+      return null;
     }
   };
   
@@ -197,17 +197,39 @@ export function GameProvider({ children }) {
 
   // Créer une session de jeu
   const createGameSession = async (gameType, playerName) => {
-    // Recharger le coupleId si nécessaire
-    let currentCoupleId = coupleId;
-    if (!currentCoupleId) {
-      const id = await AsyncStorage.getItem('@coupleId');
-      if (id) {
-        currentCoupleId = id;
-        setCoupleId(id);
-      } else {
-        console.log('❌ Couple ID non disponible');
-        return null;
+    // Toujours recharger le coupleId depuis le stockage pour s'assurer qu'on a le bon
+    let currentCoupleId = null;
+    
+    // Priorité 1: depuis @couple
+    const storedCouple = await AsyncStorage.getItem('@couple');
+    if (storedCouple) {
+      const couple = JSON.parse(storedCouple);
+      if (couple.id) {
+        currentCoupleId = couple.id;
+        console.log('🔄 CoupleId rechargé depuis @couple:', currentCoupleId);
       }
+    }
+    
+    // Priorité 2: depuis @coupleId
+    if (!currentCoupleId) {
+      currentCoupleId = await AsyncStorage.getItem('@coupleId');
+      console.log('🔄 CoupleId rechargé depuis @coupleId:', currentCoupleId);
+    }
+    
+    // Priorité 3: utiliser l'état actuel
+    if (!currentCoupleId) {
+      currentCoupleId = coupleId;
+    }
+    
+    if (!currentCoupleId) {
+      console.log('❌ Couple ID non disponible - assurez-vous d\'avoir rejoint un couple');
+      return { error: 'Vous devez d\'abord créer ou rejoindre un couple' };
+    }
+    
+    // Mettre à jour l'état si nécessaire
+    if (currentCoupleId !== coupleId) {
+      setCoupleId(currentCoupleId);
+      await AsyncStorage.setItem('@coupleId', currentCoupleId);
     }
 
     // Si Firebase n'est pas configuré, utiliser le mode local
@@ -237,7 +259,11 @@ export function GameProvider({ children }) {
     }
 
     try {
+      // D'abord supprimer toute session existante
       const sessionRef = ref(database, `games/${currentCoupleId}/session`);
+      await remove(sessionRef);
+      console.log('🗑️ Ancienne session supprimée');
+      
       const sessionData = {
         gameType,
         status: 'waiting', // waiting, ready, playing, finished
@@ -254,7 +280,7 @@ export function GameProvider({ children }) {
         answers: {},
       };
 
-      console.log('🎮 Création session pour:', currentCoupleId);
+      console.log('🎮 Création session pour:', currentCoupleId, 'par:', myPlayerId);
       await set(sessionRef, sessionData);
       setCurrentGame(gameType);
       setWaitingForPartner(true);
@@ -262,41 +288,72 @@ export function GameProvider({ children }) {
       setGameSession(sessionData);
       setGameData(sessionData);
       
-      console.log('✅ Session créée avec succès');
+      console.log('✅ Session créée avec succès - en attente du partenaire');
       return sessionData;
     } catch (error) {
       console.error('❌ Erreur création session:', error);
-      return null;
+      return { error: 'Erreur: ' + error.message };
     }
   };
 
   // Rejoindre une session de jeu existante
   const joinGameSession = async (playerName) => {
-    // Recharger le coupleId si nécessaire
-    let currentCoupleId = coupleId;
-    if (!currentCoupleId) {
-      const id = await AsyncStorage.getItem('@coupleId');
-      if (id) {
-        currentCoupleId = id;
-        setCoupleId(id);
-      } else {
-        console.log('❌ Couple ID non disponible');
-        return null;
+    // Toujours recharger le coupleId depuis le stockage pour s'assurer qu'on a le bon
+    let currentCoupleId = null;
+    
+    // Priorité 1: depuis @couple
+    const storedCouple = await AsyncStorage.getItem('@couple');
+    if (storedCouple) {
+      const couple = JSON.parse(storedCouple);
+      if (couple.id) {
+        currentCoupleId = couple.id;
+        console.log('🔄 CoupleId rechargé depuis @couple:', currentCoupleId);
       }
+    }
+    
+    // Priorité 2: depuis @coupleId
+    if (!currentCoupleId) {
+      currentCoupleId = await AsyncStorage.getItem('@coupleId');
+      console.log('🔄 CoupleId rechargé depuis @coupleId:', currentCoupleId);
+    }
+    
+    // Priorité 3: utiliser l'état actuel
+    if (!currentCoupleId) {
+      currentCoupleId = coupleId;
+    }
+    
+    if (!currentCoupleId) {
+      console.log('❌ Couple ID non disponible - assurez-vous d\'avoir rejoint un couple');
+      return { error: 'Vous devez d\'abord rejoindre un couple avec le code de votre partenaire' };
+    }
+    
+    // Mettre à jour l'état si nécessaire
+    if (currentCoupleId !== coupleId) {
+      setCoupleId(currentCoupleId);
     }
 
     if (!database) {
       console.log('❌ Firebase non disponible');
-      return null;
+      return { error: 'Connexion au serveur impossible' };
     }
 
     try {
+      console.log('🔍 Recherche session pour coupleId:', currentCoupleId);
       const sessionRef = ref(database, `games/${currentCoupleId}/session`);
       const snapshot = await get(sessionRef);
       
       if (snapshot.exists()) {
         const session = snapshot.val();
-        console.log('🎮 Session trouvée:', session.gameType);
+        console.log('🎮 Session trouvée:', session.gameType, 'status:', session.status, 'createdBy:', session.createdBy);
+        
+        // Vérifier si je suis déjà dans la session
+        if (session.players && session.players[myPlayerId]) {
+          console.log('ℹ️ Déjà dans la session');
+          setCurrentGame(session.gameType);
+          setGameSession(session);
+          setGameData(session);
+          return session;
+        }
         
         // Ajouter ce joueur à la session
         const playerRef = ref(database, `games/${currentCoupleId}/session/players/${myPlayerId}`);
@@ -309,6 +366,8 @@ export function GameProvider({ children }) {
 
         // Mettre à jour le statut si les deux joueurs sont là
         const playersCount = Object.keys(session.players || {}).length + 1;
+        console.log('👥 Nombre de joueurs:', playersCount);
+        
         if (playersCount >= 2) {
           await update(sessionRef, { status: 'ready' });
           console.log('✅ Statut mis à jour: ready');
@@ -322,12 +381,12 @@ export function GameProvider({ children }) {
         
         return session;
       } else {
-        console.log('❌ Aucune session trouvée');
+        console.log('❌ Aucune session trouvée pour:', currentCoupleId);
+        return { error: 'Votre partenaire n\'a pas encore créé de partie. Demandez-lui de créer une partie d\'abord!' };
       }
-      return null;
     } catch (error) {
       console.error('❌ Erreur jointure session:', error);
-      return null;
+      return { error: 'Erreur de connexion: ' + error.message };
     }
   };
 

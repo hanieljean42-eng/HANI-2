@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useGame } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
+import { useNotifyPartner } from '../hooks/useNotifyPartner';
 
 const { width } = Dimensions.get('window');
 
@@ -222,6 +223,7 @@ const WOULD_YOU_RATHER = [
 
 export default function GamesScreen() {
   const { user, couple, partner } = useAuth();
+  const { notifyGame, notifyGameAnswer, notifyGameWin } = useNotifyPartner();
   const { 
     createGameSession, 
     joinGameSession, 
@@ -310,34 +312,49 @@ export default function GamesScreen() {
     const session = await createGameSession(selectedGameForLobby, user?.name || 'Joueur 1');
     setIsCreatingGame(false);
     
-    if (session) {
+    if (session && !session.error) {
       setGameMode('online');
       // Démarrer l'écoute Firebase
       listenToGameSession();
+      
+      // Envoyer une notification push au partenaire
+      const gameTitle = getGameTitle(selectedGameForLobby);
+      await notifyGame(gameTitle);
+      
       Alert.alert(
         '🎮 Partie créée !',
         'En attente de votre partenaire...\n\nVotre partenaire doit appuyer sur "Rejoindre la partie" dans le même jeu.',
         [{ text: 'OK' }]
       );
     } else {
-      Alert.alert('Erreur', 'Impossible de créer la partie');
+      Alert.alert('Erreur', session?.error || 'Impossible de créer la partie');
     }
   };
 
   const handleJoinGame = async () => {
     setIsJoiningGame(true);
-    const session = await joinGameSession(user?.name || 'Joueur 2');
+    const result = await joinGameSession(user?.name || 'Joueur 2');
     setIsJoiningGame(false);
     
-    if (session) {
+    // Vérifier si c'est une erreur
+    if (result && result.error) {
+      Alert.alert(
+        '❌ Impossible de rejoindre',
+        result.error,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    if (result && !result.error) {
       setGameMode('online');
       // Démarrer l'écoute Firebase
       listenToGameSession();
       
       // Vérifier si le jeu peut démarrer immédiatement
-      if (session.status === 'ready') {
+      if (result.status === 'ready') {
         setShowLobby(false);
-        setActiveGame(session.gameType);
+        setActiveGame(result.gameType);
       }
       Alert.alert('🎉 Connecté !', 'Vous avez rejoint la partie !');
     } else {
@@ -576,6 +593,18 @@ export default function GamesScreen() {
               </Text>
             </View>
           )}
+
+          {/* Info de synchronisation (pour débogage) */}
+          <View style={styles.syncInfo}>
+            <Text style={styles.syncInfoText}>
+              📡 ID Couple: {coupleId ? coupleId.slice(-8) : 'Non défini'}
+            </Text>
+            {couple?.code && (
+              <Text style={styles.syncInfoText}>
+                🔑 Code: {couple.code}
+              </Text>
+            )}
+          </View>
 
           {/* Bouton Annuler */}
           <TouchableOpacity
@@ -1649,7 +1678,7 @@ const styles = StyleSheet.create({
   },
   lobbySeparatorText: {
     marginHorizontal: 15,
-    color: '#999',
+    color: '#666',
     fontSize: 14,
   },
   partnerIndicator: {
@@ -1663,6 +1692,19 @@ const styles = StyleSheet.create({
   partnerIndicatorText: {
     fontSize: 14,
     color: '#666',
+  },
+  syncInfo: {
+    backgroundColor: '#e8f4f8',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  syncInfoText: {
+    fontSize: 11,
+    color: '#0891b2',
+    fontFamily: 'monospace',
   },
   lobbyCancelButton: {
     marginTop: 15,

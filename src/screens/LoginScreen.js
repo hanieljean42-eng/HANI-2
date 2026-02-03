@@ -8,8 +8,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginScreen({ navigation }) {
@@ -17,6 +20,11 @@ export default function LoginScreen({ navigation }) {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotName, setForgotName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [registeredUsers, setRegisteredUsers] = useState([]);
 
   const handleLogin = async () => {
     if (!name || !password) {
@@ -25,11 +33,82 @@ export default function LoginScreen({ navigation }) {
     }
 
     setLoading(true);
-    const result = await login(name, password);
+    const result = await login(name.trim(), password);
     setLoading(false);
 
     if (!result.success) {
-      Alert.alert('Erreur', result.error);
+      // Afficher plus de détails pour aider l'utilisateur
+      Alert.alert(
+        'Erreur de connexion', 
+        result.error + '\n\nVérifiez que:\n• Le prénom est exactement comme à l\'inscription\n• Le mot de passe est correct',
+        [
+          { text: 'Réessayer', style: 'cancel' },
+          { text: 'Mot de passe oublié', onPress: () => handleForgotPassword() }
+        ]
+      );
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    // Charger les utilisateurs enregistrés
+    try {
+      const stored = await AsyncStorage.getItem('@registeredUsers');
+      if (stored) {
+        setRegisteredUsers(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.log('Erreur chargement users:', e);
+    }
+    setShowForgotModal(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!forgotName.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer votre prénom');
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      Alert.alert('Erreur', 'Le nouveau mot de passe doit avoir au moins 6 caractères');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    try {
+      const stored = await AsyncStorage.getItem('@registeredUsers');
+      if (stored) {
+        let users = JSON.parse(stored);
+        const userIndex = users.findIndex(u => 
+          u.name.toLowerCase().trim() === forgotName.toLowerCase().trim()
+        );
+        
+        if (userIndex >= 0) {
+          // Mettre à jour le mot de passe
+          users[userIndex].password = newPassword;
+          await AsyncStorage.setItem('@registeredUsers', JSON.stringify(users));
+          
+          Alert.alert(
+            '✅ Succès', 
+            'Votre mot de passe a été réinitialisé !\n\nVous pouvez maintenant vous connecter.',
+            [{ text: 'OK', onPress: () => {
+              setShowForgotModal(false);
+              setName(forgotName);
+              setPassword('');
+              setForgotName('');
+              setNewPassword('');
+              setConfirmNewPassword('');
+            }}]
+          );
+        } else {
+          Alert.alert('Erreur', 'Aucun compte trouvé avec ce prénom.\n\nComptes existants: ' + users.map(u => u.name).join(', '));
+        }
+      } else {
+        Alert.alert('Erreur', 'Aucun compte enregistré sur cet appareil.');
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de réinitialiser le mot de passe: ' + error.message);
     }
   };
 
@@ -86,10 +165,87 @@ export default function LoginScreen({ navigation }) {
               />
             </View>
 
-            <TouchableOpacity style={styles.forgotButton}>
+            <TouchableOpacity style={styles.forgotButton} onPress={handleForgotPassword}>
               <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Modal Mot de passe oublié */}
+          <Modal
+            visible={showForgotModal}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowForgotModal(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>🔐 Réinitialiser le mot de passe</Text>
+                
+                {registeredUsers.length > 0 && (
+                  <View style={styles.usersHint}>
+                    <Text style={styles.usersHintText}>Comptes sur cet appareil:</Text>
+                    {registeredUsers.map((u, i) => (
+                      <TouchableOpacity 
+                        key={i} 
+                        style={styles.userChip}
+                        onPress={() => setForgotName(u.name)}
+                      >
+                        <Text style={styles.userChipText}>{u.avatar || '👤'} {u.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Votre prénom"
+                  placeholderTextColor="#999"
+                  value={forgotName}
+                  onChangeText={setForgotName}
+                  autoCapitalize="words"
+                />
+                
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Nouveau mot de passe"
+                  placeholderTextColor="#999"
+                  secureTextEntry
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                />
+                
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Confirmer le mot de passe"
+                  placeholderTextColor="#999"
+                  secureTextEntry
+                  value={confirmNewPassword}
+                  onChangeText={setConfirmNewPassword}
+                />
+                
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity 
+                    style={styles.modalCancelBtn}
+                    onPress={() => {
+                      setShowForgotModal(false);
+                      setForgotName('');
+                      setNewPassword('');
+                      setConfirmNewPassword('');
+                    }}
+                  >
+                    <Text style={styles.modalCancelText}>Annuler</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.modalConfirmBtn}
+                    onPress={handleResetPassword}
+                  >
+                    <Text style={styles.modalConfirmText}>Réinitialiser</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           {/* Submit Button */}
           <TouchableOpacity
@@ -230,5 +386,86 @@ const styles = StyleSheet.create({
   registerLinkBold: {
     fontWeight: 'bold',
     color: '#fff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 25,
+    width: '100%',
+    maxWidth: 350,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 15,
+    fontSize: 16,
+    marginBottom: 15,
+    color: '#333',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#666',
+    fontWeight: '600',
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: '#C44569',
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  usersHint: {
+    backgroundColor: '#f0f8ff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 15,
+  },
+  usersHintText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  userChip: {
+    backgroundColor: '#e0e7ff',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginTop: 5,
+    alignSelf: 'flex-start',
+  },
+  userChipText: {
+    color: '#4338ca',
+    fontSize: 14,
   },
 });

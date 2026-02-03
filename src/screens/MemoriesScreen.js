@@ -13,23 +13,43 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../context/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { Video, ResizeMode } from 'expo-av';
 import { useData } from '../context/DataContext';
+import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import { useAuth } from '../context/AuthContext';
+import AnimatedModal from '../components/AnimatedModal';
 
 const { width, height } = Dimensions.get('window');
 
 export default function MemoriesScreen() {
-  const { memories, addMemory, timeCapsules, addTimeCapsule, deleteMemory } = useData();
+  const { theme } = useTheme();
+  const { user } = useAuth();
+  const { 
+    memories, addMemory, timeCapsules, addTimeCapsule, deleteMemory, deleteTimeCapsule, updateMemory,
+    scheduledLetters, addScheduledLetter, markLetterAsRead, deleteScheduledLetter, updateScheduledLetter, getDeliverableLetters,
+    sharedDiary, addDiaryEntry, deleteDiaryEntry, updateDiaryEntry
+  } = useData();
+  const { notifyMemory, notifyCapsule, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
   const [activeTab, setActiveTab] = useState('gallery');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState(null);
+  const [editItem, setEditItem] = useState(null);
+  const [editType, setEditType] = useState('memory'); // 'memory', 'letter', 'diary'
   const [addType, setAddType] = useState('memory');
   const [newMemory, setNewMemory] = useState({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
   const [isUploading, setIsUploading] = useState(false);
+  
+  // États pour lettres et journal
+  const [newLetter, setNewLetter] = useState({ title: '', content: '', deliveryDate: '' });
+  const [newDiaryEntry, setNewDiaryEntry] = useState({ mood: '😊', content: '' });
+  const [selectedLetter, setSelectedLetter] = useState(null);
+  const [showLetterModal, setShowLetterModal] = useState(false);
 
   // Convertir une image/vidéo en base64 pour la synchronisation
   const convertToBase64 = async (uri) => {
@@ -139,6 +159,10 @@ export default function MemoriesScreen() {
     };
 
     await addMemory(memory);
+    
+    // Envoyer notification au partenaire
+    await notifyMemory();
+    
     setNewMemory({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
     setShowAddModal(false);
     setIsUploading(false);
@@ -159,6 +183,9 @@ export default function MemoriesScreen() {
       openDate: newMemory.date,
       locked: true,
     });
+
+    // Envoyer notification au partenaire
+    await notifyCapsule();
 
     setNewMemory({ title: '', note: '', date: '', imageUri: null });
     setShowAddModal(false);
@@ -331,19 +358,44 @@ export default function MemoriesScreen() {
         <Text style={styles.addCapsuleText}>Créer une capsule</Text>
       </TouchableOpacity>
 
-      {timeCapsules.length === 0 ? (
+      {(!timeCapsules || timeCapsules.length === 0) ? (
         <View style={styles.emptyStateCapsule}>
           <Text style={styles.emptyText}>Aucune capsule temporelle</Text>
         </View>
       ) : (
         <View style={styles.capsulesList}>
-          {timeCapsules.map((capsule, index) => (
-            <View key={`capsule-${capsule.id}-${index}`} style={styles.capsuleCard}>
+          {(timeCapsules || []).map((capsule, index) => (
+            <View key={`capsule-${capsule?.id || index}-${index}`} style={styles.capsuleCard}>
               <LinearGradient
                 colors={capsule.locked ? ['#94A3B8', '#64748B'] : ['#8B5CF6', '#A855F7']}
                 style={styles.capsuleGradient}
               >
-                <Text style={styles.capsuleEmoji}>{capsule.locked ? '🔒' : '💊'}</Text>
+                <View style={styles.capsuleHeader}>
+                  <Text style={styles.capsuleEmoji}>{capsule.locked ? '🔒' : '💊'}</Text>
+                  <TouchableOpacity
+                    style={styles.capsuleDeleteBtn}
+                    onPress={() => {
+                      Alert.alert(
+                        '🗑️ Supprimer la capsule',
+                        `Voulez-vous vraiment supprimer "${capsule.title}" ?`,
+                        [
+                          { text: 'Annuler', style: 'cancel' },
+                          { 
+                            text: 'Supprimer', 
+                            style: 'destructive',
+                            onPress: async () => {
+                              await deleteTimeCapsule(capsule.id);
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                              Alert.alert('✅', 'Capsule supprimée !');
+                            }
+                          }
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.capsuleDeleteText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.capsuleTitle}>{capsule.title}</Text>
                 <Text style={styles.capsuleDate}>
                   {capsule.locked ? `S'ouvre le ${capsule.openDate}` : 'Ouverte !'}
@@ -359,9 +411,309 @@ export default function MemoriesScreen() {
     </View>
   );
 
+  // Vérifier si une lettre est délivrable
+  const isLetterDeliverable = (letter) => {
+    if (letter.fromId === user?.id) return false; // Pas ses propres lettres
+    const deliveryDate = new Date(letter.deliveryDate.split('/').reverse().join('-'));
+    const now = new Date();
+    return now >= deliveryDate;
+  };
+
+  // === LETTRES D'AMOUR PROGRAMMÉES ===
+  const handleAddLetter = async () => {
+    if (!newLetter.title.trim() || !newLetter.content.trim() || !newLetter.deliveryDate.trim()) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    await addScheduledLetter({
+      title: newLetter.title,
+      content: newLetter.content,
+      deliveryDate: newLetter.deliveryDate,
+    });
+
+    await notifyScheduledLetter();
+
+    setNewLetter({ title: '', content: '', deliveryDate: '' });
+    setShowAddModal(false);
+    Alert.alert('💌', `Votre lettre sera livrée le ${newLetter.deliveryDate} !`);
+  };
+
+  const openLetter = (letter) => {
+    if (letter.fromId === user?.id) {
+      // C'est sa propre lettre
+      Alert.alert(
+        '💌 Votre lettre',
+        `Titre: ${letter.title}\n\nContenu:\n${letter.content}\n\nSera livrée le: ${letter.deliveryDate}`,
+        [
+          { text: 'OK' },
+          { 
+            text: 'Supprimer', 
+            style: 'destructive',
+            onPress: () => deleteScheduledLetter(letter.id)
+          }
+        ]
+      );
+    } else if (isLetterDeliverable(letter)) {
+      // Lettre du partenaire, délivrable
+      if (!letter.isRead) {
+        markLetterAsRead(letter.id);
+      }
+      setSelectedLetter(letter);
+      setShowLetterModal(true);
+    } else {
+      // Lettre du partenaire, pas encore délivrable
+      Alert.alert('⏰', `Cette lettre de ${letter.from} s'ouvrira le ${letter.deliveryDate} !`);
+    }
+  };
+
+  const renderLetters = () => {
+    const myLetters = scheduledLetters?.filter(l => l.fromId === user?.id) || [];
+    const partnerLetters = scheduledLetters?.filter(l => l.fromId !== user?.id) || [];
+    const deliverableCount = partnerLetters.filter(l => isLetterDeliverable(l) && !l.isRead).length;
+
+    return (
+      <View style={styles.lettersContainer}>
+        <Text style={styles.sectionTitle}>💌 Lettres d'Amour Programmées</Text>
+        <Text style={styles.sectionDesc}>
+          Écrivez des lettres qui seront délivrées à une date future. Une belle surprise pour votre moitié !
+        </Text>
+
+        {deliverableCount > 0 && (
+          <View style={styles.notificationBadge}>
+            <Text style={styles.notificationText}>
+              💌 {deliverableCount} nouvelle{deliverableCount > 1 ? 's' : ''} lettre{deliverableCount > 1 ? 's' : ''} à lire !
+            </Text>
+          </View>
+        )}
+
+        {/* Bouton ajouter une lettre */}
+        <TouchableOpacity
+          style={styles.addLetterButton}
+          onPress={() => {
+            setAddType('letter');
+            setShowAddModal(true);
+          }}
+        >
+          <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.addLetterGradient}>
+            <Text style={styles.addLetterText}>✍️ Écrire une lettre</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Lettres reçues */}
+        {partnerLetters.length > 0 && (
+          <View style={styles.letterSection}>
+            <Text style={styles.letterSectionTitle}>📬 Lettres reçues</Text>
+            {partnerLetters.map((letter, index) => {
+              const canOpen = isLetterDeliverable(letter);
+              return (
+                <TouchableOpacity
+                  key={letter.id}
+                  style={[styles.letterCard, canOpen && !letter.isRead && styles.letterCardUnread]}
+                  onPress={() => openLetter(letter)}
+                >
+                  <View style={styles.letterCardContent}>
+                    <Text style={styles.letterEmoji}>{canOpen ? '💌' : '📨'}</Text>
+                    <View style={styles.letterInfo}>
+                      <Text style={styles.letterTitle}>{letter.title}</Text>
+                      <Text style={styles.letterFrom}>De {letter.from}</Text>
+                      <Text style={styles.letterDate}>
+                        {canOpen ? (letter.isRead ? 'Lu ✓' : '✨ À lire !') : `S'ouvre le ${letter.deliveryDate}`}
+                      </Text>
+                    </View>
+                    {canOpen && !letter.isRead && <View style={styles.letterBadge} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Mes lettres envoyées */}
+        {myLetters.length > 0 && (
+          <View style={styles.letterSection}>
+            <Text style={styles.letterSectionTitle}>📤 Mes lettres programmées</Text>
+            {myLetters.map((letter, index) => (
+              <View key={letter.id} style={styles.letterCardWrapper}>
+                <TouchableOpacity
+                  style={styles.letterCard}
+                  onPress={() => openLetter(letter)}
+                >
+                  <View style={styles.letterCardContent}>
+                    <Text style={styles.letterEmoji}>✉️</Text>
+                    <View style={styles.letterInfo}>
+                      <Text style={styles.letterTitle}>{letter.title}</Text>
+                      <Text style={styles.letterDate}>Sera livrée le {letter.deliveryDate}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+                <View style={styles.letterActionsRow}>
+                  <TouchableOpacity
+                    style={styles.letterEditBtn}
+                    onPress={() => {
+                      setEditItem({
+                        id: letter.id,
+                        title: letter.title,
+                        content: letter.content,
+                      });
+                      setEditType('letter');
+                      setShowEditModal(true);
+                    }}
+                  >
+                    <Text style={styles.letterActionText}>✏️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.letterDeleteBtn}
+                    onPress={() => {
+                      Alert.alert(
+                        '🗑️ Supprimer',
+                        'Supprimer cette lettre programmée ?',
+                        [
+                          { text: 'Annuler', style: 'cancel' },
+                          {
+                            text: 'Supprimer',
+                            style: 'destructive',
+                            onPress: async () => {
+                              await deleteScheduledLetter(letter.id);
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.letterActionText}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {scheduledLetters?.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>💌</Text>
+            <Text style={styles.emptyText}>Aucune lettre programmée</Text>
+            <Text style={styles.emptyHint}>Écrivez une lettre d'amour qui sera livrée plus tard !</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // === JOURNAL INTIME PARTAGÉ ===
+  const MOOD_EMOJIS = ['😊', '🥰', '😍', '🤗', '😌', '🥺', '😢', '😤', '🤔', '✨'];
+
+  const handleAddDiaryEntry = async () => {
+    if (!newDiaryEntry.content.trim()) {
+      Alert.alert('Erreur', 'Veuillez écrire quelque chose');
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    await addDiaryEntry({
+      mood: newDiaryEntry.mood,
+      content: newDiaryEntry.content,
+    });
+
+    await notifyDiaryEntry();
+
+    setNewDiaryEntry({ mood: '😊', content: '' });
+    setShowAddModal(false);
+    Alert.alert('📖', 'Entrée ajoutée au journal !');
+  };
+
+  const renderDiary = () => {
+    return (
+      <View style={styles.diaryContainer}>
+        <Text style={styles.sectionTitle}>📖 Journal Intime Partagé</Text>
+        <Text style={styles.sectionDesc}>
+          Écrivez ensemble votre histoire, jour après jour. Partagez vos pensées, vos moments, vos émotions.
+        </Text>
+
+        {/* Bouton ajouter une entrée */}
+        <TouchableOpacity
+          style={styles.addDiaryButton}
+          onPress={() => {
+            setAddType('diary');
+            setShowAddModal(true);
+          }}
+        >
+          <LinearGradient colors={['#8B5CF6', '#6366F1']} style={styles.addDiaryGradient}>
+            <Text style={styles.addDiaryText}>✍️ Écrire dans le journal</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Entrées du journal */}
+        {sharedDiary && Array.isArray(sharedDiary) && sharedDiary.length > 0 ? (
+          <View style={styles.diaryEntries}>
+            {sharedDiary.filter(e => e != null).map((entry, index) => (
+              <View key={entry?.id || `diary-${index}`} style={styles.diaryEntry}>
+                <View style={styles.diaryEntryHeader}>
+                  <Text style={styles.diaryMood}>{entry.mood}</Text>
+                  <View style={styles.diaryMeta}>
+                    <Text style={styles.diaryAuthor}>{entry.author}</Text>
+                    <Text style={styles.diaryDate}>{entry.date}</Text>
+                  </View>
+                  {entry.authorId === user?.id && (
+                    <View style={styles.diaryActionsRow}>
+                      <TouchableOpacity
+                        style={styles.diaryEditBtn}
+                        onPress={() => {
+                          setEditItem({
+                            id: entry.id,
+                            mood: entry.mood,
+                            content: entry.content,
+                          });
+                          setEditType('diary');
+                          setShowEditModal(true);
+                        }}
+                      >
+                        <Text style={styles.diaryEditText}>✏️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.diaryDeleteBtn}
+                        onPress={() => {
+                          Alert.alert(
+                            'Supprimer',
+                            'Supprimer cette entrée ?',
+                            [
+                              { text: 'Annuler', style: 'cancel' },
+                              { 
+                                text: 'Supprimer', 
+                                style: 'destructive',
+                                onPress: () => deleteDiaryEntry(entry.id)
+                              }
+                            ]
+                          );
+                        }}
+                      >
+                        <Text style={styles.diaryDeleteText}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.diaryContent}>{entry.content}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>📖</Text>
+            <Text style={styles.emptyText}>Votre journal est vide</Text>
+            <Text style={styles.emptyHint}>Commencez à écrire votre histoire ensemble !</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <LinearGradient
-      colors={['#FF6B9D', '#C44569', '#8B5CF6']}
+      colors={theme.primary}
       style={styles.container}
     >
       <View style={styles.header}>
@@ -375,19 +727,31 @@ export default function MemoriesScreen() {
           style={[styles.tab, activeTab === 'gallery' && styles.activeTab]}
           onPress={() => setActiveTab('gallery')}
         >
-          <Text style={[styles.tabText, activeTab === 'gallery' && styles.activeTabText]}>📷 Galerie</Text>
+          <Text style={[styles.tabText, activeTab === 'gallery' && styles.activeTabText]}>📷</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'jar' && styles.activeTab]}
           onPress={() => setActiveTab('jar')}
         >
-          <Text style={[styles.tabText, activeTab === 'jar' && styles.activeTabText]}>🫙 Bocal</Text>
+          <Text style={[styles.tabText, activeTab === 'jar' && styles.activeTabText]}>🫙</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'capsules' && styles.activeTab]}
           onPress={() => setActiveTab('capsules')}
         >
-          <Text style={[styles.tabText, activeTab === 'capsules' && styles.activeTabText]}>⏰ Capsules</Text>
+          <Text style={[styles.tabText, activeTab === 'capsules' && styles.activeTabText]}>⏰</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'letters' && styles.activeTab]}
+          onPress={() => setActiveTab('letters')}
+        >
+          <Text style={[styles.tabText, activeTab === 'letters' && styles.activeTabText]}>💌</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'diary' && styles.activeTab]}
+          onPress={() => setActiveTab('diary')}
+        >
+          <Text style={[styles.tabText, activeTab === 'diary' && styles.activeTabText]}>📖</Text>
         </TouchableOpacity>
       </View>
 
@@ -398,6 +762,8 @@ export default function MemoriesScreen() {
         {activeTab === 'gallery' && renderGallery()}
         {activeTab === 'jar' && renderJar()}
         {activeTab === 'capsules' && renderCapsules()}
+        {activeTab === 'letters' && renderLetters()}
+        {activeTab === 'diary' && renderDiary()}
 
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -428,74 +794,144 @@ export default function MemoriesScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {addType === 'capsule' ? '⏰ Nouvelle Capsule' : '✨ Nouveau Souvenir'}
+              {addType === 'capsule' ? '⏰ Nouvelle Capsule' : 
+               addType === 'letter' ? '💌 Nouvelle Lettre' :
+               addType === 'diary' ? '📖 Nouvelle Entrée' :
+               '✨ Nouveau Souvenir'}
             </Text>
 
-            <TextInput
-              style={styles.modalInput}
-              placeholder={addType === 'capsule' ? "Titre de la capsule" : "Titre du souvenir"}
-              placeholderTextColor="#999"
-              value={newMemory.title}
-              onChangeText={(text) => setNewMemory({ ...newMemory, title: text })}
-            />
-
-            <TextInput
-              style={[styles.modalInput, styles.modalTextArea]}
-              placeholder="Note ou message..."
-              placeholderTextColor="#999"
-              multiline
-              numberOfLines={4}
-              value={newMemory.note}
-              onChangeText={(text) => setNewMemory({ ...newMemory, note: text })}
-            />
-
-            {addType === 'capsule' && (
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Date d'ouverture (JJ/MM/AAAA)"
-                placeholderTextColor="#999"
-                value={newMemory.date}
-                onChangeText={(text) => setNewMemory({ ...newMemory, date: text })}
-              />
+            {/* Formulaire pour Lettre */}
+            {addType === 'letter' && (
+              <>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Titre de la lettre"
+                  placeholderTextColor="#999"
+                  value={newLetter.title}
+                  onChangeText={(text) => setNewLetter({ ...newLetter, title: text })}
+                />
+                <TextInput
+                  style={[styles.modalInput, styles.modalTextAreaLarge]}
+                  placeholder="Écris ta lettre d'amour ici... 💕"
+                  placeholderTextColor="#999"
+                  multiline
+                  numberOfLines={8}
+                  value={newLetter.content}
+                  onChangeText={(text) => setNewLetter({ ...newLetter, content: text })}
+                />
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Date de livraison (JJ/MM/AAAA)"
+                  placeholderTextColor="#999"
+                  value={newLetter.deliveryDate}
+                  onChangeText={(text) => setNewLetter({ ...newLetter, deliveryDate: text })}
+                />
+                <Text style={styles.modalHint}>
+                  💡 La lettre sera livrée à cette date !
+                </Text>
+              </>
             )}
 
-            {addType === 'memory' && (
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-                  <Text style={styles.photoButtonText}>📁 Photo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.photoButton} onPress={pickVideo}>
-                  <Text style={styles.photoButtonText}>🎬 Vidéo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
-                  <Text style={styles.photoButtonText}>📸 Caméra</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {newMemory.imageUri && (
-              <View style={styles.imagePreview}>
-                {newMemory.mediaType === 'video' ? (
-                  <Video
-                    source={{ uri: newMemory.imageUri }}
-                    style={styles.previewImage}
-                    resizeMode={ResizeMode.COVER}
-                    shouldPlay={false}
-                    isMuted={true}
-                  />
-                ) : (
-                  <Image source={{ uri: newMemory.imageUri }} style={styles.previewImage} />
-                )}
-                <View style={styles.mediaTypeIndicator}>
-                  <Text style={styles.mediaTypeText}>{newMemory.mediaType === 'video' ? '🎬' : '📸'}</Text>
+            {/* Formulaire pour Journal */}
+            {addType === 'diary' && (
+              <>
+                <Text style={styles.moodLabel}>Comment te sens-tu ?</Text>
+                <View style={styles.moodSelector}>
+                  {MOOD_EMOJIS.map((emoji) => (
+                    <TouchableOpacity
+                      key={emoji}
+                      style={[
+                        styles.moodButton,
+                        newDiaryEntry.mood === emoji && styles.moodButtonActive
+                      ]}
+                      onPress={() => setNewDiaryEntry({ ...newDiaryEntry, mood: emoji })}
+                    >
+                      <Text style={styles.moodEmoji}>{emoji}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-                <TouchableOpacity
-                  style={styles.removeImage}
-                  onPress={() => setNewMemory({ ...newMemory, imageUri: null, mediaType: 'image' })}
-                >
-                  <Text style={styles.removeImageText}>✕</Text>
-                </TouchableOpacity>
-              </View>
+                <TextInput
+                  style={[styles.modalInput, styles.modalTextAreaLarge]}
+                  placeholder="Qu'as-tu envie de partager aujourd'hui ?"
+                  placeholderTextColor="#999"
+                  multiline
+                  numberOfLines={8}
+                  value={newDiaryEntry.content}
+                  onChangeText={(text) => setNewDiaryEntry({ ...newDiaryEntry, content: text })}
+                />
+              </>
+            )}
+
+            {/* Formulaire pour Souvenir/Capsule */}
+            {(addType === 'memory' || addType === 'capsule') && (
+              <>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder={addType === 'capsule' ? "Titre de la capsule" : "Titre du souvenir"}
+                  placeholderTextColor="#999"
+                  value={newMemory.title}
+                  onChangeText={(text) => setNewMemory({ ...newMemory, title: text })}
+                />
+
+                <TextInput
+                  style={[styles.modalInput, styles.modalTextArea]}
+                  placeholder="Note ou message..."
+                  placeholderTextColor="#999"
+                  multiline
+                  numberOfLines={4}
+                  value={newMemory.note}
+                  onChangeText={(text) => setNewMemory({ ...newMemory, note: text })}
+                />
+
+                {addType === 'capsule' && (
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Date d'ouverture (JJ/MM/AAAA)"
+                    placeholderTextColor="#999"
+                    value={newMemory.date}
+                    onChangeText={(text) => setNewMemory({ ...newMemory, date: text })}
+                  />
+                )}
+
+                {addType === 'memory' && (
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
+                      <Text style={styles.photoButtonText}>📁 Photo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.photoButton} onPress={pickVideo}>
+                      <Text style={styles.photoButtonText}>🎬 Vidéo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
+                      <Text style={styles.photoButtonText}>📸 Caméra</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {newMemory.imageUri && (
+                  <View style={styles.imagePreview}>
+                    {newMemory.mediaType === 'video' ? (
+                      <Video
+                        source={{ uri: newMemory.imageUri }}
+                        style={styles.previewImage}
+                        resizeMode={ResizeMode.COVER}
+                        shouldPlay={false}
+                        isMuted={true}
+                      />
+                    ) : (
+                      <Image source={{ uri: newMemory.imageUri }} style={styles.previewImage} />
+                    )}
+                    <View style={styles.mediaTypeIndicator}>
+                      <Text style={styles.mediaTypeText}>{newMemory.mediaType === 'video' ? '🎬' : '📸'}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeImage}
+                      onPress={() => setNewMemory({ ...newMemory, imageUri: null, mediaType: 'image' })}
+                    >
+                      <Text style={styles.removeImageText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
             )}
 
             <View style={styles.modalButtons}>
@@ -504,6 +940,8 @@ export default function MemoriesScreen() {
                 onPress={() => {
                   setShowAddModal(false);
                   setNewMemory({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
+                  setNewLetter({ title: '', content: '', deliveryDate: '' });
+                  setNewDiaryEntry({ mood: '😊', content: '' });
                 }}
                 disabled={isUploading}
               >
@@ -511,7 +949,12 @@ export default function MemoriesScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.saveButton, isUploading && styles.saveButtonDisabled]}
-                onPress={addType === 'capsule' ? handleAddCapsule : handleAddMemory}
+                onPress={
+                  addType === 'capsule' ? handleAddCapsule : 
+                  addType === 'letter' ? handleAddLetter :
+                  addType === 'diary' ? handleAddDiaryEntry :
+                  handleAddMemory
+                }
                 disabled={isUploading}
               >
                 {isUploading ? (
@@ -521,7 +964,10 @@ export default function MemoriesScreen() {
                   </View>
                 ) : (
                   <Text style={styles.saveButtonText}>
-                    {addType === 'capsule' ? 'Créer ⏰' : 'Sauvegarder 💖'}
+                    {addType === 'capsule' ? 'Créer ⏰' : 
+                     addType === 'letter' ? 'Programmer 💌' :
+                     addType === 'diary' ? 'Publier 📖' :
+                     'Sauvegarder 💖'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -586,6 +1032,21 @@ export default function MemoriesScreen() {
                 </View>
                 <View style={styles.viewButtonsRow}>
                   <TouchableOpacity
+                    style={styles.editViewButton}
+                    onPress={() => {
+                      setEditItem({
+                        id: selectedMemory.id,
+                        title: selectedMemory.title,
+                        note: selectedMemory.note || '',
+                      });
+                      setEditType('memory');
+                      setShowViewModal(false);
+                      setShowEditModal(true);
+                    }}
+                  >
+                    <Text style={styles.editViewButtonText}>✏️ Modifier</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={styles.deleteViewButton}
                     onPress={() => {
                       Alert.alert(
@@ -610,15 +1071,182 @@ export default function MemoriesScreen() {
                   >
                     <Text style={styles.deleteViewButtonText}>🗑️ Supprimer</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
+                </View>
+                <TouchableOpacity
                     style={styles.closeViewButton}
                     onPress={() => setShowViewModal(false)}
                   >
                     <Text style={styles.closeViewButtonText}>Fermer 💕</Text>
                   </TouchableOpacity>
-                </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Letter Reading Modal - Animé */}
+      <AnimatedModal
+        visible={showLetterModal}
+        onClose={() => {
+          setShowLetterModal(false);
+          setSelectedLetter(null);
+        }}
+        title={selectedLetter?.title || 'Lettre'}
+        emoji="💌"
+        type="spring"
+        size="large"
+        closeButtonText="Fermer 💕"
+        gradientColors={['#EC4899', '#BE185D']}
+      >
+        {selectedLetter && (
+          <View style={styles.letterContent}>
+            <View style={styles.letterFromBadge}>
+              <Text style={styles.letterFromText}>De {selectedLetter.from}</Text>
+            </View>
+            <View style={styles.letterTextContainer}>
+              <Text style={styles.letterText}>{selectedLetter.content}</Text>
+            </View>
+            <Text style={styles.letterDate}>
+              ✍️ Écrite le {new Date(selectedLetter.createdAt).toLocaleDateString('fr-FR')}
+            </Text>
+          </View>
+        )}
+      </AnimatedModal>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {editType === 'memory' ? '✏️ Modifier le souvenir' : 
+               editType === 'letter' ? '✏️ Modifier la lettre' : 
+               '✏️ Modifier l\'entrée'}
+            </Text>
+            
+            {editType === 'memory' && editItem && (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Titre"
+                  value={editItem.title}
+                  onChangeText={(text) => setEditItem({ ...editItem, title: text })}
+                  placeholderTextColor="#999"
+                />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Note (optionnel)"
+                  value={editItem.note}
+                  onChangeText={(text) => setEditItem({ ...editItem, note: text })}
+                  multiline
+                  numberOfLines={4}
+                  placeholderTextColor="#999"
+                />
+              </>
+            )}
+
+            {editType === 'letter' && editItem && (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Titre de la lettre"
+                  value={editItem.title}
+                  onChangeText={(text) => setEditItem({ ...editItem, title: text })}
+                  placeholderTextColor="#999"
+                />
+                <TextInput
+                  style={[styles.input, styles.textAreaLarge]}
+                  placeholder="Contenu de la lettre"
+                  value={editItem.content}
+                  onChangeText={(text) => setEditItem({ ...editItem, content: text })}
+                  multiline
+                  numberOfLines={8}
+                  placeholderTextColor="#999"
+                />
+              </>
+            )}
+
+            {editType === 'diary' && editItem && (
+              <>
+                <View style={styles.moodSelector}>
+                  <Text style={styles.moodLabel}>Humeur :</Text>
+                  <View style={styles.moodOptions}>
+                    {['😊', '😍', '🥰', '😢', '😤', '🤔', '😴', '🎉'].map((mood) => (
+                      <TouchableOpacity
+                        key={mood}
+                        style={[
+                          styles.moodOption,
+                          editItem.mood === mood && styles.moodOptionSelected
+                        ]}
+                        onPress={() => setEditItem({ ...editItem, mood })}
+                      >
+                        <Text style={styles.moodEmoji}>{mood}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                <TextInput
+                  style={[styles.input, styles.textAreaLarge]}
+                  placeholder="Contenu de l'entrée"
+                  value={editItem.content}
+                  onChangeText={(text) => setEditItem({ ...editItem, content: text })}
+                  multiline
+                  numberOfLines={8}
+                  placeholderTextColor="#999"
+                />
+              </>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowEditModal(false);
+                  setEditItem(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={async () => {
+                  if (!editItem) return;
+                  
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  
+                  if (editType === 'memory') {
+                    await updateMemory(editItem.id, {
+                      title: editItem.title,
+                      note: editItem.note,
+                    });
+                    Alert.alert('✅', 'Souvenir modifié !');
+                  } else if (editType === 'letter') {
+                    await updateScheduledLetter(editItem.id, {
+                      title: editItem.title,
+                      content: editItem.content,
+                    });
+                    Alert.alert('✅', 'Lettre modifiée !');
+                  } else if (editType === 'diary') {
+                    await updateDiaryEntry(editItem.id, {
+                      mood: editItem.mood,
+                      content: editItem.content,
+                    });
+                    Alert.alert('✅', 'Entrée modifiée !');
+                  }
+                  
+                  setShowEditModal(false);
+                  setEditItem(null);
+                }}
+              >
+                <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.confirmGradient}>
+                  <Text style={styles.confirmButtonText}>Enregistrer 💕</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -830,7 +1458,7 @@ const styles = StyleSheet.create({
   },
   recentItemDate: {
     fontSize: 12,
-    color: '#999',
+    color: '#666',
     marginTop: 3,
   },
   recentArrow: {
@@ -863,6 +1491,26 @@ const styles = StyleSheet.create({
   capsuleGradient: {
     padding: 25,
     alignItems: 'center',
+  },
+  capsuleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    width: '100%',
+    marginBottom: 5,
+  },
+  capsuleDeleteBtn: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  capsuleDeleteText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   capsuleEmoji: {
     fontSize: 50,
@@ -1120,8 +1768,22 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignItems: 'center',
     paddingHorizontal: 20,
+    flex: 1,
   },
   deleteViewButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  editViewButton: {
+    backgroundColor: '#3B82F6',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    flex: 1,
+  },
+  editViewButtonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
@@ -1149,5 +1811,334 @@ const styles = StyleSheet.create({
   },
   mediaTypeText: {
     fontSize: 16,
+  },
+  // ===== STYLES LETTRES D'AMOUR =====
+  lettersContainer: {
+    padding: 15,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  sectionDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  notificationBadge: {
+    backgroundColor: '#10B981',
+    padding: 12,
+    borderRadius: 15,
+    marginBottom: 15,
+  },
+  notificationText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 15,
+  },
+  addLetterButton: {
+    marginBottom: 20,
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  addLetterGradient: {
+    padding: 15,
+    alignItems: 'center',
+  },
+  addLetterText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  letterSection: {
+    marginBottom: 20,
+  },
+  letterSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  letterCard: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 10,
+  },
+  letterCardUnread: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  letterCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  letterEmoji: {
+    fontSize: 30,
+    marginRight: 15,
+  },
+  letterInfo: {
+    flex: 1,
+  },
+  letterTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  letterFrom: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  letterDate: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 3,
+  },
+  letterBadge: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FFD700',
+  },
+  // ===== STYLES JOURNAL =====
+  diaryContainer: {
+    padding: 15,
+  },
+  addDiaryButton: {
+    marginBottom: 20,
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  addDiaryGradient: {
+    padding: 15,
+    alignItems: 'center',
+  },
+  addDiaryText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  diaryEntries: {
+    marginTop: 10,
+  },
+  diaryEntry: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 15,
+  },
+  diaryEntryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  diaryMood: {
+    fontSize: 28,
+    marginRight: 10,
+  },
+  diaryMeta: {
+    flex: 1,
+  },
+  diaryAuthor: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  diaryDate: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  diaryDeleteBtn: {
+    padding: 8,
+  },
+  diaryDeleteText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  diaryContent: {
+    fontSize: 15,
+    color: '#fff',
+    lineHeight: 22,
+  },
+  // ===== STYLES MODAL FORMULAIRES =====
+  modalTextAreaLarge: {
+    height: 150,
+    textAlignVertical: 'top',
+    paddingTop: 12,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 5,
+    marginBottom: 10,
+  },
+  moodLabel: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  moodSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 15,
+    gap: 8,
+  },
+  moodButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moodButtonActive: {
+    backgroundColor: '#FF6B9D',
+    transform: [{ scale: 1.1 }],
+  },
+  moodEmoji: {
+    fontSize: 22,
+  },
+  // ===== STYLES EMPTY STATE =====
+  emptyState: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyEmoji: {
+    fontSize: 60,
+    marginBottom: 15,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  emptyHint: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
+  // ===== STYLES ANIMATEDMODAL LETTRE =====
+  letterContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  letterFromBadge: {
+    backgroundColor: '#FDF2F8',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  letterFromText: {
+    fontSize: 14,
+    color: '#BE185D',
+    fontWeight: '600',
+  },
+  letterTextContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FCE7F3',
+  },
+  letterText: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 28,
+    textAlign: 'left',
+    fontStyle: 'italic',
+  },
+  letterDate: {
+    fontSize: 13,
+    color: '#999',
+  },
+  // Styles pour les boutons d'action sur les lettres
+  letterCardWrapper: {
+    marginBottom: 15,
+  },
+  letterActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 8,
+  },
+  letterEditBtn: {
+    backgroundColor: '#3B82F6',
+    padding: 8,
+    borderRadius: 15,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  letterDeleteBtn: {
+    backgroundColor: '#EF4444',
+    padding: 8,
+    borderRadius: 15,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  letterActionText: {
+    fontSize: 16,
+  },
+  // Styles pour les boutons d'action sur le journal
+  diaryActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  diaryEditBtn: {
+    padding: 5,
+  },
+  diaryEditText: {
+    fontSize: 16,
+  },
+  diaryDeleteText: {
+    fontSize: 16,
+  },
+  // Styles pour la modale d'édition
+  textAreaLarge: {
+    height: 200,
+    textAlignVertical: 'top',
+  },
+  moodSelector: {
+    marginBottom: 15,
+  },
+  moodLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  moodOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  moodOption: {
+    padding: 10,
+    borderRadius: 25,
+    backgroundColor: '#f0f0f0',
+  },
+  moodOptionSelected: {
+    backgroundColor: '#FF6B9D',
+  },
+  moodEmoji: {
+    fontSize: 24,
   },
 });

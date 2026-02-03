@@ -157,13 +157,29 @@ export function AuthProvider({ children }) {
       // Chercher dans la liste des utilisateurs enregistrés
       const storedUsers = await AsyncStorage.getItem('@registeredUsers');
       
+      console.log('🔑 Tentative de connexion pour:', name);
+      
       if (storedUsers) {
         const users = JSON.parse(storedUsers);
-        const foundUser = users.find(u => 
-          u.name.toLowerCase() === name.toLowerCase() && u.password === password
-        );
+        if (!Array.isArray(users)) {
+          console.log('❌ Données utilisateurs corrompues');
+          return { success: false, error: 'Données corrompues. Veuillez vous réinscrire.' };
+        }
+        console.log('📋 Utilisateurs enregistrés:', users.filter(u => u?.name).map(u => u.name).join(', '));
+        
+        // Recherche plus flexible (trim + lowercase)
+        const normalizedName = name.toLowerCase().trim();
+        const foundUser = users.find(u => {
+          if (!u?.name) return false;
+          const userNameNormalized = u.name.toLowerCase().trim();
+          const passwordMatch = u.password === password;
+          console.log(`  Comparaison: "${userNameNormalized}" === "${normalizedName}" = ${userNameNormalized === normalizedName}, pwd: ${passwordMatch}`);
+          return userNameNormalized === normalizedName && passwordMatch;
+        });
         
         if (foundUser) {
+          console.log('✅ Utilisateur trouvé:', foundUser.name);
+          
           // Restaurer l'utilisateur
           await AsyncStorage.setItem('@user', JSON.stringify(foundUser));
           setUser(foundUser);
@@ -175,22 +191,39 @@ export function AuthProvider({ children }) {
             const userCouple = couples.find(c => c.members && c.members.includes(foundUser.id));
             if (userCouple) {
               await AsyncStorage.setItem('@couple', JSON.stringify(userCouple));
+              await AsyncStorage.setItem('@coupleId', userCouple.id);
               setCouple(userCouple);
+              console.log('👫 Couple restauré:', userCouple.code);
             }
           }
           
-          // Charger le partenaire si existe
-          const storedPartner = await AsyncStorage.getItem(`@partner_${foundUser.id}`);
-          if (storedPartner) {
-            setPartner(JSON.parse(storedPartner));
+          // Charger le partenaire si existe (essayer plusieurs clés)
+          let partnerData = await AsyncStorage.getItem(`@partner_${foundUser.id}`);
+          if (!partnerData) {
+            partnerData = await AsyncStorage.getItem('@partner');
+          }
+          if (partnerData) {
+            setPartner(JSON.parse(partnerData));
+            console.log('💕 Partenaire restauré');
           }
           
           return { success: true };
+        } else {
+          // Vérifier si le nom existe mais mauvais mot de passe
+          const nameExists = users.find(u => u?.name && u.name.toLowerCase().trim() === normalizedName);
+          if (nameExists) {
+            console.log('❌ Mot de passe incorrect pour:', name);
+            return { success: false, error: 'Mot de passe incorrect' };
+          }
         }
+      } else {
+        console.log('❌ Aucun utilisateur enregistré');
+        return { success: false, error: 'Aucun compte trouvé. Veuillez vous inscrire.' };
       }
       
-      return { success: false, error: 'Nom ou mot de passe incorrect' };
+      return { success: false, error: 'Nom d\'utilisateur non trouvé' };
     } catch (error) {
+      console.log('❌ Erreur login:', error.message);
       return { success: false, error: error.message };
     }
   };
@@ -403,6 +436,36 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Suppression complète du compte utilisateur
+  const deleteAccount = async () => {
+    try {
+      // Supprimer l'utilisateur localement
+      const storedUsers = await AsyncStorage.getItem('@registeredUsers');
+      let users = storedUsers ? JSON.parse(storedUsers) : [];
+      if (user && user.email) {
+        users = users.filter(u => u.email !== user.email);
+        await AsyncStorage.setItem('@registeredUsers', JSON.stringify(users));
+      }
+      // Supprimer les données de session
+      await AsyncStorage.multiRemove(['@user', '@couple', '@partner', '@coupleId']);
+      // Supprimer sur Firebase si connecté
+      if (isConfigured && database && user?.id && couple?.id) {
+        try {
+          const memberRef = ref(database, `couples/${couple.id}/members/${user.id}`);
+          await set(memberRef, null);
+        } catch (e) {
+          console.log('⚠️ Erreur suppression Firebase:', e.message);
+        }
+      }
+      setUser(null);
+      setCouple(null);
+      setPartner(null);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
   const updateUser = async (updates) => {
     try {
       const updatedUser = { ...user, ...updates };
@@ -437,6 +500,63 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Modifier le nom du partenaire (synchronisé avec Firebase)
+  const updatePartnerName = async (newName) => {
+    try {
+      if (!partner?.id) {
+        return { success: false, error: 'Aucun partenaire trouvé' };
+      }
+
+      const updatedPartner = { ...partner, name: newName };
+      await AsyncStorage.setItem('@partner', JSON.stringify(updatedPartner));
+      await AsyncStorage.setItem(`@partner_${user.id}`, JSON.stringify(updatedPartner));
+      setPartner(updatedPartner);
+
+      // Mettre à jour sur Firebase
+      if (couple?.id && isConfigured && database && isOnline) {
+        try {
+          const partnerRef = ref(database, `couples/${couple.id}/members/${partner.id}`);
+          await update(partnerRef, { name: newName });
+          console.log('✅ Nom du partenaire mis à jour sur Firebase');
+        } catch (e) {
+          console.log('⚠️ Erreur Firebase updatePartnerName:', e.message);
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Modifier le nom du couple (synchronisé avec Firebase)
+  const updateCoupleName = async (newName) => {
+    try {
+      if (!couple?.id) {
+        return { success: false, error: 'Aucun couple trouvé' };
+      }
+
+      const updatedCouple = { ...couple, name: newName };
+      await AsyncStorage.setItem('@couple', JSON.stringify(updatedCouple));
+      setCouple(updatedCouple);
+
+      // Mettre à jour sur Firebase
+      if (isConfigured && database && isOnline) {
+        try {
+          const coupleRef = ref(database, `couples/${couple.id}`);
+          await update(coupleRef, { name: newName });
+          console.log('✅ Nom du couple mis à jour sur Firebase');
+        } catch (e) {
+          console.log('⚠️ Erreur Firebase updateCoupleName:', e.message);
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
   const value = {
     user,
     couple,
@@ -451,6 +571,9 @@ export function AuthProvider({ children }) {
     joinCouple,
     updateUser,
     updateCouple,
+    updatePartnerName,
+    updateCoupleName,
+    deleteAccount,
   };
 
   return (

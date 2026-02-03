@@ -15,10 +15,14 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme, THEMES } from '../context/ThemeContext';
+import { useSecurity } from '../context/SecurityContext';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import AnimatedModal from '../components/AnimatedModal';
 
 const { width } = Dimensions.get('window');
 
@@ -35,23 +39,136 @@ const QUICK_MESSAGES = [
 
 const AVATARS = ['😊', '😍', '🥰', '😘', '🤩', '😎', '🤗', '🦊', '🐰', '🐻', '🦁', '🐼', '🦋', '🌸', '⭐', '💖'];
 
-export default function ProfileScreen() {
-  const { user, couple, partner, logout, updateUser, updateCouple } = useAuth();
-  const { loveMeter, memories, bucketList, loveNotes, addLoveNote, addBucketItem, toggleBucketItem, updateLoveMeter } = useData();
+export default function ProfileScreen({ navigation }) {
+  const { theme, changeTheme, themes } = useTheme();
+  const { 
+    isSecretModeEnabled, 
+    setupPin, 
+    removePin, 
+    useBiometrics, 
+    biometricsAvailable,
+    toggleBiometrics,
+    isUnlocked,
+    lockSecretMode,
+  } = useSecurity();
+  const { user, couple, partner, logout, updateUser, updateCouple, updatePartnerName, updateCoupleName, deleteAccount } = useAuth();
+  const { loveMeter, memories, bucketList, loveNotes, addLoveNote, addBucketItem, toggleBucketItem, deleteBucketItem, updateBucketItem, updateLoveMeter } = useData();
+  const { 
+    notifyLoveNote, 
+    notifyBucket, 
+    notifyNewBucketItem,
+    notifyProfileUpdate, 
+    notifyCoupleNameChanged, 
+    notifyAnniversarySet,
+    notifyPhotoChanged 
+  } = useNotifyPartner();
   const [activeSection, setActiveSection] = useState('profile');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showBucketModal, setShowBucketModal] = useState(false);
+  const [showEditBucketModal, setShowEditBucketModal] = useState(false);
+  const [editBucketItem, setEditBucketItem] = useState(null);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showEditAnniversaryModal, setShowEditAnniversaryModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showCouplePhotoModal, setShowCouplePhotoModal] = useState(false);
+  const [showEditPartnerModal, setShowEditPartnerModal] = useState(false);
+  const [showEditCoupleNameModal, setShowEditCoupleNameModal] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [newBucketItem, setNewBucketItem] = useState('');
   const [showCoupleCode, setShowCoupleCode] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
+  const [editPartnerName, setEditPartnerName] = useState(partner?.name || '');
+  const [editCoupleName, setEditCoupleName] = useState(couple?.name || '');
   const [editAnniversary, setEditAnniversary] = useState(couple?.anniversary || '');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  
+  // États pour les paramètres avancés (thème, sécurité)
+  const [showThemeModal, setShowThemeModal] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinStep, setPinStep] = useState(1);
+
+  // Handlers pour thème et PIN
+  const handleThemeChange = (themeId) => {
+    changeTheme(themeId);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowThemeModal(false);
+  };
+
+  const handleSetupPin = async () => {
+    if (pinStep === 1) {
+      if (pinInput.length < 4) {
+        Alert.alert('Erreur', 'Le code doit contenir au moins 4 chiffres');
+        return;
+      }
+      setPinStep(2);
+      return;
+    }
+
+    if (confirmPin !== pinInput) {
+      Alert.alert('Erreur', 'Les codes ne correspondent pas');
+      setPinInput('');
+      setConfirmPin('');
+      setPinStep(1);
+      return;
+    }
+
+    const result = await setupPin(pinInput);
+    if (result.success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('✅', 'Code PIN configuré !');
+      setShowPinModal(false);
+      setPinInput('');
+      setConfirmPin('');
+      setPinStep(1);
+    } else {
+      Alert.alert('Erreur', result.error);
+    }
+  };
+
+  const handleRemovePin = () => {
+    Alert.alert(
+      'Supprimer le code PIN',
+      'Êtes-vous sûr ? L\'espace secret sera désactivé.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            await removePin();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }
+      ]
+    );
+  };
+
+  // Suppression du compte utilisateur
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Supprimer le compte',
+      'Êtes-vous sûr de vouloir supprimer définitivement votre compte ? Cette action est irréversible.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await deleteAccount();
+            if (res.success) {
+              Alert.alert('Compte supprimé', 'Votre compte a bien été supprimé.');
+            } else {
+              Alert.alert('Erreur', res.error || 'Impossible de supprimer le compte.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // Fonction pour choisir une photo de profil
   const pickProfilePhoto = async () => {
@@ -67,6 +184,8 @@ export default function ProfileScreen() {
         await updateUser({ profilePhoto: result.assets[0].uri });
         setShowPhotoModal(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Notifier le partenaire
+        await notifyPhotoChanged('profil');
         Alert.alert('✅', 'Photo de profil mise à jour !');
       }
     } catch (error) {
@@ -93,6 +212,8 @@ export default function ProfileScreen() {
         await updateUser({ profilePhoto: result.assets[0].uri });
         setShowPhotoModal(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Notifier le partenaire
+        await notifyPhotoChanged('profil');
         Alert.alert('✅', 'Photo de profil mise à jour !');
       }
     } catch (error) {
@@ -114,6 +235,8 @@ export default function ProfileScreen() {
         await updateCouple({ couplePhoto: result.assets[0].uri });
         setShowCouplePhotoModal(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Notifier le partenaire
+        await notifyPhotoChanged('couple');
         Alert.alert('✅', 'Photo de couple mise à jour !');
       }
     } catch (error) {
@@ -132,6 +255,9 @@ export default function ProfileScreen() {
       read: false,
     });
     
+    // Envoyer notification au partenaire
+    await notifyLoveNote(newNote);
+    
     // Augmenter le love meter
     await updateLoveMeter(loveMeter + 2);
     
@@ -149,6 +275,9 @@ export default function ProfileScreen() {
       text: newBucketItem,
     });
     
+    // Notifier le partenaire
+    await notifyNewBucketItem(newBucketItem);
+    
     setNewBucketItem('');
     setShowBucketModal(false);
     Alert.alert('✨', 'Rêve ajouté à votre liste !');
@@ -163,18 +292,26 @@ export default function ProfileScreen() {
       read: false,
     });
     
+    // Envoyer notification au partenaire
+    await notifyLoveNote(message);
+    
     await updateLoveMeter(loveMeter + 1);
     Alert.alert('💕', 'Message envoyé !');
   };
 
   const handleToggleBucket = async (itemId) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Récupérer l'item avant de le toggle
+    const item = bucketList.find(b => b.id === itemId);
+    
     await toggleBucketItem(itemId);
     
     // Augmenter le love meter quand on complète un élément
-    const item = bucketList.find(b => b.id === itemId);
     if (item && !item.completed) {
       await updateLoveMeter(loveMeter + 5);
+      // Envoyer notification au partenaire
+      await notifyBucket(item.text);
       Alert.alert('🎉', 'Félicitations ! Un rêve réalisé !');
     }
   };
@@ -188,6 +325,8 @@ export default function ProfileScreen() {
     await updateUser({ name: editName.trim() });
     setShowEditProfileModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Notifier le partenaire
+    await notifyProfileUpdate();
     Alert.alert('✅', 'Profil mis à jour !');
   };
 
@@ -216,6 +355,8 @@ export default function ProfileScreen() {
     await updateCouple({ anniversary: formattedDate });
     setShowEditAnniversaryModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Notifier le partenaire
+    await notifyAnniversarySet(formattedDate);
     Alert.alert('✅', 'Date d\'anniversaire mise à jour !\n\nLe compteur de jours est maintenant actif 💕');
   };
 
@@ -223,6 +364,42 @@ export default function ProfileScreen() {
     await updateUser({ avatar });
     setShowAvatarModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  // Modifier le nom du partenaire
+  const handleUpdatePartnerName = async () => {
+    if (!editPartnerName.trim()) {
+      Alert.alert('Erreur', 'Le nom ne peut pas être vide');
+      return;
+    }
+    
+    const result = await updatePartnerName(editPartnerName.trim());
+    if (result.success) {
+      setShowEditPartnerModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('✅', 'Nom du partenaire mis à jour !\n\nLe changement sera visible sur les deux appareils 💕');
+    } else {
+      Alert.alert('Erreur', result.error || 'Impossible de modifier le nom');
+    }
+  };
+
+  // Modifier le nom du couple
+  const handleUpdateCoupleName = async () => {
+    if (!editCoupleName.trim()) {
+      Alert.alert('Erreur', 'Le nom du couple ne peut pas être vide');
+      return;
+    }
+    
+    const result = await updateCoupleName(editCoupleName.trim());
+    if (result.success) {
+      setShowEditCoupleNameModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Notifier le partenaire
+      await notifyCoupleNameChanged(editCoupleName.trim());
+      Alert.alert('✅', 'Nom du couple mis à jour !\n\nLe changement sera visible sur les deux appareils 💕');
+    } else {
+      Alert.alert('Erreur', result.error || 'Impossible de modifier le nom');
+    }
   };
 
   const handleShareCode = async () => {
@@ -311,7 +488,19 @@ export default function ProfileScreen() {
         <View style={styles.partnerCard}>
           <View style={styles.partnerHeader}>
             <Text style={styles.partnerAvatar}>{partner?.avatar || '💕'}</Text>
-            <Text style={styles.partnerNameOnly}>{partner.name}</Text>
+            <View style={styles.partnerInfo}>
+              <Text style={styles.partnerNameOnly}>{partner.name}</Text>
+              <Text style={styles.partnerLabel}>Votre partenaire</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.editPartnerBtn}
+              onPress={() => {
+                setEditPartnerName(partner?.name || '');
+                setShowEditPartnerModal(true);
+              }}
+            >
+              <Text style={styles.editPartnerBtnText}>✏️</Text>
+            </TouchableOpacity>
           </View>
         </View>
       ) : (
@@ -321,6 +510,26 @@ export default function ProfileScreen() {
           <Text style={styles.waitingDesc}>Partagez votre code couple pour qu'il/elle vous rejoigne</Text>
         </View>
       )}
+
+      {/* Couple Name Card */}
+      <View style={styles.coupleNameCard}>
+        <View style={styles.coupleNameHeader}>
+          <Text style={styles.coupleNameIcon}>💑</Text>
+          <View style={styles.coupleNameInfo}>
+            <Text style={styles.coupleNameText}>{couple?.name || 'Notre Couple'}</Text>
+            <Text style={styles.coupleNameLabel}>Nom du couple</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.editCoupleNameBtn}
+            onPress={() => {
+              setEditCoupleName(couple?.name || '');
+              setShowEditCoupleNameModal(true);
+            }}
+          >
+            <Text style={styles.editCoupleNameBtnText}>✏️</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Couple Info */}
       <View style={styles.coupleInfo}>
@@ -383,6 +592,39 @@ export default function ProfileScreen() {
           <Text style={styles.statLabel}>Bucket List</Text>
         </View>
       </View>
+
+      {/* Quick Actions */}
+      <Text style={styles.sectionTitle}>🚀 Actions rapides</Text>
+      <View style={styles.quickActionsGrid}>
+        <TouchableOpacity 
+          style={styles.quickActionCard}
+          onPress={() => navigation.navigate('Chat')}
+        >
+          <Text style={styles.quickActionIcon}>💬</Text>
+          <Text style={styles.quickActionLabel}>Chat</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.quickActionCard}
+          onPress={() => navigation.navigate('Stats')}
+        >
+          <Text style={styles.quickActionIcon}>📈</Text>
+          <Text style={styles.quickActionLabel}>Statistiques</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.quickActionCard}
+          onPress={() => navigation.navigate('Retrospective')}
+        >
+          <Text style={styles.quickActionIcon}>✨</Text>
+          <Text style={styles.quickActionLabel}>Rétrospective</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.quickActionCard}
+          onPress={() => setActiveSection('settings')}
+        >
+          <Text style={styles.quickActionIcon}>⚙️</Text>
+          <Text style={styles.quickActionLabel}>Paramètres</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -420,12 +662,12 @@ export default function ProfileScreen() {
           <Text style={styles.emptyText}>Aucun message encore...</Text>
         </View>
       ) : (
-        loveNotes.slice(0, 5).map((note, index) => (
-          <View key={`note-${note.id || index}-${index}`} style={styles.noteCard}>
-            <Text style={styles.noteFrom}>{note.from}</Text>
-            <Text style={styles.noteText}>{note.text}</Text>
+        (loveNotes || []).slice(0, 5).map((note, index) => (
+          <View key={`note-${note?.id || index}-${index}`} style={styles.noteCard}>
+            <Text style={styles.noteFrom}>{note?.from || 'Anonyme'}</Text>
+            <Text style={styles.noteText}>{note?.text || ''}</Text>
             <Text style={styles.noteDate}>
-              {new Date(note.createdAt).toLocaleDateString('fr-FR')}
+              {note?.createdAt ? new Date(note.createdAt).toLocaleDateString('fr-FR') : ''}
             </Text>
           </View>
         ))
@@ -445,25 +687,59 @@ export default function ProfileScreen() {
         <Text style={styles.addBucketText}>➕ Ajouter un rêve</Text>
       </TouchableOpacity>
 
-      {bucketList.length === 0 ? (
+      {(!bucketList || bucketList.length === 0) ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>✨</Text>
           <Text style={styles.emptyText}>Ajoutez vos rêves à réaliser ensemble !</Text>
         </View>
       ) : (
-        bucketList.map((item, index) => (
-          <TouchableOpacity
-            key={`bucket-${item.id || index}`}
-            style={[styles.bucketItem, item.completed && styles.bucketItemCompleted]}
-            onPress={() => handleToggleBucket(item.id)}
-          >
-            <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
-              {item.completed && <Text style={styles.checkmark}>✓</Text>}
+        (bucketList || []).map((item, index) => (
+          <View key={`bucket-${item?.id || index}`} style={styles.bucketItemWrapper}>
+            <TouchableOpacity
+              style={[styles.bucketItem, item.completed && styles.bucketItemCompleted]}
+              onPress={() => handleToggleBucket(item.id)}
+            >
+              <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
+                {item.completed && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={[styles.bucketText, item.completed && styles.bucketTextCompleted]}>
+                {item.text}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.bucketActionsRow}>
+              <TouchableOpacity
+                style={styles.bucketEditBtn}
+                onPress={() => {
+                  setEditBucketItem({ id: item.id, text: item.text });
+                  setShowEditBucketModal(true);
+                }}
+              >
+                <Text style={styles.bucketActionText}>✏️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.bucketDeleteBtn}
+                onPress={() => {
+                  Alert.alert(
+                    '🗑️ Supprimer',
+                    'Supprimer ce rêve de la liste ?',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      {
+                        text: 'Supprimer',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await deleteBucketItem(item.id);
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        },
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.bucketActionText}>🗑️</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={[styles.bucketText, item.completed && styles.bucketTextCompleted]}>
-              {item.text}
-            </Text>
-          </TouchableOpacity>
+          </View>
         ))
       )}
 
@@ -488,8 +764,86 @@ export default function ProfileScreen() {
 
   const renderSettings = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>⚙️ Paramètres</Text>
+      {/* Section Personnalisation */}
+      <Text style={styles.sectionTitle}>🎨 Personnalisation</Text>
+      
+      <View style={styles.settingsGroup}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => setShowThemeModal(true)}
+        >
+          <Text style={styles.settingIcon}>🎨</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.settingText}>Thème de l'app</Text>
+            <Text style={styles.settingSubtext}>{theme.name}</Text>
+          </View>
+          <Text style={styles.settingArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
 
+      {/* Section Sécurité */}
+      <Text style={styles.sectionTitle}>🔒 Sécurité & Confidentialité</Text>
+      
+      <View style={styles.settingsGroup}>
+        <View style={styles.settingItem}>
+          <Text style={styles.settingIcon}>🔐</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.settingText}>Espace secret</Text>
+            <Text style={styles.settingSubtext}>
+              {isSecretModeEnabled ? 'Activé' : 'Désactivé'}
+            </Text>
+          </View>
+          {isSecretModeEnabled ? (
+            <TouchableOpacity
+              style={styles.dangerBadge}
+              onPress={handleRemovePin}
+            >
+              <Text style={styles.dangerBadgeText}>Supprimer</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.primaryBadge}
+              onPress={() => setShowPinModal(true)}
+            >
+              <Text style={styles.primaryBadgeText}>Configurer</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {isSecretModeEnabled && biometricsAvailable && (
+          <View style={styles.settingItem}>
+            <Text style={styles.settingIcon}>👆</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.settingText}>Biométrie</Text>
+              <Text style={styles.settingSubtext}>Face ID / Empreinte</Text>
+            </View>
+            <Switch
+              value={useBiometrics}
+              onValueChange={toggleBiometrics}
+              trackColor={{ false: '#ddd', true: theme.accent }}
+              thumbColor="#fff"
+            />
+          </View>
+        )}
+
+        {isSecretModeEnabled && isUnlocked && (
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={lockSecretMode}
+          >
+            <Text style={styles.settingIcon}>🔒</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.settingText}>Verrouiller maintenant</Text>
+              <Text style={styles.settingSubtext}>Fermer l'espace secret</Text>
+            </View>
+            <Text style={styles.settingArrow}>›</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Section Profil & Couple */}
+      <Text style={styles.sectionTitle}>👤 Profil & Couple</Text>
+      
       <View style={styles.settingsGroup}>
         <View style={styles.settingItem}>
           <Text style={styles.settingIcon}>🔔</Text>
@@ -497,7 +851,7 @@ export default function ProfileScreen() {
           <Switch
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
-            trackColor={{ false: '#ddd', true: '#C44569' }}
+            trackColor={{ false: '#ddd', true: theme.accent }}
             thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
           />
         </View>
@@ -518,7 +872,7 @@ export default function ProfileScreen() {
           style={styles.settingItem}
           onPress={() => setShowAvatarModal(true)}
         >
-          <Text style={styles.settingIcon}>🎨</Text>
+          <Text style={styles.settingIcon}>😊</Text>
           <Text style={styles.settingText}>Changer mon avatar</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
@@ -543,18 +897,67 @@ export default function ProfileScreen() {
           <Text style={styles.settingText}>Inviter mon partenaire</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Section Données */}
+      <Text style={styles.sectionTitle}>📊 Données</Text>
+      
+      <View style={styles.settingsGroup}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => navigation.navigate('Stats')}
+        >
+          <Text style={styles.settingIcon}>📈</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.settingText}>Statistiques</Text>
+            <Text style={styles.settingSubtext}>Voir vos stats de couple</Text>
+          </View>
+          <Text style={styles.settingArrow}>›</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity 
           style={styles.settingItem}
-          onPress={() => Alert.alert(
-            '💕 HANI 2',
-            'Version 5.0.0\n\n' +
-            '👨‍💻 Créé par Haniel Henoc\n\n' +
-            'Haniel Henoc est un jeune passionné d\'informatique qui a créé HANI 2 avec une mission simple : aider les couples à mieux se divertir, renforcer leurs liens et créer des souvenirs inoubliables ensemble.\n\n' +
-            '💡 Cette application est née de l\'envie de proposer aux amoureux un espace privé et ludique pour partager des moments uniques, relever des défis amusants et cultiver leur complicité au quotidien.\n\n' +
-            'Merci d\'utiliser HANI 2 ! ❤️\n\n' +
-            '📧 Contact : djeble.haniel@gmail.com'
-          )}
+          onPress={() => navigation.navigate('Retrospective')}
+        >
+          <Text style={styles.settingIcon}>📅</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.settingText}>Rétrospective</Text>
+            <Text style={styles.settingSubtext}>Revivez votre année</Text>
+          </View>
+          <Text style={styles.settingArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Section Compte */}
+      <Text style={styles.sectionTitle}>👤 Compte</Text>
+      
+      <View style={styles.settingsGroup}>
+        <View style={styles.settingItem}>
+          <Text style={styles.settingIcon}>👤</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.settingText}>{user?.name || 'Utilisateur'}</Text>
+            <Text style={styles.settingSubtext}>{user?.email || ''}</Text>
+          </View>
+        </View>
+
+        {couple?.id && (
+          <View style={styles.settingItem}>
+            <Text style={styles.settingIcon}>💑</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.settingText}>Code couple</Text>
+              <Text style={styles.settingSubtext}>{couple.code}</Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Section Infos */}
+      <Text style={styles.sectionTitle}>ℹ️ Informations</Text>
+      
+      <View style={styles.settingsGroup}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => setShowAboutModal(true)}
         >
           <Text style={styles.settingIcon}>❓</Text>
           <Text style={styles.settingText}>À propos</Text>
@@ -576,6 +979,13 @@ export default function ProfileScreen() {
         }}
       >
         <Text style={styles.logoutButtonText}>🚪 Se déconnecter</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.deleteAccountButton} 
+        onPress={handleDeleteAccount}
+      >
+        <Text style={styles.deleteAccountButtonText}>🗑️ Supprimer mon compte</Text>
       </TouchableOpacity>
 
       <Text style={styles.version}>HANI 2 v5.0.0 - by Haniel Henoc 💕</Text>
@@ -934,6 +1344,294 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Partner Name Modal */}
+      <Modal
+        visible={showEditPartnerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditPartnerModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>💕 Modifier le nom du partenaire</Text>
+            <Text style={styles.modalSubtitle}>
+              Ce changement sera synchronisé sur les deux appareils
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Nom de votre partenaire"
+              placeholderTextColor="#999"
+              value={editPartnerName}
+              onChangeText={setEditPartnerName}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowEditPartnerModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={handleUpdatePartnerName}
+              >
+                <Text style={styles.sendButtonText}>Enregistrer ✓</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Couple Name Modal */}
+      <Modal
+        visible={showEditCoupleNameModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditCoupleNameModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>💑 Modifier le nom du couple</Text>
+            <Text style={styles.modalSubtitle}>
+              Donnez un nom unique à votre couple !{'\n'}Exemple: "Les Amoureux", "John & Jane"
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Nom de votre couple"
+              placeholderTextColor="#999"
+              value={editCoupleName}
+              onChangeText={setEditCoupleName}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowEditCoupleNameModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={handleUpdateCoupleName}
+              >
+                <Text style={styles.sendButtonText}>Enregistrer ✓</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Bucket Item Modal */}
+      <Modal
+        visible={showEditBucketModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditBucketModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>✏️ Modifier le rêve</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Votre rêve à réaliser"
+              placeholderTextColor="#999"
+              value={editBucketItem?.text || ''}
+              onChangeText={(text) => setEditBucketItem({ ...editBucketItem, text })}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowEditBucketModal(false);
+                  setEditBucketItem(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={async () => {
+                  if (editBucketItem?.text?.trim()) {
+                    await updateBucketItem(editBucketItem.id, { text: editBucketItem.text });
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    setShowEditBucketModal(false);
+                    setEditBucketItem(null);
+                    Alert.alert('✅', 'Rêve modifié !');
+                  }
+                }}
+              >
+                <Text style={styles.sendButtonText}>Enregistrer ✓</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Theme Modal */}
+      <Modal
+        visible={showThemeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowThemeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🎨 Choisir un thème</Text>
+            
+            <ScrollView style={styles.themeList}>
+              {Object.values(themes).map((t) => (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[
+                    styles.themeOption,
+                    theme.id === t.id && styles.themeOptionActive
+                  ]}
+                  onPress={() => handleThemeChange(t.id)}
+                >
+                  <LinearGradient
+                    colors={t.primary}
+                    style={styles.themePreview}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  />
+                  <Text style={styles.themeName}>{t.name}</Text>
+                  {theme.id === t.id && <Text style={styles.themeCheck}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.closeThemeButton}
+              onPress={() => setShowThemeModal(false)}
+            >
+              <Text style={styles.closeThemeButtonText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* PIN Setup Modal */}
+      <Modal
+        visible={showPinModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowPinModal(false);
+          setPinInput('');
+          setConfirmPin('');
+          setPinStep(1);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🔐 Code PIN</Text>
+            <Text style={styles.modalSubtitle}>
+              {pinStep === 1 
+                ? 'Entrez votre nouveau code PIN' 
+                : 'Confirmez votre code PIN'}
+            </Text>
+            
+            <TextInput
+              style={styles.pinInput}
+              value={pinStep === 1 ? pinInput : confirmPin}
+              onChangeText={pinStep === 1 ? setPinInput : setConfirmPin}
+              keyboardType="numeric"
+              secureTextEntry
+              maxLength={6}
+              placeholder="••••"
+              placeholderTextColor="#999"
+            />
+
+            <View style={styles.pinDots}>
+              {[...Array(4)].map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.pinDot,
+                    (pinStep === 1 ? pinInput : confirmPin).length > i && styles.pinDotFilled
+                  ]}
+                />
+              ))}
+            </View>
+
+            <View style={styles.pinModalButtons}>
+              <TouchableOpacity
+                style={styles.pinCancelButton}
+                onPress={() => {
+                  setShowPinModal(false);
+                  setPinInput('');
+                  setConfirmPin('');
+                  setPinStep(1);
+                }}
+              >
+                <Text style={styles.pinCancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pinConfirmButton}
+                onPress={handleSetupPin}
+              >
+                <LinearGradient
+                  colors={theme.primary}
+                  style={styles.pinConfirmButtonGradient}
+                >
+                  <Text style={styles.pinConfirmButtonText}>
+                    {pinStep === 1 ? 'Suivant' : 'Confirmer'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* About Modal - Animée */}
+      <AnimatedModal
+        visible={showAboutModal}
+        onClose={() => setShowAboutModal(false)}
+        title="HANI 2"
+        emoji="💕"
+        type="spring"
+        size="large"
+        closeButtonText="Merci ! ❤️"
+        gradientColors={['#8B5CF6', '#C44569']}
+      >
+        <View style={styles.aboutContent}>
+          <View style={styles.aboutVersionBadge}>
+            <Text style={styles.aboutVersionText}>Version 5.0.0</Text>
+          </View>
+          
+          <View style={styles.aboutSection}>
+            <Text style={styles.aboutSectionTitle}>👨‍💻 Créateur</Text>
+            <Text style={styles.aboutSectionText}>Haniel Henoc</Text>
+          </View>
+          
+          <View style={styles.aboutSection}>
+            <Text style={styles.aboutSectionTitle}>💡 Notre Mission</Text>
+            <Text style={styles.aboutSectionText}>
+              HANI 2 a été créé avec une mission simple : aider les couples à mieux se divertir, 
+              renforcer leurs liens et créer des souvenirs inoubliables ensemble.
+            </Text>
+          </View>
+          
+          <View style={styles.aboutSection}>
+            <Text style={styles.aboutSectionTitle}>✨ Notre Vision</Text>
+            <Text style={styles.aboutSectionText}>
+              Cette application est née de l'envie de proposer aux amoureux un espace privé et ludique 
+              pour partager des moments uniques, relever des défis amusants et cultiver leur complicité au quotidien.
+            </Text>
+          </View>
+          
+          <View style={styles.aboutSection}>
+            <Text style={styles.aboutSectionTitle}>📧 Contact</Text>
+            <Text style={styles.aboutContactEmail}>djeble.haniel@gmail.com</Text>
+          </View>
+          
+          <View style={styles.aboutFooter}>
+            <Text style={styles.aboutFooterText}>Merci d'utiliser HANI 2 ! 💖</Text>
+            <Text style={styles.aboutFooterHeart}>❤️ 🧡 💛 💚 💙 💜</Text>
+          </View>
+        </View>
+      </AnimatedModal>
     </LinearGradient>
   );
 }
@@ -1009,7 +1707,7 @@ const styles = StyleSheet.create({
   },
   userEmail: {
     fontSize: 14,
-    color: '#999',
+    color: '#666',
   },
   partnerCard: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -1050,6 +1748,9 @@ const styles = StyleSheet.create({
     fontSize: 50,
     marginRight: 15,
   },
+  partnerInfo: {
+    flex: 1,
+  },
   partnerLabel: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.7)',
@@ -1063,8 +1764,54 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
-    textAlign: 'center',
-    paddingVertical: 5,
+  },
+  editPartnerBtn: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 15,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editPartnerBtnText: {
+    fontSize: 18,
+  },
+  coupleNameCard: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 15,
+  },
+  coupleNameHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  coupleNameIcon: {
+    fontSize: 40,
+    marginRight: 15,
+  },
+  coupleNameInfo: {
+    flex: 1,
+  },
+  coupleNameText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  coupleNameLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  editCoupleNameBtn: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 15,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editCoupleNameBtnText: {
+    fontSize: 18,
   },
   coupleInfo: {
     marginBottom: 25,
@@ -1311,6 +2058,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  deleteAccountButton: {
+    backgroundColor: '#EF4444',
+    borderRadius: 15,
+    padding: 18,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  deleteAccountButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   version: {
     textAlign: 'center',
@@ -1655,5 +2414,248 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  // Quick Actions
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+  },
+  quickActionCard: {
+    width: (width - 60) / 2,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#C44569',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
+    marginBottom: 10,
+  },
+  quickActionIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  quickActionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  // Styles pour les boutons d'action sur la bucket list
+  bucketItemWrapper: {
+    marginBottom: 10,
+  },
+  bucketActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 5,
+  },
+  bucketEditBtn: {
+    backgroundColor: '#3B82F6',
+    padding: 6,
+    borderRadius: 12,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bucketDeleteBtn: {
+    backgroundColor: '#EF4444',
+    padding: 6,
+    borderRadius: 12,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bucketActionText: {
+    fontSize: 14,
+  },
+  // Styles pour la modale À propos
+  aboutContent: {
+    alignItems: 'center',
+  },
+  aboutVersionBadge: {
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  aboutVersionText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  aboutSection: {
+    width: '100%',
+    marginBottom: 18,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
+    padding: 16,
+  },
+  aboutSectionTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#C44569',
+    marginBottom: 8,
+  },
+  aboutSectionText: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 22,
+  },
+  aboutContactEmail: {
+    fontSize: 15,
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  aboutFooter: {
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    width: '100%',
+  },
+  aboutFooterText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  aboutFooterHeart: {
+    fontSize: 20,
+    letterSpacing: 4,
+  },
+  // Nouveaux styles pour thème et PIN
+  settingSubtext: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  dangerBadge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  dangerBadgeText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  primaryBadge: {
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  primaryBadgeText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  themeList: {
+    maxHeight: 400,
+  },
+  themeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: '#f5f5f5',
+  },
+  themeOptionActive: {
+    backgroundColor: '#e0e7ff',
+    borderWidth: 2,
+    borderColor: '#8B5CF6',
+  },
+  themePreview: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 15,
+  },
+  themeName: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  themeCheck: {
+    fontSize: 20,
+    color: '#8B5CF6',
+    fontWeight: 'bold',
+  },
+  closeThemeButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  closeThemeButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  pinInput: {
+    fontSize: 32,
+    textAlign: 'center',
+    letterSpacing: 10,
+    padding: 20,
+    marginBottom: 20,
+    color: '#333',
+  },
+  pinDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 30,
+    gap: 15,
+  },
+  pinDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#ddd',
+  },
+  pinDotFilled: {
+    backgroundColor: '#8B5CF6',
+  },
+  pinModalButtons: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  pinCancelButton: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  pinCancelButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  pinConfirmButton: {
+    flex: 1,
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  pinConfirmButtonGradient: {
+    padding: 15,
+    alignItems: 'center',
+  },
+  pinConfirmButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });

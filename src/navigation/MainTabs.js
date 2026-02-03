@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
@@ -8,22 +9,25 @@ import WheelScreen from '../screens/WheelScreen';
 import ChallengesScreen from '../screens/ChallengesScreen';
 import MemoriesScreen from '../screens/MemoriesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SecretScreen from '../screens/SecretScreen';
 
 const Tab = createBottomTabNavigator();
 
-const TabIcon = ({ icon, label, focused }) => (
+const TabIcon = ({ icon, label, focused, accentColor }) => (
   <View style={styles.tabItem}>
     <Text style={[styles.tabIcon, focused && styles.tabIconFocused]}>{icon}</Text>
-    <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]}>{label}</Text>
+    <Text style={[styles.tabLabel, focused && { color: accentColor, fontWeight: 'bold' }]}>{label}</Text>
   </View>
 );
 
 export default function MainTabs() {
+  const { theme } = useTheme();
+  
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { shadowColor: theme.accent }],
         tabBarShowLabel: false,
       }}
     >
@@ -32,7 +36,7 @@ export default function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="🏠" label="Accueil" focused={focused} />
+            <TabIcon icon="🏠" label="Accueil" focused={focused} accentColor={theme.accent} />
           ),
         }}
       />
@@ -41,7 +45,16 @@ export default function MainTabs() {
         component={WheelScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="🎰" label="Roue" focused={focused} />
+            <TabIcon icon="🎰" label="Roue" focused={focused} accentColor={theme.accent} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Secret"
+        component={SecretScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon icon="🔐" label="Secret" focused={focused} accentColor={theme.accent} />
           ),
         }}
       />
@@ -50,7 +63,7 @@ export default function MainTabs() {
         component={ChallengesScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="⚡" label="Défis" focused={focused} />
+            <TabIcon icon="⚡" label="Défis" focused={focused} accentColor={theme.accent} />
           ),
         }}
       />
@@ -59,7 +72,7 @@ export default function MainTabs() {
         component={MemoriesScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="🫙" label="Souvenirs" focused={focused} />
+            <TabIcon icon="🫙" label="Souvenirs" focused={focused} accentColor={theme.accent} />
           ),
         }}
       />
@@ -68,7 +81,7 @@ export default function MainTabs() {
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="💑" label="Profil" focused={focused} />
+            <TabIcon icon="💑" label="Profil" focused={focused} accentColor={theme.accent} />
           ),
         }}
       />
@@ -85,7 +98,6 @@ const styles = StyleSheet.create({
     height: 70,
     backgroundColor: '#fff',
     borderRadius: 35,
-    shadowColor: '#C44569',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
@@ -106,10 +118,6 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 10,
-    color: '#999',
-  },
-  tabLabelFocused: {
-    color: '#C44569',
-    fontWeight: 'bold',
+    color: '#666',
   },
 });

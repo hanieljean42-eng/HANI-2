@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../context/ThemeContext';
 import * as Haptics from 'expo-haptics';
+import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import AnimatedModal from '../components/AnimatedModal';
 
 const { width } = Dimensions.get('window');
 
@@ -26,9 +28,16 @@ const WHEEL_ITEMS = [
   { id: 10, text: 'Photos 📸', color: '#6366F1', details: 'Séance photo couple dans un bel endroit!' },
   { id: 11, text: 'Danse 💃', color: '#A855F7', details: 'Apprenez une nouvelle danse ensemble!' },
   { id: 12, text: 'Surprise 🎁', color: '#F43F5E', details: 'Chacun prépare une surprise pour l\'autre!' },
+  { id: 13, text: 'Mougou 🥰', color: '#E11D48', details: 'Moment câlin et tendresse, juste vous deux 💕' },
+  { id: 14, text: 'Tuaibailait 💋', color: '#BE185D', details: 'Moment intime et passionné ensemble 🔥' },
+  { id: 15, text: 'Sucer Junior 🍆', color: '#9333EA', details: 'Moment coquin et gourmand pour lui 😈🔥' },
+  { id: 16, text: 'Laper Brigitte 👅', color: '#DB2777', details: 'Moment coquin et gourmand pour elle 😈💦' },
+  { id: 17, text: 'Jouer avec Brigitte 🎀', color: '#EC4899', details: 'Moment de plaisir et de jeux intimes avec elle 💕🔥' },
 ];
 
 export default function WheelScreen() {
+  const { theme } = useTheme();
+  const { notifyWheelSpin } = useNotifyPartner();
   const [spinning, setSpinning] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -53,11 +62,13 @@ export default function WheelScreen() {
       toValue: currentRotation.current,
       duration: 4000,
       useNativeDriver: true,
-    }).start(() => {
+    }).start(async () => {
       setSpinning(false);
       setSelectedItem(WHEEL_ITEMS[randomIndex]);
       setShowModal(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Notifier le partenaire du résultat
+      await notifyWheelSpin(WHEEL_ITEMS[randomIndex].text);
     });
   };
 
@@ -145,36 +156,32 @@ export default function WheelScreen() {
         </View>
       </View>
 
-      {/* Result Modal */}
-      <Modal
+      {/* Result Modal - Animé */}
+      <AnimatedModal
         visible={showModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowModal(false)}
+        onClose={() => setShowModal(false)}
+        title="C'est décidé !"
+        emoji="🎉"
+        type="spring"
+        size="medium"
+        closeButtonText="Super ! 💖"
+        gradientColors={selectedItem ? [selectedItem.color, '#C44569'] : ['#FF6B9D', '#C44569']}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalEmoji}>🎉</Text>
-            <Text style={styles.modalTitle}>C'est décidé !</Text>
-            
-            {selectedItem && (
-              <>
-                <View style={[styles.modalResult, { backgroundColor: selectedItem.color }]}>
-                  <Text style={styles.modalResultText}>{selectedItem.text}</Text>
-                </View>
-                <Text style={styles.modalDetails}>{selectedItem.details}</Text>
-              </>
-            )}
-
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setShowModal(false)}
-            >
-              <Text style={styles.modalButtonText}>Super ! 💖</Text>
-            </TouchableOpacity>
+        {selectedItem && (
+          <View style={styles.modalResultContent}>
+            <View style={[styles.modalResult, { backgroundColor: selectedItem.color }]}>
+              <Text style={styles.modalResultText}>{selectedItem.text}</Text>
+            </View>
+            <Text style={styles.modalDetails}>{selectedItem.details}</Text>
+            <View style={styles.modalTip}>
+              <Text style={styles.modalTipEmoji}>💡</Text>
+              <Text style={styles.modalTipText}>
+                Préparez-vous pour une activité mémorable ensemble !
+              </Text>
+            </View>
           </View>
-        </View>
-      </Modal>
+        )}
+      </AnimatedModal>
     </LinearGradient>
   );
 }
@@ -310,57 +317,51 @@ const styles = StyleSheet.create({
   historyEmoji: {
     fontSize: 24,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 30,
-    padding: 30,
+  modalResultContent: {
     alignItems: 'center',
     width: '100%',
   },
-  modalEmoji: {
-    fontSize: 60,
-    marginBottom: 15,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-  },
   modalResult: {
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 20,
-    marginBottom: 15,
+    paddingVertical: 18,
+    paddingHorizontal: 35,
+    borderRadius: 25,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   modalResultText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
+    textAlign: 'center',
   },
   modalDetails: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 15,
+    color: '#555',
     textAlign: 'center',
-    marginBottom: 25,
-    lineHeight: 22,
+    marginBottom: 20,
+    lineHeight: 24,
+    paddingHorizontal: 10,
   },
-  modalButton: {
-    backgroundColor: '#C44569',
-    paddingVertical: 15,
-    paddingHorizontal: 50,
-    borderRadius: 25,
+  modalTip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    padding: 15,
+    borderRadius: 15,
+    marginTop: 10,
+    gap: 10,
   },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+  modalTipEmoji: {
+    fontSize: 24,
+  },
+  modalTipText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
   },
 });
