@@ -57,7 +57,7 @@ export default function WelcomeScreen({ navigation }) {
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>Créé avec ❤️ par Haniel Henoc</Text>
+        <Text style={styles.footer}>Créé avec ❤️ par Djeble Haniel Henoc</Text>
       </View>
     </LinearGradient>
   );

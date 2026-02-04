@@ -51,7 +51,7 @@ export function DataProvider({ children }) {
     
     const dataRef = ref(database, `couples/${couple.id}/data`);
     
-    const unsubscribe = onValue(dataRef, (snapshot) => {
+    const handleSnapshot = (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         console.log('📥 Données couple reçues de Firebase');
@@ -110,11 +110,26 @@ export function DataProvider({ children }) {
         }
         
         setIsDataSynced(true);
+      } else {
+        console.log('📭 Aucune donnée couple trouvée sur Firebase');
       }
-    }, (error) => {
+    };
+    
+    const handleError = (error) => {
       console.error('❌ Erreur écoute données Firebase:', error);
       setIsDataSynced(false);
-    });
+      
+      // Tentative de reconnexion après 5 secondes
+      setTimeout(() => {
+        if (coupleIdRef.current === couple.id) {
+          console.log('🔄 Tentative de reconnexion Firebase...');
+          isListeningRef.current = false;
+          // Le useEffect se redéclenchera
+        }
+      }, 5000);
+    };
+    
+    const unsubscribe = onValue(dataRef, handleSnapshot, handleError);
 
     return () => {
       console.log('🔕 Arrêt écoute données Firebase');
@@ -691,9 +706,31 @@ export function DataProvider({ children }) {
       if (letter.isDelivered) return false;
       if (letter.fromId === user?.id) return false; // Pas ses propres lettres
       
-      const deliveryDate = new Date(letter.deliveryDate);
-      return now >= deliveryDate;
+      // Parser la date correctement
+      let deliveryDate;
+      if (letter.deliveryDate.includes('/')) {
+        const [day, month, year] = letter.deliveryDate.split('/').map(Number);
+        deliveryDate = new Date(year, month - 1, day, 0, 0, 0);
+      } else {
+        deliveryDate = new Date(letter.deliveryDate);
+      }
+      
+      // Comparer les dates (pas l'heure)
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const deliveryDay = new Date(deliveryDate.getFullYear(), deliveryDate.getMonth(), deliveryDate.getDate());
+      
+      return today >= deliveryDay;
     });
+  };
+
+  // Vérifier et notifier les lettres délivrables au démarrage
+  const checkDeliverableLettersAtStartup = async () => {
+    const deliverable = getDeliverableLetters();
+    if (deliverable.length > 0) {
+      console.log(`💌 ${deliverable.length} lettre(s) à livrer !`);
+      // Les notifications seront affichées dans l'écran Memories
+    }
+    return deliverable;
   };
 
   // ===== JOURNAL INTIME PARTAGÉ =====
@@ -883,6 +920,7 @@ export function DataProvider({ children }) {
     deleteScheduledLetter,
     updateScheduledLetter,
     getDeliverableLetters,
+    checkDeliverableLettersAtStartup,
     // Shared Diary
     addDiaryEntry,
     deleteDiaryEntry,

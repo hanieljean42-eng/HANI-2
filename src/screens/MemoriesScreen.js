@@ -25,9 +25,43 @@ import AnimatedModal from '../components/AnimatedModal';
 
 const { width, height } = Dimensions.get('window');
 
+// Fonction utilitaire pour convertir en base64
+const convertToBase64 = async (uri) => {
+  try {
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    return base64;
+  } catch (error) {
+    console.error('Erreur conversion base64:', error);
+    return null;
+  }
+};
+
+// Fonction pour obtenir les infos d'un fichier
+const getFileInfo = async (uri) => {
+  try {
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    const sizeMB = fileInfo.size / (1024 * 1024);
+    const extension = uri.split('.').pop()?.toLowerCase();
+    const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'].includes(extension);
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(extension);
+    
+    return {
+      exists: fileInfo.exists,
+      sizeMB,
+      isVideo,
+      isImage,
+      canUpload: isImage && sizeMB <= 5, // Max 5MB pour les images
+    };
+  } catch (error) {
+    return { exists: false, sizeMB: 0, canUpload: false };
+  }
+};
+
 export default function MemoriesScreen() {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, couple } = useAuth();
   const { 
     memories, addMemory, timeCapsules, addTimeCapsule, deleteMemory, deleteTimeCapsule, updateMemory,
     scheduledLetters, addScheduledLetter, markLetterAsRead, deleteScheduledLetter, updateScheduledLetter, getDeliverableLetters,
@@ -44,6 +78,7 @@ export default function MemoriesScreen() {
   const [addType, setAddType] = useState('memory');
   const [newMemory, setNewMemory] = useState({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // États pour lettres et journal
   const [newLetter, setNewLetter] = useState({ title: '', content: '', deliveryDate: '' });
@@ -52,14 +87,41 @@ export default function MemoriesScreen() {
   const [showLetterModal, setShowLetterModal] = useState(false);
 
   // Convertir une image/vidéo en base64 pour la synchronisation
-  const convertToBase64 = async (uri) => {
+  // Avec compression pour éviter les fichiers trop volumineux
+  const convertToBase64 = async (uri, mediaType = 'image') => {
     try {
+      // Vérifier d'abord la taille du fichier
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      const fileSizeMB = fileInfo.size / (1024 * 1024);
+      
+      // Limiter à 5MB pour les images (Firebase Realtime DB a des limites)
+      if (mediaType === 'image' && fileSizeMB > 5) {
+        console.log('⚠️ Image trop volumineuse pour la synchronisation:', fileSizeMB.toFixed(2), 'MB');
+        Alert.alert(
+          '⚠️ Image trop grande',
+          'Cette image fait ' + fileSizeMB.toFixed(1) + ' MB. Pour la synchronisation, les images doivent faire moins de 5MB. L\'image sera sauvegardée localement uniquement.',
+          [{ text: 'OK' }]
+        );
+        return null;
+      }
+      
+      // Pas de sync pour les vidéos (trop volumineuses)
+      if (mediaType === 'video') {
+        console.log('⚠️ Les vidéos sont trop volumineuses pour la synchronisation Firebase');
+        return null;
+      }
+      
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
+      
+      // Vérifier la taille du base64 (environ 1.33x la taille originale)
+      const base64SizeKB = (base64.length * 0.75) / 1024;
+      console.log('📊 Taille base64:', (base64SizeKB / 1024).toFixed(2), 'MB');
+      
       return base64;
     } catch (error) {
-      console.log('Erreur conversion base64:', error);
+      console.log('❌ Erreur conversion base64:', error);
       return null;
     }
   };
@@ -81,31 +143,13 @@ export default function MemoriesScreen() {
     }
   };
 
+  // Vidéos non disponibles actuellement
   const pickVideo = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['videos'],
-        allowsEditing: false,
-        quality: 1,
-        videoMaxDuration: 60, // 60 secondes max
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        // Vérifier la taille du fichier
-        const fileInfo = await FileSystem.getInfoAsync(result.assets[0].uri);
-        const fileSizeMB = fileInfo.size / (1024 * 1024);
-        
-        if (fileSizeMB > 50) {
-          Alert.alert('Fichier trop volumineux', 'La vidéo ne doit pas dépasser 50 MB');
-          return;
-        }
-        
-        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri, mediaType: 'video' });
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'accéder aux vidéos');
-    }
+    Alert.alert(
+      '🎬 Bientôt disponible',
+      'L\'ajout de vidéos n\'est pas disponible actuellement.\n\nCette fonctionnalité arrivera dans une prochaine mise à jour ! 💕',
+      [{ text: 'OK', style: 'default' }]
+    );
   };
 
   const takePhoto = async () => {
@@ -137,25 +181,56 @@ export default function MemoriesScreen() {
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     let mediaBase64 = null;
+    let syncMessage = 'Souvenir ajouté !';
+    
+    // Si une image est sélectionnée, la convertir en base64
     if (newMemory.imageUri) {
-      // Convertir en base64 pour la synchronisation
+      setUploadProgress(30);
+      
+      // Vérifier la taille du fichier
+      const fileInfo = await getFileInfo(newMemory.imageUri);
+      
+      if (!fileInfo.canUpload) {
+        setIsUploading(false);
+        Alert.alert(
+          '📸 Image trop grande',
+          `L'image fait ${fileInfo.sizeMB?.toFixed(1) || '?'} MB.\n\nMaximum: 5 MB.\n\nConseil: Prenez une photo avec une résolution plus basse.`,
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+      
+      setUploadProgress(50);
+      
+      // Convertir en base64
       mediaBase64 = await convertToBase64(newMemory.imageUri);
+      
+      setUploadProgress(80);
+      
+      if (mediaBase64) {
+        syncMessage = 'Souvenir ajouté et synchronisé ! 💕';
+      } else {
+        syncMessage = 'Souvenir ajouté localement';
+      }
     }
     
+    setUploadProgress(90);
+    
     const memory = {
-      type: newMemory.imageUri ? (newMemory.mediaType === 'video' ? 'video' : 'photo') : 'note',
+      type: newMemory.imageUri ? 'photo' : 'note',
       title: newMemory.title,
       note: newMemory.note,
       date: new Date().toLocaleDateString('fr-FR'),
-      emoji: newMemory.imageUri ? (newMemory.mediaType === 'video' ? '🎬' : '📸') : '💌',
+      emoji: newMemory.imageUri ? '📸' : '💌',
       color: ['#FF6B9D', '#8B5CF6', '#10B981', '#F59E0B'][Math.floor(Math.random() * 4)],
       imageUri: newMemory.imageUri,
-      mediaType: newMemory.mediaType || 'image',
-      // Stocker le base64 pour la synchronisation entre partenaires
+      mediaType: 'image',
       mediaBase64: mediaBase64,
+      isSynced: mediaBase64 !== null,
     };
 
     await addMemory(memory);
@@ -166,7 +241,8 @@ export default function MemoriesScreen() {
     setNewMemory({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
     setShowAddModal(false);
     setIsUploading(false);
-    Alert.alert('💖', 'Souvenir ajouté et synchronisé !');
+    setUploadProgress(0);
+    Alert.alert('💖', syncMessage);
   };
 
   const handleAddCapsule = async () => {
@@ -201,12 +277,16 @@ export default function MemoriesScreen() {
   const renderGallery = () => {
     // Fonction pour obtenir la source de l'image/vidéo
     const getMediaSource = (memory) => {
-      // Si on a un base64, l'utiliser (pour les médias synchronisés)
+      // Priorité 1: URL Firebase Storage (pour les gros fichiers uploadés)
+      if (memory.mediaUrl) {
+        return { uri: memory.mediaUrl };
+      }
+      // Priorité 2: base64 (pour les médias synchronisés en temps réel)
       if (memory.mediaBase64) {
         const prefix = memory.mediaType === 'video' ? 'data:video/mp4;base64,' : 'data:image/jpeg;base64,';
         return { uri: prefix + memory.mediaBase64 };
       }
-      // Sinon utiliser l'URI local
+      // Priorité 3: URI local
       if (memory.imageUri) {
         return { uri: memory.imageUri };
       }
@@ -411,12 +491,28 @@ export default function MemoriesScreen() {
     </View>
   );
 
-  // Vérifier si une lettre est délivrable
+  // Vérifier si une lettre est délivrable (avec timezone correct)
   const isLetterDeliverable = (letter) => {
+    if (!letter) return false;
     if (letter.fromId === user?.id) return false; // Pas ses propres lettres
-    const deliveryDate = new Date(letter.deliveryDate.split('/').reverse().join('-'));
+    
+    // Parser la date de livraison
+    let deliveryDate;
+    if (letter.deliveryDate.includes('/')) {
+      // Format JJ/MM/AAAA
+      const [day, month, year] = letter.deliveryDate.split('/').map(Number);
+      deliveryDate = new Date(year, month - 1, day, 0, 0, 0);
+    } else {
+      // Format ISO ou autre
+      deliveryDate = new Date(letter.deliveryDate);
+    }
+    
+    // Comparer uniquement les dates (pas l'heure)
     const now = new Date();
-    return now >= deliveryDate;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const deliveryDay = new Date(deliveryDate.getFullYear(), deliveryDate.getMonth(), deliveryDate.getDate());
+    
+    return today >= deliveryDay;
   };
 
   // === LETTRES D'AMOUR PROGRAMMÉES ===
@@ -426,19 +522,50 @@ export default function MemoriesScreen() {
       return;
     }
 
+    // Valider le format de la date (JJ/MM/AAAA)
+    const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = newLetter.deliveryDate.match(dateRegex);
+    if (!match) {
+      Alert.alert('Erreur', 'Format de date invalide. Utilisez JJ/MM/AAAA (ex: 14/02/2025)');
+      return;
+    }
+
+    // Vérifier que la date est dans le futur
+    const [_, day, month, year] = match;
+    const deliveryDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (deliveryDate <= today) {
+      Alert.alert('Erreur', 'La date de livraison doit être dans le futur');
+      return;
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
-    await addScheduledLetter({
-      title: newLetter.title,
-      content: newLetter.content,
-      deliveryDate: newLetter.deliveryDate,
-    });
+    try {
+      const letter = await addScheduledLetter({
+        title: newLetter.title,
+        content: newLetter.content,
+        deliveryDate: newLetter.deliveryDate,
+      });
 
-    await notifyScheduledLetter();
+      // Notifier le partenaire qu'une lettre a été programmée
+      await notifyScheduledLetter();
+      
+      // Note: La notification de livraison sera gérée par le système
+      // quand le partenaire ouvrira l'app après la date de livraison
 
-    setNewLetter({ title: '', content: '', deliveryDate: '' });
-    setShowAddModal(false);
-    Alert.alert('💌', `Votre lettre sera livrée le ${newLetter.deliveryDate} !`);
+      setNewLetter({ title: '', content: '', deliveryDate: '' });
+      setShowAddModal(false);
+      Alert.alert(
+        '💌 Lettre programmée !', 
+        `Votre lettre sera livrée à votre partenaire le ${newLetter.deliveryDate}.\n\nIl/Elle recevra une notification le jour venu !`
+      );
+    } catch (error) {
+      console.error('Erreur ajout lettre:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder la lettre. Réessayez.');
+    }
   };
 
   const openLetter = (letter) => {
@@ -612,18 +739,32 @@ export default function MemoriesScreen() {
       return;
     }
 
+    // Vérifier la longueur minimale
+    if (newDiaryEntry.content.trim().length < 3) {
+      Alert.alert('Erreur', 'Le texte est trop court');
+      return;
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
-    await addDiaryEntry({
-      mood: newDiaryEntry.mood,
-      content: newDiaryEntry.content,
-    });
+    try {
+      const entry = await addDiaryEntry({
+        mood: newDiaryEntry.mood,
+        content: newDiaryEntry.content.trim(),
+      });
 
-    await notifyDiaryEntry();
-
-    setNewDiaryEntry({ mood: '😊', content: '' });
-    setShowAddModal(false);
-    Alert.alert('📖', 'Entrée ajoutée au journal !');
+      if (entry) {
+        await notifyDiaryEntry();
+        setNewDiaryEntry({ mood: '😊', content: '' });
+        setShowAddModal(false);
+        Alert.alert('📖', 'Entrée ajoutée au journal !');
+      } else {
+        throw new Error('Entrée non créée');
+      }
+    } catch (error) {
+      console.error('Erreur ajout entrée journal:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder l\'entrée. Réessayez.');
+    }
   };
 
   const renderDiary = () => {
@@ -960,7 +1101,9 @@ export default function MemoriesScreen() {
                 {isUploading ? (
                   <View style={styles.uploadingContainer}>
                     <ActivityIndicator color="#fff" size="small" />
-                    <Text style={styles.saveButtonText}> Envoi...</Text>
+                    <Text style={styles.saveButtonText}>
+                      {uploadProgress > 0 ? ` ${uploadProgress}%` : ' Envoi...'}
+                    </Text>
                   </View>
                 ) : (
                   <Text style={styles.saveButtonText}>
@@ -988,9 +1131,12 @@ export default function MemoriesScreen() {
             {selectedMemory && (
               <>
                 {(() => {
-                  // Obtenir la source du média
+                  // Obtenir la source du média - priorité: URL Storage > base64 > URI local
                   let mediaSource = null;
-                  if (selectedMemory.mediaBase64) {
+                  if (selectedMemory.mediaUrl) {
+                    // URL Firebase Storage
+                    mediaSource = { uri: selectedMemory.mediaUrl };
+                  } else if (selectedMemory.mediaBase64) {
                     const prefix = selectedMemory.mediaType === 'video' ? 'data:video/mp4;base64,' : 'data:image/jpeg;base64,';
                     mediaSource = { uri: prefix + selectedMemory.mediaBase64 };
                   } else if (selectedMemory.imageUri) {

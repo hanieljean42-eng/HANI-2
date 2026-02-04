@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -234,6 +237,9 @@ export default function GamesScreen() {
     submitAnswer,
     checkBothAnswered,
     getBothAnswers,
+    getMyAnswer,
+    hasMyAnswer,
+    gameData,
     nextQuestion: nextGameQuestion,
     isFirebaseReady,
     pendingGameInvite,
@@ -253,6 +259,12 @@ export default function GamesScreen() {
   const [player1Answer, setPlayer1Answer] = useState(null);
   const [player2Answer, setPlayer2Answer] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(1);
+  
+  // États pour Action/Vérité avec réponses
+  const [todResponse, setTodResponse] = useState('');
+  const [todSubmitted, setTodSubmitted] = useState(false);
+  const [todRound, setTodRound] = useState(0);
+  const [todCurrentPlayer, setTodCurrentPlayer] = useState(null); // qui doit répondre
   
   // États pour le mode multijoueur à distance
   const [showLobby, setShowLobby] = useState(false);
@@ -397,12 +409,92 @@ export default function GamesScreen() {
     }
   };
 
-  const selectTruthOrDare = (type) => {
+  const selectTruthOrDare = async (type) => {
     const items = type === 'truth' ? TRUTH_OR_DARE.truths : TRUTH_OR_DARE.dares;
     const random = items[Math.floor(Math.random() * items.length)];
-    setTruthOrDare({ type, text: random });
+    const selection = { type, text: random, round: todRound };
+    setTruthOrDare(selection);
+    setTodResponse('');
+    setTodSubmitted(false);
+    setTodCurrentPlayer(user?.name || 'Moi'); // C'est moi qui dois répondre
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // En mode online, synchroniser le choix avec le partenaire
+    if (gameMode === 'online' && isFirebaseReady) {
+      await submitAnswer(`tod_question_${todRound}`, { 
+        type, 
+        text: random, 
+        askedBy: partner?.name || 'Partenaire',
+        mustAnswerBy: user?.name || 'Moi',
+        round: todRound 
+      }, user?.name);
+    }
   };
+
+  // Soumettre la réponse à une Action/Vérité
+  const submitTodResponse = async () => {
+    if (!todResponse.trim()) {
+      Alert.alert('Oops', 'Écris ta réponse avant de soumettre !');
+      return;
+    }
+    
+    setTodSubmitted(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // En mode online, synchroniser la réponse avec le partenaire
+    if (gameMode === 'online' && isFirebaseReady) {
+      await submitAnswer(`tod_response_${todRound}`, {
+        response: todResponse.trim(),
+        respondedBy: user?.name || 'Moi',
+        question: truthOrDare,
+        round: todRound,
+        timestamp: Date.now()
+      }, user?.name);
+    }
+  };
+
+  // Confirmer qu'une Action a été réalisée (sans texte)
+  const confirmActionDone = async () => {
+    setTodSubmitted(true);
+    setTodResponse('✅ Action réalisée !');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    if (gameMode === 'online' && isFirebaseReady) {
+      await submitAnswer(`tod_response_${todRound}`, {
+        response: '✅ Action réalisée !',
+        respondedBy: user?.name || 'Moi',
+        question: truthOrDare,
+        round: todRound,
+        timestamp: Date.now()
+      }, user?.name);
+    }
+  };
+
+  // Passer au tour suivant d'Action/Vérité
+  const nextTodRound = () => {
+    setTruthOrDare(null);
+    setTodResponse('');
+    setTodSubmitted(false);
+    setTodRound(prev => prev + 1);
+    setTodCurrentPlayer(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  // Obtenir la réponse du partenaire pour le tour actuel
+  const getPartnerTodResponse = useCallback(() => {
+    if (!gameData?.answers) return null;
+    const responseKey = `tod_response_${todRound}`;
+    const responses = gameData.answers[responseKey];
+    if (!responses) return null;
+    
+    // Trouver la réponse qui n'est pas la mienne
+    for (const [playerId, data] of Object.entries(responses)) {
+      if (data.respondedBy !== user?.name) {
+        return data;
+      }
+    }
+    return null;
+  }, [gameData, todRound, user?.name]);
 
   const addScore = (player) => {
     setScores({
@@ -1062,20 +1154,127 @@ export default function GamesScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.todResult}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.todResult}
+        >
           <Text style={styles.todResultType}>
             {truthOrDare.type === 'truth' ? '💬 VÉRITÉ' : '⚡ ACTION'}
           </Text>
           <View style={styles.todResultCard}>
             <Text style={styles.todResultText}>{truthOrDare.text}</Text>
           </View>
+
+          {/* Zone de réponse */}
+          {!todSubmitted ? (
+            <View style={styles.todResponseContainer}>
+              <Text style={styles.todResponseLabel}>
+                {truthOrDare.type === 'truth' 
+                  ? '📝 Écris ta réponse :' 
+                  : '⚡ Confirme que tu as fait l\'action :'}
+              </Text>
+              
+              {truthOrDare.type === 'truth' ? (
+                <>
+                  <TextInput
+                    style={styles.todResponseInput}
+                    value={todResponse}
+                    onChangeText={setTodResponse}
+                    placeholder="Tape ta réponse ici..."
+                    placeholderTextColor="#999"
+                    multiline
+                    maxLength={500}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.todSubmitButton,
+                      !todResponse.trim() && styles.todSubmitButtonDisabled
+                    ]}
+                    onPress={submitTodResponse}
+                    disabled={!todResponse.trim()}
+                  >
+                    <Text style={styles.todSubmitButtonText}>
+                      Envoyer ma réponse ✓
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.todActionButtons}>
+                  <TouchableOpacity
+                    style={styles.todActionDoneButton}
+                    onPress={confirmActionDone}
+                  >
+                    <Text style={styles.todActionDoneText}>✅ J'ai fait l'action !</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.todActionSkipButton}
+                    onPress={() => {
+                      setTodSubmitted(true);
+                      setTodResponse('❌ Action passée...');
+                      if (gameMode === 'online' && isFirebaseReady) {
+                        submitAnswer(`tod_response_${todRound}`, {
+                          response: '❌ Action passée...',
+                          respondedBy: user?.name || 'Moi',
+                          question: truthOrDare,
+                          round: todRound,
+                          timestamp: Date.now()
+                        }, user?.name);
+                      }
+                    }}
+                  >
+                    <Text style={styles.todActionSkipText}>😅 Je passe...</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.todAnswerContainer}>
+              <Text style={styles.todAnswerLabel}>✅ Ta réponse :</Text>
+              <View style={styles.todAnswerBox}>
+                <Text style={styles.todAnswerText}>{todResponse}</Text>
+              </View>
+              
+              {/* Afficher la réponse du partenaire en mode online */}
+              {gameMode === 'online' && (
+                <View style={styles.todPartnerSection}>
+                  {(() => {
+                    const partnerResponse = getPartnerTodResponse();
+                    if (partnerResponse) {
+                      return (
+                        <>
+                          <Text style={styles.todPartnerLabel}>
+                            💕 Réponse de {partnerResponse.respondedBy || partner?.name || 'ton partenaire'} :
+                          </Text>
+                          <View style={styles.todPartnerAnswerBox}>
+                            <Text style={styles.todPartnerAnswerText}>
+                              {partnerResponse.response}
+                            </Text>
+                          </View>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <View style={styles.todWaitingPartner}>
+                          <ActivityIndicator size="small" color="#FF6B9D" />
+                          <Text style={styles.todWaitingText}>
+                            En attente de la réponse de {partner?.name || 'ton partenaire'}...
+                          </Text>
+                        </View>
+                      );
+                    }
+                  })()}
+                </View>
+              )}
+            </View>
+          )}
+
           <TouchableOpacity
             style={styles.todNextButton}
-            onPress={() => setTruthOrDare(null)}
+            onPress={nextTodRound}
           >
-            <Text style={styles.todNextButtonText}>Prochain tour</Text>
+            <Text style={styles.todNextButtonText}>Prochain tour →</Text>
           </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       )}
     </View>
   );
@@ -1918,5 +2117,128 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 15,
     textAlign: 'center',
+  },
+  
+  // ===== STYLES ACTION/VÉRITÉ AVEC RÉPONSES =====
+  todResponseContainer: {
+    width: '100%',
+    marginTop: 20,
+    paddingHorizontal: 10,
+  },
+  todResponseLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  todResponseInput: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 15,
+    padding: 15,
+    fontSize: 16,
+    color: '#fff',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    marginBottom: 15,
+  },
+  todSubmitButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 15,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  todSubmitButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  todSubmitButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  todActionButtons: {
+    gap: 12,
+  },
+  todActionDoneButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 15,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  todActionDoneText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  todActionSkipButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 15,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  todActionSkipText: {
+    fontSize: 15,
+    color: '#fff',
+  },
+  todAnswerContainer: {
+    width: '100%',
+    marginTop: 20,
+    paddingHorizontal: 10,
+  },
+  todAnswerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 8,
+  },
+  todAnswerBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 12,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  todAnswerText: {
+    fontSize: 15,
+    color: '#fff',
+  },
+  todPartnerSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.2)',
+  },
+  todPartnerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF6B9D',
+    marginBottom: 8,
+  },
+  todPartnerAnswerBox: {
+    backgroundColor: 'rgba(255, 107, 157, 0.2)',
+    borderRadius: 12,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#FF6B9D',
+  },
+  todPartnerAnswerText: {
+    fontSize: 15,
+    color: '#fff',
+  },
+  todWaitingPartner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    gap: 10,
+  },
+  todWaitingText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    fontStyle: 'italic',
   },
 });

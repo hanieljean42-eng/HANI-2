@@ -180,17 +180,30 @@ export function NotificationProvider({ children }) {
       }
 
       try {
-        // Obtenir le token Expo Push
+        // Obtenir le token Expo Push avec le bon projectId
+        // Le projectId doit correspondre à celui de app.json/eas.json
+        const projectId = '87b635c7-a516-44d2-a9b4-8783d45c6cf4'; // ID du projet EAS
         const tokenData = await Notifications.getExpoPushTokenAsync({
-          projectId: 'your-project-id', // Sera ignoré en dev
+          projectId: projectId,
         });
         token = tokenData.data;
-        console.log('🔔 Token Push:', token);
+        console.log('🔔 Token Push obtenu:', token);
+        
+        // Sauvegarder le token pour persistance
+        await AsyncStorage.setItem('@expoPushToken', token);
       } catch (error) {
-        console.log('⚠️ Erreur token (normal en dev):', error.message);
-        // En mode développement, on peut avoir une erreur
-        // On génère un token factice pour le dev
-        token = `dev-token-${Date.now()}`;
+        console.log('⚠️ Erreur obtention token:', error.message);
+        
+        // Essayer de récupérer un token précédemment sauvegardé
+        const savedToken = await AsyncStorage.getItem('@expoPushToken');
+        if (savedToken && savedToken.startsWith('ExponentPushToken')) {
+          token = savedToken;
+          console.log('🔔 Token Push récupéré du cache:', token);
+        } else {
+          // En mode développement, générer un token factice
+          token = `dev-token-${Date.now()}`;
+          console.log('⚠️ Mode dev - Token factice généré');
+        }
       }
     } else {
       console.log('⚠️ Les notifications push nécessitent un appareil physique');
@@ -247,21 +260,64 @@ export function NotificationProvider({ children }) {
   };
 
   // Programmer une notification locale (pour test ou rappels)
-  const scheduleLocalNotification = async (title, body, data = {}, seconds = 1) => {
+  const scheduleLocalNotification = async (title, body, data = {}, triggerOptions = { seconds: 1 }) => {
     try {
-      await Notifications.scheduleNotificationAsync({
+      // Vérifier les permissions d'abord
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('⚠️ Permissions notifications non accordées');
+        return false;
+      }
+
+      // Créer le trigger approprié
+      let trigger;
+      if (typeof triggerOptions === 'number') {
+        // Compatibilité avec l'ancienne API (seconds)
+        trigger = { seconds: triggerOptions };
+      } else if (triggerOptions.date) {
+        // Notification à une date précise
+        const targetDate = new Date(triggerOptions.date);
+        const now = new Date();
+        if (targetDate <= now) {
+          console.log('⚠️ Date de notification passée');
+          return false;
+        }
+        trigger = { date: targetDate };
+      } else if (triggerOptions.seconds) {
+        trigger = { seconds: triggerOptions.seconds };
+      } else {
+        trigger = { seconds: 1 };
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title: title,
           body: body,
-          data: data,
+          data: { ...data, scheduledAt: new Date().toISOString() },
           sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: { seconds: seconds },
+        trigger: trigger,
       });
-      console.log('📅 Notification locale programmée');
-      return true;
+      
+      console.log('📅 Notification locale programmée, ID:', notificationId);
+      
+      // Sauvegarder l'ID pour pouvoir annuler si nécessaire
+      const scheduled = await AsyncStorage.getItem('@scheduledNotifications');
+      const notifications = scheduled ? JSON.parse(scheduled) : [];
+      notifications.push({
+        id: notificationId,
+        title,
+        body,
+        data,
+        trigger: triggerOptions,
+        createdAt: new Date().toISOString(),
+      });
+      await AsyncStorage.setItem('@scheduledNotifications', JSON.stringify(notifications));
+      
+      return notificationId;
     } catch (error) {
-      console.error('Erreur notification locale:', error);
+      console.error('❌ Erreur notification locale:', error);
       return false;
     }
   };
@@ -393,6 +449,73 @@ export function NotificationProvider({ children }) {
   // Annuler toutes les notifications programmées
   const cancelAllNotifications = async () => {
     await Notifications.cancelAllScheduledNotificationsAsync();
+    await AsyncStorage.removeItem('@scheduledNotifications');
+  };
+
+  // Programmer une notification pour une lettre d'amour avec date spécifique
+  const scheduleLetterNotification = async (letterId, title, body, deliveryDate, fromName) => {
+    try {
+      // Parser la date (format attendu: JJ/MM/AAAA ou AAAA-MM-DD)
+      let targetDate;
+      if (deliveryDate.includes('/')) {
+        const [day, month, year] = deliveryDate.split('/').map(Number);
+        targetDate = new Date(year, month - 1, day, 9, 0, 0); // 9h du matin
+      } else {
+        targetDate = new Date(deliveryDate);
+        targetDate.setHours(9, 0, 0, 0);
+      }
+
+      const now = new Date();
+      if (targetDate <= now) {
+        console.log('⚠️ Date de livraison déjà passée');
+        return false;
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💌 Lettre d\'amour !',
+          body: `${fromName} t'a écrit une lettre d'amour ! Ouvre-la vite ! 💕`,
+          data: { 
+            type: 'scheduled_letter',
+            letterId: letterId,
+          },
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { date: targetDate },
+      });
+
+      console.log('📅 Notification lettre programmée pour:', targetDate.toISOString(), 'ID:', notificationId);
+      
+      // Sauvegarder la correspondance lettre -> notification
+      const letterNotifs = await AsyncStorage.getItem('@letterNotifications');
+      const notifs = letterNotifs ? JSON.parse(letterNotifs) : {};
+      notifs[letterId] = notificationId;
+      await AsyncStorage.setItem('@letterNotifications', JSON.stringify(notifs));
+      
+      return notificationId;
+    } catch (error) {
+      console.error('❌ Erreur programmation notification lettre:', error);
+      return false;
+    }
+  };
+
+  // Annuler une notification de lettre
+  const cancelLetterNotification = async (letterId) => {
+    try {
+      const letterNotifs = await AsyncStorage.getItem('@letterNotifications');
+      if (letterNotifs) {
+        const notifs = JSON.parse(letterNotifs);
+        if (notifs[letterId]) {
+          await Notifications.cancelScheduledNotificationAsync(notifs[letterId]);
+          delete notifs[letterId];
+          await AsyncStorage.setItem('@letterNotifications', JSON.stringify(notifs));
+          console.log('🔕 Notification lettre annulée');
+        }
+      }
+    } catch (error) {
+      console.error('Erreur annulation notification lettre:', error);
+    }
   };
 
   const value = {
@@ -415,6 +538,9 @@ export function NotificationProvider({ children }) {
     scheduleDailyReminder,
     scheduleAnniversaryReminder,
     cancelAllNotifications,
+    // Lettres programmées
+    scheduleLetterNotification,
+    cancelLetterNotification,
   };
 
   return (

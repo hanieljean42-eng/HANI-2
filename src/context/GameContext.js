@@ -437,7 +437,7 @@ export function GameProvider({ children }) {
   }, [coupleId, isFirebaseReady, myPlayerId]);
 
   // Soumettre une réponse
-  const submitAnswer = async (questionIndex, answer) => {
+  const submitAnswer = async (questionIndex, answer, playerName = null) => {
     // Mode local - mettre à jour l'état local directement
     if (!isFirebaseReady) {
       setGameSession(prev => {
@@ -449,41 +449,89 @@ export function GameProvider({ children }) {
         newSession.answers[questionIndex][myPlayerId] = {
           answer,
           timestamp: Date.now(),
+          playerName: playerName || 'Joueur',
         };
         // Simuler la réponse du partenaire pour les tests
         newSession.answers[questionIndex]['partner'] = {
           answer: answer, // Même réponse pour simplifier
           timestamp: Date.now(),
+          playerName: 'Partenaire',
         };
         return newSession;
       });
-      return;
+      return true;
     }
 
-    if (!coupleId || !database || !myPlayerId) return;
+    if (!coupleId || !database || !myPlayerId) {
+      console.log('❌ Impossible de soumettre: coupleId, database ou myPlayerId manquant');
+      return false;
+    }
 
     try {
+      console.log('📤 Soumission réponse:', { questionIndex, answer, myPlayerId });
+      
       const answerRef = ref(database, `games/${coupleId}/session/answers/${questionIndex}/${myPlayerId}`);
       await set(answerRef, {
         answer,
         timestamp: Date.now(),
+        playerName: playerName || 'Joueur',
+        playerId: myPlayerId,
       });
+      
+      console.log('✅ Réponse soumise avec succès');
+      return true;
     } catch (error) {
-      console.error('Erreur soumission réponse:', error);
+      console.error('❌ Erreur soumission réponse:', error);
+      return false;
     }
   };
 
   // Vérifier si les deux joueurs ont répondu à une question
   const checkBothAnswered = (questionIndex) => {
-    if (!gameSession?.answers?.[questionIndex]) return false;
-    const answers = gameSession.answers[questionIndex];
-    return Object.keys(answers).length >= 2;
+    // Utiliser gameData qui est mis à jour en temps réel via Firebase
+    const sessionData = gameData || gameSession;
+    if (!sessionData?.answers?.[questionIndex]) return false;
+    const answers = sessionData.answers[questionIndex];
+    const answerCount = Object.keys(answers).length;
+    console.log(`📊 Question ${questionIndex}: ${answerCount} réponse(s)`);
+    return answerCount >= 2;
   };
 
   // Obtenir les réponses des deux joueurs
   const getBothAnswers = (questionIndex) => {
-    if (!gameSession?.answers?.[questionIndex]) return null;
-    return gameSession.answers[questionIndex];
+    // Utiliser gameData qui est mis à jour en temps réel via Firebase
+    const sessionData = gameData || gameSession;
+    if (!sessionData?.answers?.[questionIndex]) return null;
+    return sessionData.answers[questionIndex];
+  };
+
+  // Obtenir ma réponse pour une question
+  const getMyAnswer = (questionIndex) => {
+    const sessionData = gameData || gameSession;
+    if (!sessionData?.answers?.[questionIndex]) return null;
+    return sessionData.answers[questionIndex][myPlayerId];
+  };
+
+  // Vérifier si j'ai déjà répondu à une question
+  const hasMyAnswer = (questionIndex) => {
+    return getMyAnswer(questionIndex) !== null && getMyAnswer(questionIndex) !== undefined;
+  };
+
+  // Attendre que le partenaire réponde (avec timeout)
+  const waitForPartnerAnswer = async (questionIndex, timeoutMs = 60000) => {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      
+      const checkInterval = setInterval(() => {
+        if (checkBothAnswered(questionIndex)) {
+          clearInterval(checkInterval);
+          resolve(true);
+        } else if (Date.now() - startTime > timeoutMs) {
+          clearInterval(checkInterval);
+          resolve(false);
+        }
+      }, 500); // Vérifier toutes les 500ms
+    });
   };
 
   // Passer à la question suivante
@@ -652,6 +700,9 @@ export function GameProvider({ children }) {
     submitAnswer,
     checkBothAnswered,
     getBothAnswers,
+    getMyAnswer,
+    hasMyAnswer,
+    waitForPartnerAnswer,
     nextQuestion,
     endGameSession,
     checkActiveSession,

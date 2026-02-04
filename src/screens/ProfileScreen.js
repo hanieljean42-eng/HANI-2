@@ -988,7 +988,7 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.deleteAccountButtonText}>🗑️ Supprimer mon compte</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>HANI 2 v5.0.0 - by Haniel Henoc 💕</Text>
+      <Text style={styles.version}>HANI 2 v5.0.0 - by Djeble Haniel Henoc 💕</Text>
     </View>
   );
 
@@ -1602,7 +1602,7 @@ export default function ProfileScreen({ navigation }) {
           
           <View style={styles.aboutSection}>
             <Text style={styles.aboutSectionTitle}>👨‍💻 Créateur</Text>
-            <Text style={styles.aboutSectionText}>Haniel Henoc</Text>
+            <Text style={styles.aboutSectionText}>Djeble Haniel Henoc</Text>
           </View>
           
           <View style={styles.aboutSection}>

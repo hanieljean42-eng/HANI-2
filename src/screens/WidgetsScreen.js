@@ -22,7 +22,7 @@ const { width, height } = Dimensions.get('window');
 export default function WidgetsScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, partner, couple } = useAuth();
-  const { activities, memories, loveNotes, challenges } = useData();
+  const { memories, loveNotes, challenges } = useData();
   
   const [widgetSettings, setWidgetSettings] = useState({
     showCountdown: true,
@@ -310,8 +310,8 @@ export default function WidgetsScreen({ navigation }) {
             </View>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{activities?.length || 0}</Text>
-                <Text style={styles.statLabel}>Activités</Text>
+                <Text style={styles.statNumber}>{challenges?.length || 0}</Text>
+                <Text style={styles.statLabel}>Défis</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>{memories?.length || 0}</Text>
