@@ -1,0 +1,5 @@
+# Ignore local cache directories that cause permission issues
+.expo/
+.expo-shared/
+android/
+ios/
