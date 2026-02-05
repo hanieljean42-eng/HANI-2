@@ -4,6 +4,10 @@
     "appVersionSource": "local"
   },
   "build": {
+    "base": {
+      "node": "20.18.0",
+      "npm": "10.8.2"
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
@@ -18,7 +22,8 @@
         "gradleCommand": ":app:assembleRelease"
       },
       "env": {
-        "APP_VERSION": "3.0.0"
+        "APP_VERSION": "3.0.0",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
     "production": {
