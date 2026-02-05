@@ -56,11 +56,11 @@
       "androidMode": "default",
       "androidCollapsedTitle": "HANI 2 💕"
     },
-    "owner": "ddaq",
     "extra": {
       "eas": {
-        "projectId": "87b635c7-a516-44d2-a9b4-8783d45c6cf4"
+        "projectId": "b1f00575-c61e-45ee-84ac-b1644dff132f"
       }
-    }
+    },
+    "owner": "25aa00445b"
   }
 }
