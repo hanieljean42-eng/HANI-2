@@ -57,7 +57,13 @@ export default function JoinCoupleScreen() {
       return;
     }
 
-    const result = await joinCouple(coupleCode, formData);
+    // Normaliser le code saisi (majuscules, sans espaces)
+    const normalizedCode = coupleCode.toUpperCase().trim();
+    console.log('📝 Code saisi:', coupleCode, '→ normalisé:', normalizedCode);
+    
+    const result = await joinCouple(normalizedCode, formData);
+    console.log('📤 Résultat joinCouple:', JSON.stringify(result, null, 2));
+    
     if (result.success) {
       // Notification quand on rejoint un couple
       await notifyCoupleJoined(formData.partnerName);
@@ -66,9 +72,25 @@ export default function JoinCoupleScreen() {
           '🎉 Connectés !',
           'Vous êtes maintenant connecté(e) avec votre partenaire !\n\nToutes vos données seront synchronisées en temps réel. 💕'
         );
+      } else {
+        Alert.alert(
+          '✅ Code accepté !',
+          'Votre partenaire sera notifié(e) quand il/elle se connectera.\n\nLes données se synchroniseront automatiquement.',
+          [{ text: 'OK' }]
+        );
       }
     } else {
-      Alert.alert('Erreur', result.error || 'Code invalide. Vérifiez que votre partenaire a bien créé l\'espace couple et que vous êtes connecté(e) à Internet.');
+      // Message d'erreur plus détaillé
+      let errorMsg = result.error || 'Code invalide';
+      if (result.error?.includes('introuvable')) {
+        errorMsg = `❌ Le code "${normalizedCode}" n'a pas été trouvé.\n\n` +
+          '📝 Vérifiez que:\n' +
+          '• Votre partenaire a bien créé son espace couple\n' +
+          '• Vous avez entré le bon code (6 caractères)\n' +
+          '• Votre partenaire vous a partagé le code exact\n\n' +
+          '💡 Demandez à votre partenaire de vous renvoyer son code depuis son profil.';
+      }
+      Alert.alert('Erreur de jonction', errorMsg);
     }
   };
 

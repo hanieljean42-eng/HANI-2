@@ -290,41 +290,91 @@ export function AuthProvider({ children }) {
       let foundCouple = null;
       let coupleId = null;
 
+      // Normaliser le code (majuscules, trim)
+      const normalizedCode = code?.toUpperCase().trim();
+      console.log('🔗 Tentative de rejoindre avec le code:', normalizedCode);
+
       // Chercher d'abord sur Firebase si connecté
       if (isConfigured && database && isOnline) {
         try {
-          console.log('🔍 Recherche du code sur Firebase:', code);
+          console.log('🔍 Recherche du code sur Firebase...');
           const couplesRef = ref(database, 'couples');
           const snapshot = await get(couplesRef);
           
           if (snapshot.exists()) {
             const couples = snapshot.val();
+            console.log('📋 Nombre de couples sur Firebase:', Object.keys(couples).length);
+            
             for (const [id, data] of Object.entries(couples)) {
-              if (data.code?.toUpperCase() === code?.toUpperCase()) {
+              const firebaseCode = data.code?.toUpperCase().trim();
+              console.log(`  Comparaison: "${firebaseCode}" === "${normalizedCode}" = ${firebaseCode === normalizedCode}`);
+              
+              if (firebaseCode === normalizedCode) {
                 coupleId = id;
                 foundCouple = data;
-                console.log('✅ Couple trouvé sur Firebase:', data.name);
+                console.log('✅ Couple trouvé sur Firebase:', data.name, '- ID:', id);
                 break;
               }
             }
+            
+            if (!foundCouple) {
+              console.log('❌ Code non trouvé sur Firebase');
+            }
+          } else {
+            console.log('❌ Aucun couple sur Firebase');
           }
         } catch (e) {
           console.log('⚠️ Erreur recherche Firebase:', e.message);
         }
+      } else {
+        console.log('⚠️ Firebase non disponible - isConfigured:', isConfigured, 'isOnline:', isOnline);
+      }
+
+      // Chercher aussi localement si pas trouvé sur Firebase
+      if (!foundCouple) {
+        console.log('🔍 Recherche locale...');
+        const storedCouples = await AsyncStorage.getItem('@registeredCouples');
+        if (storedCouples) {
+          const localCouples = JSON.parse(storedCouples);
+          console.log('📋 Couples locaux:', localCouples.length);
+          
+          const localMatch = localCouples.find(c => c.code?.toUpperCase().trim() === normalizedCode);
+          if (localMatch) {
+            foundCouple = localMatch;
+            coupleId = localMatch.id;
+            console.log('✅ Couple trouvé localement:', localMatch.name);
+          }
+        }
+      }
+
+      // Si toujours pas trouvé, retourner erreur
+      if (!foundCouple) {
+        console.log('❌ Code couple introuvable');
+        return { 
+          success: false, 
+          error: 'Code invalide. Vérifiez que:\n• Votre partenaire a bien créé l\'espace\n• Le code est correctement saisi\n• Vous êtes connecté à Internet' 
+        };
       }
 
       // Si trouvé sur Firebase, rejoindre
       if (foundCouple && coupleId) {
         // Ajouter le membre sur Firebase
-        const memberRef = ref(database, `couples/${coupleId}/members/${user.id}`);
-        await set(memberRef, {
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar || '😊',
-          joinedAt: new Date().toISOString(),
-          isCreator: false,
-          isOnline: true,
-        });
+        if (isConfigured && database && isOnline) {
+          try {
+            const memberRef = ref(database, `couples/${coupleId}/members/${user.id}`);
+            await set(memberRef, {
+              name: user.name,
+              email: user.email,
+              avatar: user.avatar || '😊',
+              joinedAt: new Date().toISOString(),
+              isCreator: false,
+              isOnline: true,
+            });
+            console.log('✅ Membre ajouté sur Firebase');
+          } catch (e) {
+            console.log('⚠️ Erreur ajout membre Firebase:', e.message);
+          }
+        }
 
         // Créer l'objet couple local
         const newCouple = {
@@ -368,8 +418,11 @@ export function AuthProvider({ children }) {
         // Ajouter à la liste des couples
         const storedCouples = await AsyncStorage.getItem('@registeredCouples');
         let couples = storedCouples ? JSON.parse(storedCouples) : [];
-        couples.push(newCouple);
-        await AsyncStorage.setItem('@registeredCouples', JSON.stringify(couples));
+        // Éviter les doublons
+        if (!couples.find(c => c.id === coupleId)) {
+          couples.push(newCouple);
+          await AsyncStorage.setItem('@registeredCouples', JSON.stringify(couples));
+        }
 
         setCouple(newCouple);
         setPartner(newPartner);
@@ -411,6 +464,7 @@ export function AuthProvider({ children }) {
       
       return { success: true, synced: false };
     } catch (error) {
+      console.log('❌ Erreur joinCouple:', error.message);
       return { success: false, error: error.message };
     }
   };
