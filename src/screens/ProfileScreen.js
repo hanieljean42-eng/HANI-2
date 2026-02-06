@@ -150,20 +150,38 @@ export default function ProfileScreen({ navigation }) {
   // Suppression du compte utilisateur
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Supprimer le compte',
-      'Êtes-vous sûr de vouloir supprimer définitivement votre compte ? Cette action est irréversible.',
+      '⚠️ Supprimer le compte',
+      'Êtes-vous sûr de vouloir supprimer définitivement votre compte ?\n\n• Toutes vos données seront effacées\n• Vos souvenirs, messages et défis seront perdus\n• Cette action est IRRÉVERSIBLE',
       [
         { text: 'Annuler', style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: 'Confirmer la suppression',
           style: 'destructive',
-          onPress: async () => {
-            const res = await deleteAccount();
-            if (res.success) {
-              Alert.alert('Compte supprimé', 'Votre compte a bien été supprimé.');
-            } else {
-              Alert.alert('Erreur', res.error || 'Impossible de supprimer le compte.');
-            }
+          onPress: () => {
+            // Double confirmation
+            Alert.alert(
+              '🚨 Dernière confirmation',
+              'Tapez "SUPPRIMER" mentalement et appuyez sur OK pour confirmer la suppression définitive de votre compte.',
+              [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                  text: 'OK, Supprimer tout',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const res = await deleteAccount();
+                    if (res.success) {
+                      Alert.alert(
+                        '✅ Compte supprimé', 
+                        'Votre compte et toutes vos données ont été supprimés.\n\nVous pouvez maintenant créer un nouveau compte ou rejoindre un espace couple.',
+                        [{ text: 'OK' }]
+                      );
+                    } else {
+                      Alert.alert('Erreur', res.error || 'Impossible de supprimer le compte.');
+                    }
+                  }
+                }
+              ]
+            );
           }
         }
       ]

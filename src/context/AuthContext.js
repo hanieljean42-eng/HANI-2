@@ -439,29 +439,93 @@ export function AuthProvider({ children }) {
   // Suppression complète du compte utilisateur
   const deleteAccount = async () => {
     try {
-      // Supprimer l'utilisateur localement
+      console.log('🗑️ Début suppression complète du compte...');
+      
+      // 1. Supprimer l'utilisateur de la liste des utilisateurs enregistrés
       const storedUsers = await AsyncStorage.getItem('@registeredUsers');
       let users = storedUsers ? JSON.parse(storedUsers) : [];
       if (user && user.email) {
         users = users.filter(u => u.email !== user.email);
         await AsyncStorage.setItem('@registeredUsers', JSON.stringify(users));
+        console.log('✅ Utilisateur supprimé de la liste des comptes');
       }
-      // Supprimer les données de session
-      await AsyncStorage.multiRemove(['@user', '@couple', '@partner', '@coupleId']);
-      // Supprimer sur Firebase si connecté
+
+      // 2. Supprimer sur Firebase si connecté
       if (isConfigured && database && user?.id && couple?.id) {
         try {
+          // Supprimer le membre du couple
           const memberRef = ref(database, `couples/${couple.id}/members/${user.id}`);
           await set(memberRef, null);
+          
+          // Supprimer le token push
+          const tokenRef = ref(database, `couples/${couple.id}/pushTokens/${user.id}`);
+          await set(tokenRef, null);
+          
+          console.log('✅ Données Firebase supprimées');
         } catch (e) {
           console.log('⚠️ Erreur suppression Firebase:', e.message);
         }
       }
+
+      // 3. Liste de TOUTES les clés à supprimer du stockage local
+      const keysToRemove = [
+        '@user',
+        '@couple',
+        '@partner',
+        '@coupleId',
+        '@pushToken',
+        '@expoPushToken',
+        '@scheduledNotifications',
+        '@letterNotifications',
+        '@memories',
+        '@loveNotes',
+        '@bucketList',
+        '@challenges',
+        '@dailyChallengeStatus',
+        '@weeklyChallenges',
+        '@challengeXP',
+        '@challengeStreak',
+        '@challengeLevel',
+        '@wheelHistory',
+        '@journal',
+        '@timeCapsules',
+        '@scheduledLetters',
+        '@secretContent',
+        '@secretPin',
+        '@useBiometrics',
+        '@gameScores',
+        '@quizScores',
+        '@selectedTheme',
+        '@loveMeterValue',
+        '@stats',
+        '@lastSync',
+        '@notifications',
+        '@settings',
+      ];
+
+      // Supprimer aussi les clés spécifiques à l'utilisateur si elles existent
+      if (user?.id) {
+        keysToRemove.push(`@partner_${user.id}`);
+        keysToRemove.push(`@user_${user.id}`);
+      }
+
+      // 4. Supprimer toutes les clés
+      await AsyncStorage.multiRemove(keysToRemove);
+      console.log('✅ Toutes les données locales supprimées');
+
+      // 5. Pour être sûr, vider tout le AsyncStorage (option nucléaire)
+      // Décommenter si besoin: await AsyncStorage.clear();
+
+      // 6. Réinitialiser les états
       setUser(null);
       setCouple(null);
       setPartner(null);
+      setIsSynced(false);
+      
+      console.log('✅ Compte supprimé avec succès !');
       return { success: true };
     } catch (error) {
+      console.error('❌ Erreur suppression compte:', error);
       return { success: false, error: error.message };
     }
   };
