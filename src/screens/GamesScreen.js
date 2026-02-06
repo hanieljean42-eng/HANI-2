@@ -271,6 +271,16 @@ export default function GamesScreen() {
   const [todHistory, setTodHistory] = useState([]); // historique des réponses du tour
   const [isMyTurnToAsk, setIsMyTurnToAsk] = useState(true); // est-ce mon tour de poser?
   
+  // États pour "Qui est le Plus" TOUR PAR TOUR
+  const [wimPhase, setWimPhase] = useState('player1'); // 'player1', 'passPhone', 'player2', 'reveal'
+  const [wimPlayer1Answer, setWimPlayer1Answer] = useState(null);
+  const [wimPlayer2Answer, setWimPlayer2Answer] = useState(null);
+  
+  // États pour "Tu Préfères" TOUR PAR TOUR  
+  const [wyrPhase, setWyrPhase] = useState('player1'); // 'player1', 'passPhone', 'player2', 'reveal'
+  const [wyrPlayer1Choice, setWyrPlayer1Choice] = useState(null);
+  const [wyrPlayer2Choice, setWyrPlayer2Choice] = useState(null)
+  
   // États pour le mode multijoueur à distance
   const [showLobby, setShowLobby] = useState(false);
   const [selectedGameForLobby, setSelectedGameForLobby] = useState(null);
@@ -396,6 +406,14 @@ export default function GamesScreen() {
     setPlayer1Answer(null);
     setPlayer2Answer(null);
     setCurrentPlayer(1);
+    // Reset pour "Qui est le Plus" tour par tour
+    setWimPhase('player1');
+    setWimPlayer1Answer(null);
+    setWimPlayer2Answer(null);
+    // Reset pour "Tu Préfères" tour par tour
+    setWyrPhase('player1');
+    setWyrPlayer1Choice(null);
+    setWyrPlayer2Choice(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
@@ -558,65 +576,175 @@ export default function GamesScreen() {
     }
   };
 
-  const renderWouldYouRather = () => (
-    <View style={styles.gameContainer}>
-      {!showResult ? (
-        <>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / WOULD_YOU_RATHER.length) * 100}%` }]} />
-          </View>
-          <Text style={styles.questionNumber}>{currentQuestion + 1}/{WOULD_YOU_RATHER.length}</Text>
-          
-          <Text style={styles.wyrTitle}>Tu préfères...</Text>
+  const renderWouldYouRather = () => {
+    const myName = user?.name || 'Moi';
+    const partnerName = partner?.name || 'Partenaire';
+    const currentQ = WOULD_YOU_RATHER[currentQuestion];
 
-          <TouchableOpacity
-            style={[styles.wyrOption, wyrChoice === 1 && styles.wyrOptionSelected]}
-            onPress={() => selectWyrOption(1)}
-          >
-            <Text style={[styles.wyrOptionText, wyrChoice === 1 && styles.wyrOptionTextSelected]}>
-              {WOULD_YOU_RATHER[currentQuestion].option1}
-            </Text>
-          </TouchableOpacity>
+    const handleWyrAnswer = (choice) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      if (wyrPhase === 'player1') {
+        setWyrPlayer1Choice(choice);
+        setWyrPhase('passPhone');
+      } else if (wyrPhase === 'player2') {
+        setWyrPlayer2Choice(choice);
+        setWyrPhase('reveal');
+      }
+    };
 
-          <Text style={styles.wyrOr}>OU</Text>
+    const handleWyrNext = () => {
+      if (currentQuestion < WOULD_YOU_RATHER.length - 1) {
+        setCurrentQuestion(currentQuestion + 1);
+        setWyrPhase('player1');
+        setWyrPlayer1Choice(null);
+        setWyrPlayer2Choice(null);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        setShowResult(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    };
 
-          <TouchableOpacity
-            style={[styles.wyrOption, wyrChoice === 2 && styles.wyrOptionSelected]}
-            onPress={() => selectWyrOption(2)}
-          >
-            <Text style={[styles.wyrOptionText, wyrChoice === 2 && styles.wyrOptionTextSelected]}>
-              {WOULD_YOU_RATHER[currentQuestion].option2}
-            </Text>
-          </TouchableOpacity>
+    return (
+      <View style={styles.gameContainer}>
+        {!showResult ? (
+          <>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / WOULD_YOU_RATHER.length) * 100}%` }]} />
+            </View>
+            <Text style={styles.questionNumber}>{currentQuestion + 1}/{WOULD_YOU_RATHER.length}</Text>
+            
+            <Text style={styles.wyrTitle}>Tu préfères...</Text>
 
-          {wyrChoice && (
-            <TouchableOpacity style={styles.wyrNextButton} onPress={nextWyrQuestion}>
-              <Text style={styles.wyrNextButtonText}>
-                {currentQuestion < WOULD_YOU_RATHER.length - 1 ? 'Suivant →' : 'Terminer ✓'}
-              </Text>
+            {/* PHASE 1: Premier joueur choisit */}
+            {wyrPhase === 'player1' && (
+              <View style={styles.wyrPhaseContainer}>
+                <Text style={styles.wyrPhaseTitle}>🎯 C'est au tour de {myName}</Text>
+                
+                <TouchableOpacity
+                  style={styles.wyrOption}
+                  onPress={() => handleWyrAnswer(1)}
+                >
+                  <Text style={styles.wyrOptionText}>{currentQ.option1}</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.wyrOr}>OU</Text>
+
+                <TouchableOpacity
+                  style={styles.wyrOption}
+                  onPress={() => handleWyrAnswer(2)}
+                >
+                  <Text style={styles.wyrOptionText}>{currentQ.option2}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* PHASE PASS: Passer le téléphone */}
+            {wyrPhase === 'passPhone' && (
+              <View style={styles.passPhoneContainer}>
+                <Text style={styles.passPhoneEmoji}>📱</Text>
+                <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
+                <Text style={styles.passPhoneText}>
+                  {myName} a fait son choix. Maintenant passe le téléphone à {partnerName} !
+                </Text>
+                <Text style={styles.passPhoneWarning}>⚠️ {partnerName} ne doit pas voir le choix de {myName} !</Text>
+                <TouchableOpacity
+                  style={styles.passPhoneButton}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setWyrPhase('player2');
+                  }}
+                >
+                  <Text style={styles.passPhoneButtonText}>👋 {partnerName} est prêt(e)</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* PHASE 2: Deuxième joueur choisit */}
+            {wyrPhase === 'player2' && (
+              <View style={styles.wyrPhaseContainer}>
+                <Text style={styles.wyrPhaseTitle}>🎯 C'est au tour de {partnerName}</Text>
+                
+                <TouchableOpacity
+                  style={styles.wyrOption}
+                  onPress={() => handleWyrAnswer(1)}
+                >
+                  <Text style={styles.wyrOptionText}>{currentQ.option1}</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.wyrOr}>OU</Text>
+
+                <TouchableOpacity
+                  style={styles.wyrOption}
+                  onPress={() => handleWyrAnswer(2)}
+                >
+                  <Text style={styles.wyrOptionText}>{currentQ.option2}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* PHASE REVEAL: Comparer les choix */}
+            {wyrPhase === 'reveal' && (
+              <View style={styles.quizRevealContainer}>
+                <Text style={styles.quizRevealTitle}>🔮 Révélation !</Text>
+                
+                <View style={styles.quizRevealAnswers}>
+                  <View style={styles.quizRevealAnswer}>
+                    <Text style={styles.quizRevealLabel}>{myName} préfère :</Text>
+                    <Text style={styles.quizRevealValue}>
+                      {wyrPlayer1Choice === 1 ? currentQ.option1 : currentQ.option2}
+                    </Text>
+                  </View>
+                  <View style={styles.quizRevealAnswer}>
+                    <Text style={styles.quizRevealLabel}>{partnerName} préfère :</Text>
+                    <Text style={styles.quizRevealValue}>
+                      {wyrPlayer2Choice === 1 ? currentQ.option1 : currentQ.option2}
+                    </Text>
+                  </View>
+                  
+                  {wyrPlayer1Choice === wyrPlayer2Choice ? (
+                    <Text style={styles.quizMatch}>✨ Vous êtes d'accord !</Text>
+                  ) : (
+                    <Text style={styles.wimDisagree}>🤔 Goûts différents !</Text>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.quizNextButton, { marginTop: 20 }]}
+                  onPress={handleWyrNext}
+                >
+                  <Text style={styles.quizNextButtonText}>
+                    {currentQuestion < WOULD_YOU_RATHER.length - 1 ? 'Suivant →' : 'Terminer ✓'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={styles.resultContainer}>
+            <Text style={styles.resultEmoji}>🎉</Text>
+            <Text style={styles.resultTitle}>Bravo {myName} & {partnerName} !</Text>
+            <Text style={styles.resultScore}>Vous avez terminé le jeu "Tu préfères" !</Text>
+            <Text style={styles.wyrResultHint}>Discutez de vos choix différents 💕</Text>
+            <TouchableOpacity
+              style={styles.playAgainButton}
+              onPress={() => {
+                setCurrentQuestion(0);
+                setWyrChoice(null);
+                setWyrPhase('player1');
+                setWyrPlayer1Choice(null);
+                setWyrPlayer2Choice(null);
+                setShowResult(false);
+              }}
+            >
+              <Text style={styles.playAgainText}>Rejouer</Text>
             </TouchableOpacity>
-          )}
-        </>
-      ) : (
-        <View style={styles.resultContainer}>
-          <Text style={styles.resultEmoji}>🎉</Text>
-          <Text style={styles.resultTitle}>Bravo !</Text>
-          <Text style={styles.resultScore}>Vous avez terminé le jeu "Tu préfères" !</Text>
-          <Text style={styles.wyrResultHint}>Discutez de vos choix ensemble 💕</Text>
-          <TouchableOpacity
-            style={styles.playAgainButton}
-            onPress={() => {
-              setCurrentQuestion(0);
-              setWyrChoice(null);
-              setShowResult(false);
-            }}
-          >
-            <Text style={styles.playAgainText}>Rejouer</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const getGameTitle = (gameType) => {
     const titles = {
@@ -973,13 +1101,15 @@ export default function GamesScreen() {
 
   const renderQuizGame = () => {
     const question = QUIZ_QUESTIONS[currentQuestion];
+    const myName = user?.name || 'Joueur 1';
+    const partnerName = partner?.name || 'Joueur 2';
     
     const handleQuizAnswer = (answer) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
       if (quizPhase === 'player1') {
         setPlayer1Answer(answer);
-        setQuizPhase('player2');
+        setQuizPhase('passPhone1'); // Passer le téléphone
       } else if (quizPhase === 'player2') {
         setPlayer2Answer(answer);
         setQuizPhase('reveal');
@@ -1017,12 +1147,12 @@ export default function GamesScreen() {
             
             <View style={styles.quizScoreBoard}>
               <View style={styles.quizPlayerScore}>
-                <Text style={styles.quizPlayerLabel}>Joueur 1</Text>
+                <Text style={styles.quizPlayerLabel}>{myName}</Text>
                 <Text style={styles.quizPlayerPoints}>{scores.player1} pts</Text>
               </View>
               <Text style={styles.quizVs}>VS</Text>
               <View style={styles.quizPlayerScore}>
-                <Text style={styles.quizPlayerLabel}>Joueur 2</Text>
+                <Text style={styles.quizPlayerLabel}>{partnerName}</Text>
                 <Text style={styles.quizPlayerPoints}>{scores.player2} pts</Text>
               </View>
             </View>
@@ -1033,10 +1163,11 @@ export default function GamesScreen() {
               <Text style={styles.questionText}>{question.question}</Text>
             </View>
 
+            {/* PHASE 1: Premier joueur répond */}
             {quizPhase === 'player1' && (
               <View style={styles.quizPhaseContainer}>
-                <Text style={styles.quizPhaseTitle}>👤 Joueur 1 répond :</Text>
-                <Text style={styles.quizPhaseHint}>(Le partenaire doit deviner la réponse)</Text>
+                <Text style={styles.quizPhaseTitle}>🎯 C'est au tour de {myName}</Text>
+                <Text style={styles.quizPhaseHint}>{partnerName} doit deviner ta réponse ensuite !</Text>
                 {question.type === 'choice' ? (
                   <View style={styles.quizOptions}>
                     {question.options.map((option, idx) => (
@@ -1060,10 +1191,32 @@ export default function GamesScreen() {
               </View>
             )}
 
+            {/* PHASE PASS: Passer le téléphone */}
+            {quizPhase === 'passPhone1' && (
+              <View style={styles.passPhoneContainer}>
+                <Text style={styles.passPhoneEmoji}>📱</Text>
+                <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
+                <Text style={styles.passPhoneText}>
+                  {myName} a répondu. Maintenant passe le téléphone à {partnerName} pour qu'il/elle devine.
+                </Text>
+                <Text style={styles.passPhoneWarning}>⚠️ {partnerName} ne doit pas voir la réponse !</Text>
+                <TouchableOpacity
+                  style={styles.passPhoneButton}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setQuizPhase('player2');
+                  }}
+                >
+                  <Text style={styles.passPhoneButtonText}>👋 {partnerName} est prêt(e)</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* PHASE 2: Deuxième joueur devine */}
             {quizPhase === 'player2' && (
               <View style={styles.quizPhaseContainer}>
-                <Text style={styles.quizPhaseTitle}>👤 Joueur 2 devine :</Text>
-                <Text style={styles.quizPhaseHint}>(Essaie de deviner la réponse !)</Text>
+                <Text style={styles.quizPhaseTitle}>🤔 C'est au tour de {partnerName}</Text>
+                <Text style={styles.quizPhaseHint}>Devine la réponse de {myName} !</Text>
                 {question.type === 'choice' ? (
                   <View style={styles.quizOptions}>
                     {question.options.map((option, idx) => (
@@ -1087,6 +1240,7 @@ export default function GamesScreen() {
               </View>
             )}
 
+            {/* PHASE REVEAL: Comparer les réponses */}
             {quizPhase === 'reveal' && (
               <View style={styles.quizRevealContainer}>
                 <Text style={styles.quizRevealTitle}>🎯 Comparez vos réponses !</Text>
@@ -1094,11 +1248,11 @@ export default function GamesScreen() {
                 {question.type === 'choice' && (
                   <View style={styles.quizRevealAnswers}>
                     <View style={styles.quizRevealAnswer}>
-                      <Text style={styles.quizRevealLabel}>Joueur 1 :</Text>
+                      <Text style={styles.quizRevealLabel}>{myName} :</Text>
                       <Text style={styles.quizRevealValue}>{player1Answer}</Text>
                     </View>
                     <View style={styles.quizRevealAnswer}>
-                      <Text style={styles.quizRevealLabel}>Joueur 2 :</Text>
+                      <Text style={styles.quizRevealLabel}>{partnerName} :</Text>
                       <Text style={styles.quizRevealValue}>{player2Answer}</Text>
                     </View>
                     {player1Answer === player2Answer && (
@@ -1114,13 +1268,13 @@ export default function GamesScreen() {
                     style={styles.quizRevealBtn}
                     onPress={() => handleCorrect('player1')}
                   >
-                    <Text style={styles.quizRevealBtnText}>Joueur 1 ✓</Text>
+                    <Text style={styles.quizRevealBtnText}>{myName} ✓</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.quizRevealBtn}
                     onPress={() => handleCorrect('player2')}
                   >
-                    <Text style={styles.quizRevealBtnText}>Joueur 2 ✓</Text>
+                    <Text style={styles.quizRevealBtnText}>{partnerName} ✓</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.quizRevealBtn, styles.quizRevealBtnBoth]}
@@ -1147,9 +1301,9 @@ export default function GamesScreen() {
             <Text style={styles.resultTitle}>Résultats du Quiz !</Text>
             <Text style={styles.resultScore}>
               {scores.player1 > scores.player2 
-                ? `Joueur 1 gagne ${scores.player1}-${scores.player2} !`
+                ? `${myName} gagne ${scores.player1}-${scores.player2} !`
                 : scores.player2 > scores.player1
-                ? `Joueur 2 gagne ${scores.player2}-${scores.player1} !`
+                ? `${partnerName} gagne ${scores.player2}-${scores.player1} !`
                 : `Égalité ${scores.player1}-${scores.player2} !`
               }
             </Text>
@@ -1427,67 +1581,224 @@ export default function GamesScreen() {
     );
   };
 
-  const renderWhoIsMore = () => (
-    <View style={styles.gameContainer}>
-      {!showResult ? (
-        <>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / 10) * 100}%` }]} />
-          </View>
-          <Text style={styles.questionNumber}>{currentQuestion + 1}/10</Text>
-          
-          <View style={styles.questionCard}>
-            <Text style={styles.questionText}>{WHO_IS_MORE[currentQuestion]}</Text>
-          </View>
+  const renderWhoIsMore = () => {
+    const myName = user?.name || 'Moi';
+    const partnerName = partner?.name || 'Partenaire';
 
-          <View style={styles.whoIsMoreButtons}>
-            <TouchableOpacity
-              style={styles.whoButton}
-              onPress={() => addScore('player1')}
-            >
-              <Text style={styles.whoButtonEmoji}>👈</Text>
-              <Text style={styles.whoButtonText}>Moi</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.whoButton}
-              onPress={() => addScore('player2')}
-            >
-              <Text style={styles.whoButtonEmoji}>👉</Text>
-              <Text style={styles.whoButtonText}>Toi</Text>
-            </TouchableOpacity>
-          </View>
+    const handleWimAnswer = (answer) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      if (wimPhase === 'player1') {
+        setWimPlayer1Answer(answer);
+        setWimPhase('passPhone');
+      } else if (wimPhase === 'player2') {
+        setWimPlayer2Answer(answer);
+        setWimPhase('reveal');
+      }
+    };
 
-          <View style={styles.scoresContainer}>
-            <Text style={styles.scoreText}>Moi: {scores.player1}</Text>
-            <Text style={styles.scoreText}>Toi: {scores.player2}</Text>
+    const handleWimNext = () => {
+      if (currentQuestion < WHO_IS_MORE.length - 1) {
+        setCurrentQuestion(currentQuestion + 1);
+        setWimPhase('player1');
+        setWimPlayer1Answer(null);
+        setWimPlayer2Answer(null);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        setShowResult(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    };
+
+    const handleWimScore = (bothAgree, who) => {
+      if (bothAgree) {
+        // Les deux sont d'accord
+        if (who === 'me') {
+          setScores(prev => ({ ...prev, player1: prev.player1 + 1 }));
+        } else {
+          setScores(prev => ({ ...prev, player2: prev.player2 + 1 }));
+        }
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      handleWimNext();
+    };
+
+    return (
+      <View style={styles.gameContainer}>
+        {!showResult ? (
+          <>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / WHO_IS_MORE.length) * 100}%` }]} />
+            </View>
+            <Text style={styles.questionNumber}>{currentQuestion + 1}/{WHO_IS_MORE.length}</Text>
+            
+            <View style={styles.questionCard}>
+              <Text style={styles.questionText}>{WHO_IS_MORE[currentQuestion]}</Text>
+            </View>
+
+            {/* PHASE 1: Premier joueur pointe */}
+            {wimPhase === 'player1' && (
+              <View style={styles.wimPhaseContainer}>
+                <Text style={styles.wimPhaseTitle}>🎯 C'est au tour de {myName}</Text>
+                <Text style={styles.wimPhaseHint}>Qui correspond le plus à cette question ?</Text>
+                
+                <View style={styles.whoIsMoreButtons}>
+                  <TouchableOpacity
+                    style={styles.whoButton}
+                    onPress={() => handleWimAnswer('me')}
+                  >
+                    <Text style={styles.whoButtonEmoji}>👈</Text>
+                    <Text style={styles.whoButtonText}>Moi</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.whoButton}
+                    onPress={() => handleWimAnswer('partner')}
+                  >
+                    <Text style={styles.whoButtonEmoji}>👉</Text>
+                    <Text style={styles.whoButtonText}>{partnerName}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* PHASE PASS: Passer le téléphone */}
+            {wimPhase === 'passPhone' && (
+              <View style={styles.passPhoneContainer}>
+                <Text style={styles.passPhoneEmoji}>📱</Text>
+                <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
+                <Text style={styles.passPhoneText}>
+                  {myName} a fait son choix. Maintenant passe le téléphone à {partnerName} pour qu'il/elle réponde aussi !
+                </Text>
+                <Text style={styles.passPhoneWarning}>⚠️ {partnerName} ne doit pas voir le choix de {myName} !</Text>
+                <TouchableOpacity
+                  style={styles.passPhoneButton}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setWimPhase('player2');
+                  }}
+                >
+                  <Text style={styles.passPhoneButtonText}>👋 {partnerName} est prêt(e)</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* PHASE 2: Deuxième joueur pointe */}
+            {wimPhase === 'player2' && (
+              <View style={styles.wimPhaseContainer}>
+                <Text style={styles.wimPhaseTitle}>🎯 C'est au tour de {partnerName}</Text>
+                <Text style={styles.wimPhaseHint}>Qui correspond le plus à cette question ?</Text>
+                
+                <View style={styles.whoIsMoreButtons}>
+                  <TouchableOpacity
+                    style={styles.whoButton}
+                    onPress={() => handleWimAnswer('me')}
+                  >
+                    <Text style={styles.whoButtonEmoji}>👈</Text>
+                    <Text style={styles.whoButtonText}>{myName}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.whoButton}
+                    onPress={() => handleWimAnswer('partner')}
+                  >
+                    <Text style={styles.whoButtonEmoji}>👉</Text>
+                    <Text style={styles.whoButtonText}>Moi</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* PHASE REVEAL: Comparer les réponses */}
+            {wimPhase === 'reveal' && (
+              <View style={styles.quizRevealContainer}>
+                <Text style={styles.quizRevealTitle}>🔮 Révélation !</Text>
+                
+                <View style={styles.quizRevealAnswers}>
+                  <View style={styles.quizRevealAnswer}>
+                    <Text style={styles.quizRevealLabel}>{myName} a pointé :</Text>
+                    <Text style={styles.quizRevealValue}>
+                      {wimPlayer1Answer === 'me' ? `👈 ${myName}` : `👉 ${partnerName}`}
+                    </Text>
+                  </View>
+                  <View style={styles.quizRevealAnswer}>
+                    <Text style={styles.quizRevealLabel}>{partnerName} a pointé :</Text>
+                    <Text style={styles.quizRevealValue}>
+                      {wimPlayer2Answer === 'me' ? `👈 ${myName}` : `👉 ${partnerName}`}
+                    </Text>
+                  </View>
+                  
+                  {/* Vérifier si les deux sont d'accord */}
+                  {wimPlayer1Answer === wimPlayer2Answer ? (
+                    <Text style={styles.quizMatch}>✨ Vous êtes d'accord !</Text>
+                  ) : (
+                    <Text style={styles.wimDisagree}>🤔 Vous n'êtes pas d'accord !</Text>
+                  )}
+                </View>
+
+                <View style={styles.quizRevealButtons}>
+                  {wimPlayer1Answer === wimPlayer2Answer ? (
+                    <TouchableOpacity
+                      style={[styles.quizRevealBtn, styles.quizRevealBtnBoth]}
+                      onPress={() => handleWimScore(true, wimPlayer1Answer)}
+                    >
+                      <Text style={styles.quizRevealBtnText}>
+                        +1 point pour {wimPlayer1Answer === 'me' ? myName : partnerName} !
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.quizRevealBtn}
+                      onPress={() => handleWimScore(false, null)}
+                    >
+                      <Text style={styles.quizRevealBtnText}>Question suivante →</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
+            <View style={styles.scoresContainer}>
+              <Text style={styles.scoreText}>{myName}: {scores.player1}</Text>
+              <Text style={styles.scoreText}>{partnerName}: {scores.player2}</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.resultContainer}>
+            <Text style={styles.resultEmoji}>🏆</Text>
+            <Text style={styles.resultTitle}>Résultats !</Text>
+            <Text style={styles.resultScore}>
+              {scores.player1 > scores.player2 
+                ? `${myName} gagne ${scores.player1}-${scores.player2} !`
+                : scores.player2 > scores.player1
+                ? `${partnerName} gagne ${scores.player2}-${scores.player1} !`
+                : `Égalité ${scores.player1}-${scores.player2} !`
+              }
+            </Text>
+            <Text style={styles.wyrResultHint}>
+              {scores.player1 > scores.player2 
+                ? `${myName} est vraiment unique ! 💕`
+                : scores.player2 > scores.player1
+                ? `${partnerName} est vraiment unique ! 💕`
+                : `Vous êtes tous les deux incroyables ! 💕`
+              }
+            </Text>
+            <TouchableOpacity
+              style={styles.playAgainButton}
+              onPress={() => {
+                setCurrentQuestion(0);
+                setScores({ player1: 0, player2: 0 });
+                setShowResult(false);
+                setWimPhase('player1');
+                setWimPlayer1Answer(null);
+                setWimPlayer2Answer(null);
+              }}
+            >
+              <Text style={styles.playAgainText}>Rejouer</Text>
+            </TouchableOpacity>
           </View>
-        </>
-      ) : (
-        <View style={styles.resultContainer}>
-          <Text style={styles.resultEmoji}>🏆</Text>
-          <Text style={styles.resultTitle}>Résultats !</Text>
-          <Text style={styles.resultScore}>
-            {scores.player1 > scores.player2 
-              ? `Moi gagne ${scores.player1}-${scores.player2} !`
-              : scores.player2 > scores.player1
-              ? `Toi gagne ${scores.player2}-${scores.player1} !`
-              : `Égalité ${scores.player1}-${scores.player2} !`
-            }
-          </Text>
-          <TouchableOpacity
-            style={styles.playAgainButton}
-            onPress={() => {
-              setCurrentQuestion(0);
-              setScores({ player1: 0, player2: 0 });
-              setShowResult(false);
-            }}
-          >
-            <Text style={styles.playAgainText}>Rejouer</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+        )}
+      </View>
+    );
+  };
 
   return (
     <LinearGradient
@@ -2531,5 +2842,86 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
     fontStyle: 'italic',
+  },
+  // ===== NOUVEAUX STYLES TOUR PAR TOUR =====
+  passPhoneContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 25,
+    marginVertical: 20,
+  },
+  passPhoneEmoji: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
+  passPhoneTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  passPhoneText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    marginBottom: 15,
+    lineHeight: 24,
+  },
+  passPhoneWarning: {
+    fontSize: 14,
+    color: '#FFD700',
+    textAlign: 'center',
+    marginBottom: 25,
+    fontWeight: '600',
+  },
+  passPhoneButton: {
+    backgroundColor: '#10B981',
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+  },
+  passPhoneButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  wimPhaseContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  wimPhaseTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  wimPhaseHint: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 25,
+    textAlign: 'center',
+  },
+  wimDisagree: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#F59E0B',
+    marginTop: 15,
+    textAlign: 'center',
+  },
+  wyrPhaseContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  wyrPhaseTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 20,
+    textAlign: 'center',
   },
 });

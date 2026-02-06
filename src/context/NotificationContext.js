@@ -140,6 +140,13 @@ export function NotificationProvider({ children }) {
     }
   };
 
+  // Ré-sauvegarder le token quand on récupère le couple/user (utile si on s'enregistre avant d'avoir joint le couple)
+  useEffect(() => {
+    if (expoPushToken && userId && coupleId) {
+      saveTokenToFirebase(expoPushToken);
+    }
+  }, [expoPushToken, userId, coupleId]);
+
   // Fonction pour demander les permissions
   async function registerForPushNotificationsAsync() {
     let token;
@@ -217,15 +224,17 @@ export function NotificationProvider({ children }) {
   // Envoyer une notification au partenaire via Expo Push
   const sendPushNotification = async (title, body, data = {}) => {
     if (!partnerToken) {
-      console.log('⚠️ Pas de token partenaire disponible');
-      return false;
+      console.log('⚠️ Pas de token partenaire disponible - envoi local de secours');
+      // Envoyer une notification locale en secours pour confirmation
+      await scheduleLocalNotification(title, body, data, 1);
+      return true;
     }
 
     // Vérifier si c'est un vrai token Expo
     if (!partnerToken.startsWith('ExponentPushToken')) {
       console.log('⚠️ Token partenaire non valide (mode dev)');
       // En mode dev, on peut simuler avec une notification locale
-      await scheduleLocalNotification(title, body, data);
+      await scheduleLocalNotification(title, body, data, 1);
       return true;
     }
 
@@ -255,6 +264,8 @@ export function NotificationProvider({ children }) {
       return true;
     } catch (error) {
       console.error('❌ Erreur envoi notification:', error);
+      // En cas d'erreur réseau, retomber sur une notification locale
+      await scheduleLocalNotification(title, body, data, 1);
       return false;
     }
   };
@@ -455,14 +466,26 @@ export function NotificationProvider({ children }) {
   // Programmer une notification pour une lettre d'amour avec date spécifique
   const scheduleLetterNotification = async (letterId, title, body, deliveryDate, fromName) => {
     try {
-      // Parser la date (format attendu: JJ/MM/AAAA ou AAAA-MM-DD)
+      // Accepter ISO (AAAA-MM-DDTHH:MM:SSZ) ou format JJ/MM/AAAA HH:MM
       let targetDate;
+      if (!deliveryDate) return false;
+
       if (deliveryDate.includes('/')) {
-        const [day, month, year] = deliveryDate.split('/').map(Number);
-        targetDate = new Date(year, month - 1, day, 9, 0, 0); // 9h du matin
+        // Format JJ/MM/AAAA ou JJ/MM/AAAA HH:MM
+        const parts = deliveryDate.split(' ');
+        const [day, month, year] = parts[0].split('/').map(Number);
+        let hour = 9, minute = 0;
+        if (parts[1]) {
+          const tm = parts[1].match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+          if (tm) {
+            hour = parseInt(tm[1], 10);
+            minute = parseInt(tm[2], 10);
+          }
+        }
+        targetDate = new Date(year, month - 1, day, hour, minute, 0);
       } else {
+        // ISO string -> use exact time if present
         targetDate = new Date(deliveryDate);
-        targetDate.setHours(9, 0, 0, 0);
       }
 
       const now = new Date();
@@ -499,6 +522,31 @@ export function NotificationProvider({ children }) {
       return false;
     }
   };
+
+  // À l'initialisation, reprogrammer les notifications de lettres existantes si besoin
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@scheduledLetters');
+        if (!stored) return;
+        const letters = JSON.parse(stored);
+        const letterNotifs = await AsyncStorage.getItem('@letterNotifications');
+        const notifs = letterNotifs ? JSON.parse(letterNotifs) : {};
+
+        for (const l of letters) {
+          // Ne programmer que si pas encore programmé et si future
+          if (l && l.id && !notifs[l.id]) {
+            const date = new Date(l.deliveryDate);
+            if (date > new Date()) {
+              await scheduleLetterNotification(l.id, l.title, l.content, l.deliveryDate, l.from || '');
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Erreur reprogrammation lettres:', e.message);
+      }
+    })();
+  }, [coupleId]);
 
   // Annuler une notification de lettre
   const cancelLetterNotification = async (letterId) => {

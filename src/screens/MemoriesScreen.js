@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { Video, ResizeMode } from 'expo-av';
 import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import AnimatedModal from '../components/AnimatedModal';
 
@@ -59,6 +60,18 @@ const getFileInfo = async (uri) => {
   }
 };
 
+// Helper pour formater date ISO -> JJ/MM/AAAA HH:MM
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '';
+  if (dateStr.includes('/')) return dateStr; // legacy format
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const datePart = `${('0'+d.getDate()).slice(-2)}/${('0'+(d.getMonth()+1)).slice(-2)}/${d.getFullYear()}`;
+  const hour = ('0'+d.getHours()).slice(-2);
+  const minute = ('0'+d.getMinutes()).slice(-2);
+  return `${datePart} ${hour}:${minute}`;
+};
+
 export default function MemoriesScreen() {
   const { theme } = useTheme();
   const { user, couple } = useAuth();
@@ -68,6 +81,7 @@ export default function MemoriesScreen() {
     sharedDiary, addDiaryEntry, deleteDiaryEntry, updateDiaryEntry
   } = useData();
   const { notifyMemory, notifyCapsule, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
+  const notifications = useNotifications();
   const [activeTab, setActiveTab] = useState('gallery');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -76,12 +90,12 @@ export default function MemoriesScreen() {
   const [editItem, setEditItem] = useState(null);
   const [editType, setEditType] = useState('memory'); // 'memory', 'letter', 'diary'
   const [addType, setAddType] = useState('memory');
-  const [newMemory, setNewMemory] = useState({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
+  const [newMemory, setNewMemory] = useState({ title: '', note: '', date: '', time: '', imageUri: null, mediaType: 'image' });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   
   // États pour lettres et journal
-  const [newLetter, setNewLetter] = useState({ title: '', content: '', deliveryDate: '' });
+  const [newLetter, setNewLetter] = useState({ title: '', content: '', deliveryDate: '', deliveryTime: '' });
   const [newDiaryEntry, setNewDiaryEntry] = useState({ mood: '😊', content: '' });
   const [selectedLetter, setSelectedLetter] = useState(null);
   const [showLetterModal, setShowLetterModal] = useState(false);
@@ -127,20 +141,12 @@ export default function MemoriesScreen() {
   };
 
   const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,  // Désactivé pour garder la qualité originale
-        quality: 1,  // Qualité maximale
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri, mediaType: 'image' });
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');
-    }
+    // Fonction désactivée — ajout de photos non disponible pour le moment
+    Alert.alert(
+      '📸 Ajout de photos non disponible',
+      "L'ajout de photos n'est pas disponible pour le moment. Cette fonctionnalité arrivera dans une prochaine mise à jour.",
+      [{ text: 'OK' }]
+    );
   };
 
   // Vidéos non disponibles actuellement
@@ -153,25 +159,12 @@ export default function MemoriesScreen() {
   };
 
   const takePhoto = async () => {
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: false,
-        quality: 1,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri, mediaType: 'image' });
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'accéder à la caméra');
-    }
+    // Désactivé pour le moment
+    Alert.alert(
+      '📸 Appareil photo indisponible',
+      "La capture photo n'est pas disponible pour le moment. Revenez dans une prochaine mise à jour !",
+      [{ text: 'OK' }]
+    );
   };
 
   const handleAddMemory = async () => {
@@ -238,7 +231,7 @@ export default function MemoriesScreen() {
     // Envoyer notification au partenaire
     await notifyMemory();
     
-    setNewMemory({ title: '', note: '', date: '', imageUri: null, mediaType: 'image' });
+    setNewMemory({ title: '', note: '', date: '', time: '', imageUri: null, mediaType: 'image' });
     setShowAddModal(false);
     setIsUploading(false);
     setUploadProgress(0);
@@ -251,19 +244,43 @@ export default function MemoriesScreen() {
       return;
     }
 
+    // Valider le format de la date (JJ/MM/AAAA)
+    const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = newMemory.date.match(dateRegex);
+    if (!match) {
+      Alert.alert('Erreur', 'Format de date invalide. Utilisez JJ/MM/AAAA (ex: 14/02/2025)');
+      return;
+    }
+
+    // Valider l'heure si fournie
+    let hour = 0, minute = 0;
+    if (newMemory.time && newMemory.time.trim()) {
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      const tm = newMemory.time.match(timeRegex);
+      if (!tm) {
+        Alert.alert('Erreur', 'Format d\'heure invalide. Utilisez HH:MM (24h)');
+        return;
+      }
+      hour = parseInt(tm[1], 10);
+      minute = parseInt(tm[2], 10);
+    }
+
+    const [_, day, month, year] = match;
+    const openDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hour, minute, 0).toISOString();
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     await addTimeCapsule({
       title: newMemory.title,
       note: newMemory.note,
-      openDate: newMemory.date,
+      openDate: openDate,
       locked: true,
     });
 
     // Envoyer notification au partenaire
     await notifyCapsule();
 
-    setNewMemory({ title: '', note: '', date: '', imageUri: null });
+    setNewMemory({ title: '', note: '', date: '', time: '', imageUri: null });
     setShowAddModal(false);
     Alert.alert('⏰', 'Capsule temporelle créée !');
   };
@@ -478,7 +495,7 @@ export default function MemoriesScreen() {
                 </View>
                 <Text style={styles.capsuleTitle}>{capsule.title}</Text>
                 <Text style={styles.capsuleDate}>
-                  {capsule.locked ? `S'ouvre le ${capsule.openDate}` : 'Ouverte !'}
+                  {capsule.locked ? `S'ouvre le ${formatDateTime(capsule.openDate)}` : 'Ouverte !'}
                 </Text>
                 {!capsule.locked && capsule.note && (
                   <Text style={styles.capsuleNote}>{capsule.note}</Text>
@@ -497,21 +514,30 @@ export default function MemoriesScreen() {
     if (letter.fromId === user?.id) return false; // Pas ses propres lettres
     
     // Parser la date de livraison
-    let deliveryDate;
-    if (letter.deliveryDate.includes('/')) {
-      // Format JJ/MM/AAAA
-      const [day, month, year] = letter.deliveryDate.split('/').map(Number);
-      deliveryDate = new Date(year, month - 1, day, 0, 0, 0);
-    } else {
-      // Format ISO ou autre
-      deliveryDate = new Date(letter.deliveryDate);
+    let deliveryDate = null;
+    if (typeof letter.deliveryDate === 'string') {
+      if (letter.deliveryDate.includes('/')) {
+        // Format JJ/MM/AAAA
+        const [day, month, year] = letter.deliveryDate.split('/').map(Number);
+        deliveryDate = new Date(year, month - 1, day, 0, 0, 0);
+      } else {
+        // Format ISO ou autre
+        deliveryDate = new Date(letter.deliveryDate);
+      }
     }
-    
-    // Comparer uniquement les dates (pas l'heure)
+
+    if (!deliveryDate || isNaN(deliveryDate.getTime())) return false;
+
+    // Si la deliveryDate contient heure, comparer date+heure
     const now = new Date();
+    // Si l'heure est fournie (non minuit), comparer l'instant
+    if (deliveryDate.getHours() !== 0 || deliveryDate.getMinutes() !== 0) {
+      return now >= deliveryDate;
+    }
+
+    // Sinon comparer la date (comme avant)
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const deliveryDay = new Date(deliveryDate.getFullYear(), deliveryDate.getMonth(), deliveryDate.getDate());
-    
     return today >= deliveryDay;
   };
 
@@ -530,37 +556,57 @@ export default function MemoriesScreen() {
       return;
     }
 
-    // Vérifier que la date est dans le futur
+    // Vérifier que la date est dans le futur et optionnellement l'heure
     const [_, day, month, year] = match;
-    const deliveryDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (deliveryDate <= today) {
-      Alert.alert('Erreur', 'La date de livraison doit être dans le futur');
+
+    // Valider l'heure si fournie
+    let hour = 0, minute = 0;
+    if (newLetter.deliveryTime && newLetter.deliveryTime.trim()) {
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      const tm = newLetter.deliveryTime.match(timeRegex);
+      if (!tm) {
+        Alert.alert('Erreur', 'Format d\'heure invalide. Utilisez HH:MM (24h)');
+        return;
+      }
+      hour = parseInt(tm[1], 10);
+      minute = parseInt(tm[2], 10);
+    }
+
+    const deliveryDateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hour, minute, 0);
+    const now = new Date();
+    if (deliveryDateObj <= now) {
+      Alert.alert('Erreur', 'La date/heure de livraison doit être dans le futur');
       return;
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     try {
+      const isoDate = deliveryDateObj.toISOString();
       const letter = await addScheduledLetter({
         title: newLetter.title,
         content: newLetter.content,
-        deliveryDate: newLetter.deliveryDate,
+        deliveryDate: isoDate,
       });
 
       // Notifier le partenaire qu'une lettre a été programmée
       await notifyScheduledLetter();
-      
-      // Note: La notification de livraison sera gérée par le système
-      // quand le partenaire ouvrira l'app après la date de livraison
 
-      setNewLetter({ title: '', content: '', deliveryDate: '' });
+      // Planifier localement la notification de livraison (sur cet appareil)
+      try {
+        if (notifications && notifications.scheduleLetterNotification) {
+          await notifications.scheduleLetterNotification(letter.id, letter.title, letter.content, isoDate, user?.name || '');
+        }
+      } catch (e) {
+        console.warn('⚠️ Impossible de planifier notification lettre localement:', e.message);
+      }
+
+      // Remise à zéro du form
+      setNewLetter({ title: '', content: '', deliveryDate: '', deliveryTime: '' });
       setShowAddModal(false);
       Alert.alert(
         '💌 Lettre programmée !', 
-        `Votre lettre sera livrée à votre partenaire le ${newLetter.deliveryDate}.\n\nIl/Elle recevra une notification le jour venu !`
+        `Votre lettre sera livrée à votre partenaire le ${formatDateTime(isoDate)}.\n\nIl/Elle recevra une notification le jour et l'heure programmés !`
       );
     } catch (error) {
       console.error('Erreur ajout lettre:', error);
@@ -573,7 +619,7 @@ export default function MemoriesScreen() {
       // C'est sa propre lettre
       Alert.alert(
         '💌 Votre lettre',
-        `Titre: ${letter.title}\n\nContenu:\n${letter.content}\n\nSera livrée le: ${letter.deliveryDate}`,
+        `Titre: ${letter.title}\n\nContenu:\n${letter.content}\n\nSera livrée le: ${formatDateTime(letter.deliveryDate)}`,
         [
           { text: 'OK' },
           { 
@@ -647,7 +693,7 @@ export default function MemoriesScreen() {
                       <Text style={styles.letterTitle}>{letter.title}</Text>
                       <Text style={styles.letterFrom}>De {letter.from}</Text>
                       <Text style={styles.letterDate}>
-                        {canOpen ? (letter.isRead ? 'Lu ✓' : '✨ À lire !') : `S'ouvre le ${letter.deliveryDate}`}
+                        {canOpen ? (letter.isRead ? 'Lu ✓' : '✨ À lire !') : `S'ouvre le ${formatDateTime(letter.deliveryDate)}`}
                       </Text>
                     </View>
                     {canOpen && !letter.isRead && <View style={styles.letterBadge} />}
@@ -672,7 +718,7 @@ export default function MemoriesScreen() {
                     <Text style={styles.letterEmoji}>✉️</Text>
                     <View style={styles.letterInfo}>
                       <Text style={styles.letterTitle}>{letter.title}</Text>
-                      <Text style={styles.letterDate}>Sera livrée le {letter.deliveryDate}</Text>
+                      <Text style={styles.letterDate}>Sera livrée le {formatDateTime(letter.deliveryDate)}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -734,37 +780,9 @@ export default function MemoriesScreen() {
   const MOOD_EMOJIS = ['😊', '🥰', '😍', '🤗', '😌', '🥺', '😢', '😤', '🤔', '✨'];
 
   const handleAddDiaryEntry = async () => {
-    if (!newDiaryEntry.content.trim()) {
-      Alert.alert('Erreur', 'Veuillez écrire quelque chose');
-      return;
-    }
-
-    // Vérifier la longueur minimale
-    if (newDiaryEntry.content.trim().length < 3) {
-      Alert.alert('Erreur', 'Le texte est trop court');
-      return;
-    }
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    try {
-      const entry = await addDiaryEntry({
-        mood: newDiaryEntry.mood,
-        content: newDiaryEntry.content.trim(),
-      });
-
-      if (entry) {
-        await notifyDiaryEntry();
-        setNewDiaryEntry({ mood: '😊', content: '' });
-        setShowAddModal(false);
-        Alert.alert('📖', 'Entrée ajoutée au journal !');
-      } else {
-        throw new Error('Entrée non créée');
-      }
-    } catch (error) {
-      console.error('Erreur ajout entrée journal:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder l\'entrée. Réessayez.');
-    }
+    // Journal is currently unavailable
+    Alert.alert('📔 Journal indisponible', "La fonctionnalité du journal intime n'est pas disponible pour le moment.");
+    return;
   };
 
   const renderDiary = () => {
@@ -967,39 +985,16 @@ export default function MemoriesScreen() {
                   value={newLetter.deliveryDate}
                   onChangeText={(text) => setNewLetter({ ...newLetter, deliveryDate: text })}
                 />
-                <Text style={styles.modalHint}>
-                  💡 La lettre sera livrée à cette date !
-                </Text>
-              </>
-            )}
-
-            {/* Formulaire pour Journal */}
-            {addType === 'diary' && (
-              <>
-                <Text style={styles.moodLabel}>Comment te sens-tu ?</Text>
-                <View style={styles.moodSelector}>
-                  {MOOD_EMOJIS.map((emoji) => (
-                    <TouchableOpacity
-                      key={emoji}
-                      style={[
-                        styles.moodButton,
-                        newDiaryEntry.mood === emoji && styles.moodButtonActive
-                      ]}
-                      onPress={() => setNewDiaryEntry({ ...newDiaryEntry, mood: emoji })}
-                    >
-                      <Text style={styles.moodEmoji}>{emoji}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
                 <TextInput
-                  style={[styles.modalInput, styles.modalTextAreaLarge]}
-                  placeholder="Qu'as-tu envie de partager aujourd'hui ?"
+                  style={styles.modalInput}
+                  placeholder="Heure de livraison (HH:MM, 24h)"
                   placeholderTextColor="#999"
-                  multiline
-                  numberOfLines={8}
-                  value={newDiaryEntry.content}
-                  onChangeText={(text) => setNewDiaryEntry({ ...newDiaryEntry, content: text })}
+                  value={newLetter.deliveryTime}
+                  onChangeText={(text) => setNewLetter({ ...newLetter, deliveryTime: text })}
                 />
+                <Text style={styles.modalHint}>
+                  💡 La lettre sera livrée à la date et heure choisies.
+                </Text>
               </>
             )}
 
@@ -1025,13 +1020,25 @@ export default function MemoriesScreen() {
                 />
 
                 {addType === 'capsule' && (
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder="Date d'ouverture (JJ/MM/AAAA)"
-                    placeholderTextColor="#999"
-                    value={newMemory.date}
-                    onChangeText={(text) => setNewMemory({ ...newMemory, date: text })}
-                  />
+                  <>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Date d'ouverture (JJ/MM/AAAA)"
+                      placeholderTextColor="#999"
+                      value={newMemory.date}
+                      onChangeText={(text) => setNewMemory({ ...newMemory, date: text })}
+                    />
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Heure d'ouverture (HH:MM, 24h)"
+                      placeholderTextColor="#999"
+                      value={newMemory.time}
+                      onChangeText={(text) => setNewMemory({ ...newMemory, time: text })}
+                    />
+                    <Text style={styles.modalHint}>
+                      💡 Vous pouvez choisir une date et une heure pour l'ouverture de la capsule.
+                    </Text>
+                  </>
                 )}
 
                 {addType === 'memory' && (
@@ -1045,6 +1052,13 @@ export default function MemoriesScreen() {
                     <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
                       <Text style={styles.photoButtonText}>📸 Caméra</Text>
                     </TouchableOpacity>
+                  </View>
+                )}
+
+                {addType === 'diary' && (
+                  <View style={{padding:20, alignItems:'center'}}>
+                    <Text style={{fontSize:18, fontWeight:'bold', color:'#333'}}>📔 Journal intime</Text>
+                    <Text style={{color:'#666', marginTop:10, textAlign:'center'}}>La fonctionnalité du journal intime n'est pas disponible pour le moment. Nous travaillons dessus ❤️</Text>
                   </View>
                 )}
 

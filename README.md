@@ -33,9 +33,11 @@ Une application mobile romantique pour les couples, avec de nombreuses fonctionn
 ### 🫙 Souvenirs
 - Jar à souvenirs visuel
 - Timeline chronologique
-- Capsules temporelles
-- Ajout de photos et notes
+- Capsules temporelles *(l'utilisateur peut choisir la **date et l'heure**)*
+- Ajout de photos *(**non disponible pour le moment**)* et notes
 - Souvenirs avec dates
+### 📔 Journal Intime *(non disponible pour le moment)*
+*La fonctionnalité du journal intime n'est **pas disponible pour le moment**.*
 
 ### 💌 Love Notes
 - Messages rapides prédéfinis
@@ -52,6 +54,10 @@ Une application mobile romantique pour les couples, avec de nombreuses fonctionn
 - Action ou Vérité
 - Qui est le Plus...
 - Tu Préfères...
+### 💬 Chat *(non disponible pour le moment)*
+*La fonctionnalité d'envoi de messages dans le chat n'est **pas disponible pour le moment**.*
+### ✉️ Lettres programmées
+L'utilisateur peut choisir la **date et l'heure** d'envoi de la lettre.
 
 ### 👤 Profil
 - Informations personnelles
@@ -175,6 +181,9 @@ COUPLE/
 - [ ] Partage sur réseaux sociaux
 - [ ] Rappels d'anniversaires
 - [ ] Playlist musicale partagée
+- [ ] Ajout de photos dans les souvenirs
+- [ ] Envoi de messages dans le chat
+- [ ] Journal intime
 
 ## ❤️ Fait avec amour
 

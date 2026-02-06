@@ -40,6 +40,9 @@ export default function ChatScreen({ navigation }) {
     setTyping,
     deleteMessage,
   } = useChat();
+
+  // Chat temporarily disabled (feature in development)
+  const chatAvailable = false;
   const { notifyLoveNote } = useNotifyPartner();
   const { addDiaryEntry } = useData();
 
@@ -111,6 +114,11 @@ export default function ChatScreen({ navigation }) {
   }, [messages.length]);
 
   const handleSend = async () => {
+    if (!chatAvailable) {
+      Alert.alert('💬 Chat indisponible', "L'envoi de messages n'est pas disponible pour le moment. Cette fonctionnalité arrivera dans une prochaine version.");
+      return;
+    }
+
     if (!inputText.trim()) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -127,6 +135,11 @@ export default function ChatScreen({ navigation }) {
   };
 
   const handleImagePick = async () => {
+    if (!chatAvailable) {
+      Alert.alert('💬 Chat indisponible', "L'envoi d'images n'est pas disponible pour le moment.");
+      return;
+    }
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -144,6 +157,11 @@ export default function ChatScreen({ navigation }) {
 
   // === MESSAGES VOCAUX ===
   const startRecording = async () => {
+    if (!chatAvailable) {
+      Alert.alert('💬 Chat indisponible', "L'envoi de messages vocaux n'est pas disponible pour le moment.");
+      return;
+    }
+
     try {
       // Demander les permissions
       const permission = await Audio.requestPermissionsAsync();
@@ -441,6 +459,13 @@ export default function ChatScreen({ navigation }) {
         </View>
       </View>
 
+      {/* Chat disabled banner */}
+      {!chatAvailable && (
+        <View style={styles.disabledBanner}>
+          <Text style={styles.disabledBannerText}>💬 Le chat et l'envoi de messages ne sont pas disponibles pour le moment.</Text>
+        </View>
+      )}
+
       {/* Messages */}
       <View style={styles.messagesContainer}>
         <FlatList
@@ -614,6 +639,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  disabledBanner: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+  },
+  disabledBannerText: {
+    color: '#fff',
+    fontSize: 13,
+    textAlign: 'center',
   },
   avatarText: {
     fontSize: 20,
