@@ -543,29 +543,36 @@ export function NotificationProvider({ children }) {
   // Notification de test immédiate
   const testNotification = async () => {
     try {
+      console.log('🔔 Démarrage test notification...');
+      
       const { status } = await Notifications.getPermissionsAsync();
       console.log('📱 Status permissions:', status);
       
       if (status !== 'granted') {
+        console.log('⚠️ Demande de permissions...');
         const { status: newStatus } = await Notifications.requestPermissionsAsync();
+        console.log('📱 Nouveau status:', newStatus);
         if (newStatus !== 'granted') {
           console.log('❌ Permissions refusées');
-          return { success: false, error: 'Permissions refusées' };
+          return { success: false, error: 'Permissions refusées. Allez dans Paramètres > Applications > Couple H > Notifications pour les activer.' };
         }
       }
 
+      // IMPORTANT: trigger: null = notification immédiate (pas de délai)
+      console.log('📤 Envoi notification immédiate...');
       const notifId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: '💕 Test de notification',
-          body: 'Si tu vois ce message, les notifications fonctionnent parfaitement ! 🎉',
+          title: '💕 Test Couple H',
+          body: 'Super ! Les notifications fonctionnent parfaitement ! 🎉',
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
           vibrate: [0, 250, 250, 250],
+          data: { test: true },
         },
-        trigger: { seconds: 1 },
+        trigger: null, // NULL = immédiat, pas de délai
       });
       
-      console.log('✅ Notification test programmée, ID:', notifId);
+      console.log('✅ Notification envoyée avec succès ! ID:', notifId);
       return { success: true, id: notifId };
     } catch (error) {
       console.error('❌ Erreur test notification:', error);
@@ -576,6 +583,7 @@ export function NotificationProvider({ children }) {
   // Test notification avec délai
   const testNotificationDelayed = async (seconds = 5) => {
     try {
+      console.log(`🔔 Programmation notification dans ${seconds}s...`);
       const notifId = await Notifications.scheduleNotificationAsync({
         content: {
           title: '⏰ Notification différée',
@@ -603,7 +611,7 @@ export function NotificationProvider({ children }) {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: { seconds: 2 },
+        trigger: null, // Immédiat
       });
       return true;
     } catch (error) {
@@ -622,7 +630,7 @@ export function NotificationProvider({ children }) {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.DEFAULT,
         },
-        trigger: { seconds: 1 },
+        trigger: null, // Immédiat
       });
       return true;
     } catch (error) {
