@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme, THEMES } from '../context/ThemeContext';
 import { useSecurity } from '../context/SecurityContext';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const { width } = Dimensions.get('window');
 
@@ -32,12 +33,34 @@ export default function SettingsScreen({ navigation }) {
     lockSecretMode,
   } = useSecurity();
   const { logout, user, couple } = useAuth();
+  const { testNotification, testNotificationDelayed, notificationsEnabled, expoPushToken } = useNotifications();
 
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinStep, setPinStep] = useState(1);
+
+  // Fonction pour tester les notifications
+  const handleTestNotification = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const result = await testNotification();
+    if (result.success) {
+      Alert.alert('✅ Notification envoyée !', 'Tu devrais la recevoir dans 1 seconde.');
+    } else {
+      Alert.alert('❌ Erreur', result.error || 'Impossible d\'envoyer la notification');
+    }
+  };
+
+  const handleTestNotificationDelayed = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const result = await testNotificationDelayed(5);
+    if (result.success) {
+      Alert.alert('✅ Notification programmée !', 'Tu la recevras dans 5 secondes. Tu peux fermer l\'app pour tester !');
+    } else {
+      Alert.alert('❌ Erreur', result.error || 'Impossible de programmer la notification');
+    }
+  };
 
   const handleThemeChange = (themeId) => {
     changeTheme(themeId);
@@ -227,6 +250,63 @@ export default function SettingsScreen({ navigation }) {
           </View>
           <Text style={styles.settingArrow}>→</Text>
         </TouchableOpacity>
+
+        {/* Section Notifications */}
+        <Text style={styles.sectionTitle}>🔔 Notifications</Text>
+
+        <View style={styles.settingCard}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingIcon}>🔔</Text>
+            <View>
+              <Text style={styles.settingLabel}>Statut</Text>
+              <Text style={[styles.settingValue, { color: notificationsEnabled ? '#4CAF50' : '#F44336' }]}>
+                {notificationsEnabled ? '✅ Activées' : '❌ Désactivées'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.settingCard}
+          onPress={handleTestNotification}
+        >
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingIcon}>🧪</Text>
+            <View>
+              <Text style={styles.settingLabel}>Test immédiat</Text>
+              <Text style={styles.settingValue}>Envoyer une notification maintenant</Text>
+            </View>
+          </View>
+          <Text style={styles.settingArrow}>→</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.settingCard}
+          onPress={handleTestNotificationDelayed}
+        >
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingIcon}>⏱️</Text>
+            <View>
+              <Text style={styles.settingLabel}>Test différé (5s)</Text>
+              <Text style={styles.settingValue}>Ferme l'app pour vérifier</Text>
+            </View>
+          </View>
+          <Text style={styles.settingArrow}>→</Text>
+        </TouchableOpacity>
+
+        {expoPushToken && (
+          <View style={styles.settingCard}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingIcon}>📱</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.settingLabel}>Token Push</Text>
+                <Text style={[styles.settingValue, { fontSize: 10 }]} numberOfLines={1}>
+                  {expoPushToken}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Section Compte */}
         <Text style={styles.sectionTitle}>👤 Compte</Text>

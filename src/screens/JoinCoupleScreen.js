@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function JoinCoupleScreen() {
   const { user, joinCouple, createCouple, logout } = useAuth();
+  const { notifyCoupleJoined } = useNotifications();
   const [mode, setMode] = useState('choice'); // 'choice', 'create', 'join'
   const [coupleCode, setCoupleCode] = useState('');
   const [formData, setFormData] = useState({
@@ -37,6 +39,8 @@ export default function JoinCoupleScreen() {
 
     if (result.success) {
       setGeneratedCode(result.code);
+      // Notification de création de couple
+      await notifyCoupleJoined(formData.partnerName || 'ton partenaire');
       Alert.alert(
         '✅ Espace créé !',
         `Votre code couple est:\n\n${result.code}\n\nPartagez ce code avec ${formData.partnerName || 'votre partenaire'} pour qu'il/elle puisse vous rejoindre.\n\n📱 Les données seront synchronisées automatiquement dès que votre partenaire rejoindra !`,
@@ -55,6 +59,8 @@ export default function JoinCoupleScreen() {
 
     const result = await joinCouple(coupleCode, formData);
     if (result.success) {
+      // Notification quand on rejoint un couple
+      await notifyCoupleJoined(formData.partnerName);
       if (result.synced) {
         Alert.alert(
           '🎉 Connectés !',

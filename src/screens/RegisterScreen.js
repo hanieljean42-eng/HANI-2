@@ -12,11 +12,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const AVATARS = ['😊', '😍', '🥰', '😎', '🤗', '💖', '👸', '🤴', '🦋', '🌸', '⭐', '🌙'];
 
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
+  const { notifyWelcome, testNotification } = useNotifications();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -50,6 +52,8 @@ export default function RegisterScreen({ navigation }) {
 
     const result = await register(formData);
     if (result.success) {
+      // Envoyer notification de bienvenue
+      await notifyWelcome(formData.name);
       // Navigation automatique via AuthContext
     } else {
       Alert.alert('Erreur', result.error);

@@ -182,7 +182,7 @@ export function NotificationProvider({ children }) {
       try {
         // Obtenir le token Expo Push avec le bon projectId
         // Le projectId doit correspondre à celui de app.json/eas.json
-        const projectId = '87b635c7-a516-44d2-a9b4-8783d45c6cf4'; // ID du projet EAS
+        const projectId = 'b1f00575-c61e-45ee-84ac-b1644dff132f'; // ID du projet EAS
         const tokenData = await Notifications.getExpoPushTokenAsync({
           projectId: projectId,
         });
@@ -518,6 +518,119 @@ export function NotificationProvider({ children }) {
     }
   };
 
+  // === NOTIFICATIONS DE TEST ===
+  
+  // Notification de bienvenue après création de compte
+  const notifyWelcome = async (userName) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🎉 Bienvenue sur HANI 2 !',
+          body: `Salut ${userName} ! Ton compte a été créé avec succès. L'amour t'attend ! 💕`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds: 2 },
+      });
+      console.log('✅ Notification de bienvenue envoyée');
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur notification bienvenue:', error);
+      return false;
+    }
+  };
+
+  // Notification de test immédiate
+  const testNotification = async () => {
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      console.log('📱 Status permissions:', status);
+      
+      if (status !== 'granted') {
+        const { status: newStatus } = await Notifications.requestPermissionsAsync();
+        if (newStatus !== 'granted') {
+          console.log('❌ Permissions refusées');
+          return { success: false, error: 'Permissions refusées' };
+        }
+      }
+
+      const notifId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💕 Test de notification',
+          body: 'Si tu vois ce message, les notifications fonctionnent parfaitement ! 🎉',
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          vibrate: [0, 250, 250, 250],
+        },
+        trigger: { seconds: 1 },
+      });
+      
+      console.log('✅ Notification test programmée, ID:', notifId);
+      return { success: true, id: notifId };
+    } catch (error) {
+      console.error('❌ Erreur test notification:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Test notification avec délai
+  const testNotificationDelayed = async (seconds = 5) => {
+    try {
+      const notifId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '⏰ Notification différée',
+          body: `Cette notification était programmée pour ${seconds} secondes. Ça fonctionne ! 🎯`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds: seconds },
+      });
+      console.log(`✅ Notification différée programmée (${seconds}s), ID:`, notifId);
+      return { success: true, id: notifId };
+    } catch (error) {
+      console.error('❌ Erreur notification différée:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Notification quand on rejoint un couple
+  const notifyCoupleJoined = async (partnerName) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💑 Couple créé !',
+          body: `Félicitations ! Tu es maintenant en couple avec ${partnerName} sur HANI 2 ! 💕`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds: 2 },
+      });
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur notification couple:', error);
+      return false;
+    }
+  };
+
+  // Notification quand on se connecte
+  const notifyLoginSuccess = async (userName) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '👋 Re-bonjour !',
+          body: `Content de te revoir ${userName} ! Ton amour t'attend 💕`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.DEFAULT,
+        },
+        trigger: { seconds: 1 },
+      });
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur notification login:', error);
+      return false;
+    }
+  };
+
   const value = {
     expoPushToken,
     notification,
@@ -541,6 +654,12 @@ export function NotificationProvider({ children }) {
     // Lettres programmées
     scheduleLetterNotification,
     cancelLetterNotification,
+    // Notifications de test et événements
+    notifyWelcome,
+    testNotification,
+    testNotificationDelayed,
+    notifyCoupleJoined,
+    notifyLoginSuccess,
   };
 
   return (
