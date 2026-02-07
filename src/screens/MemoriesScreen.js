@@ -852,84 +852,176 @@ export default function MemoriesScreen() {
   };
 
   const renderDiary = () => {
+    const sortedDiary = sharedDiary && Array.isArray(sharedDiary) 
+      ? [...sharedDiary].filter(e => e != null).sort((a, b) => {
+          const dateA = a.createdAt || a.date || '';
+          const dateB = b.createdAt || b.date || '';
+          return dateB > dateA ? 1 : -1;
+        })
+      : [];
+
+    // Regrouper par date
+    const groupedByDate = {};
+    sortedDiary.forEach(entry => {
+      const dateKey = entry.date || 'Aujourd\'hui';
+      if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
+      groupedByDate[dateKey].push(entry);
+    });
+
     return (
       <View style={styles.diaryContainer}>
-        <Text style={styles.sectionTitle}>📖 Journal Intime Partagé</Text>
-        <Text style={styles.sectionDesc}>
-          Écrivez ensemble votre histoire, jour après jour. Partagez vos pensées, vos moments, vos émotions.
-        </Text>
+        {/* En-tête livre */}
+        <View style={styles.diaryBookHeader}>
+          <View style={styles.diaryBookSpine} />
+          <View style={styles.diaryBookCover}>
+            <Text style={styles.diaryBookIcon}>📔</Text>
+            <Text style={styles.diaryBookTitle}>Notre Journal Intime</Text>
+            <Text style={styles.diaryBookSubtitle}>
+              {sortedDiary.length} {sortedDiary.length <= 1 ? 'page écrite' : 'pages écrites'} ensemble
+            </Text>
+          </View>
+        </View>
 
-        {/* Bouton ajouter une entrée */}
+        {/* Bouton écrire */}
         <TouchableOpacity
-          style={styles.addDiaryButton}
+          style={styles.diaryWriteBtn}
           onPress={() => {
             setAddType('diary');
             setShowAddModal(true);
           }}
+          activeOpacity={0.8}
         >
-          <LinearGradient colors={['#8B5CF6', '#6366F1']} style={styles.addDiaryGradient}>
-            <Text style={styles.addDiaryText}>✍️ Écrire dans le journal</Text>
+          <LinearGradient 
+            colors={['#667eea', '#764ba2']} 
+            start={{ x: 0, y: 0 }} 
+            end={{ x: 1, y: 0 }}
+            style={styles.diaryWriteGradient}
+          >
+            <Text style={styles.diaryWriteIcon}>✍️</Text>
+            <View style={styles.diaryWriteTextWrap}>
+              <Text style={styles.diaryWriteTitle}>Écrire une page</Text>
+              <Text style={styles.diaryWriteHint}>Partagez ce que vous ressentez...</Text>
+            </View>
+            <Text style={styles.diaryWriteArrow}>→</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Entrées du journal */}
-        {sharedDiary && Array.isArray(sharedDiary) && sharedDiary.length > 0 ? (
-          <View style={styles.diaryEntries}>
-            {sharedDiary.filter(e => e != null).map((entry, index) => (
-              <View key={entry?.id || `diary-${index}`} style={styles.diaryEntry}>
-                <View style={styles.diaryEntryHeader}>
-                  <Text style={styles.diaryMood}>{entry.mood}</Text>
-                  <View style={styles.diaryMeta}>
-                    <Text style={styles.diaryAuthor}>{entry.author}</Text>
-                    <Text style={styles.diaryDate}>{entry.date}</Text>
+        {/* Entrées groupées par date */}
+        {sortedDiary.length > 0 ? (
+          <View style={styles.diaryTimeline}>
+            {Object.keys(groupedByDate).map((dateKey, groupIndex) => (
+              <View key={`group-${groupIndex}`} style={styles.diaryDateGroup}>
+                {/* Séparateur de date */}
+                <View style={styles.diaryDateSeparator}>
+                  <View style={styles.diaryDateLine} />
+                  <View style={styles.diaryDateBadge}>
+                    <Text style={styles.diaryDateBadgeText}>📅 {dateKey}</Text>
                   </View>
-                  {entry.authorId === user?.id && (
-                    <View style={styles.diaryActionsRow}>
-                      <TouchableOpacity
-                        style={styles.diaryEditBtn}
-                        onPress={() => {
-                          setEditItem({
-                            id: entry.id,
-                            mood: entry.mood,
-                            content: entry.content,
-                          });
-                          setEditType('diary');
-                          setShowEditModal(true);
-                        }}
-                      >
-                        <Text style={styles.diaryEditText}>✏️</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.diaryDeleteBtn}
-                        onPress={() => {
-                          Alert.alert(
-                            'Supprimer',
-                            'Supprimer cette entrée ?',
-                            [
-                              { text: 'Annuler', style: 'cancel' },
-                              { 
-                                text: 'Supprimer', 
-                                style: 'destructive',
-                                onPress: () => deleteDiaryEntry(entry.id)
-                              }
-                            ]
-                          );
-                        }}
-                      >
-                        <Text style={styles.diaryDeleteText}>🗑️</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                  <View style={styles.diaryDateLine} />
                 </View>
-                <Text style={styles.diaryContent}>{entry.content}</Text>
+
+                {groupedByDate[dateKey].map((entry, index) => {
+                  const isMe = entry.authorId === user?.id;
+                  return (
+                    <View 
+                      key={entry?.id || `diary-${groupIndex}-${index}`} 
+                      style={[
+                        styles.diaryPageCard,
+                        isMe ? styles.diaryPageMine : styles.diaryPagePartner,
+                      ]}
+                    >
+                      {/* Coin de page plié */}
+                      <View style={[styles.diaryPageCorner, isMe ? styles.diaryPageCornerMine : styles.diaryPageCornerPartner]} />
+                      
+                      {/* En-tête de l'entrée */}
+                      <View style={styles.diaryPageHeader}>
+                        <View style={styles.diaryPageAuthorWrap}>
+                          <View style={[
+                            styles.diaryPageAvatar,
+                            isMe ? styles.diaryPageAvatarMine : styles.diaryPageAvatarPartner
+                          ]}>
+                            <Text style={styles.diaryPageAvatarText}>
+                              {isMe ? '💜' : '💗'}
+                            </Text>
+                          </View>
+                          <View>
+                            <Text style={styles.diaryPageAuthor}>
+                              {isMe ? 'Moi' : entry.author}
+                            </Text>
+                            <Text style={styles.diaryPageTime}>
+                              {entry.date || 'Récemment'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.diaryPageMoodBig}>{entry.mood}</Text>
+                      </View>
+
+                      {/* Ligne de séparation fine */}
+                      <View style={styles.diaryPageDivider} />
+
+                      {/* Contenu */}
+                      <Text style={styles.diaryPageContent}>{entry.content}</Text>
+
+                      {/* Actions (seulement pour mes entrées) */}
+                      {isMe && (
+                        <View style={styles.diaryPageActions}>
+                          <TouchableOpacity
+                            style={styles.diaryPageActionBtn}
+                            onPress={() => {
+                              setEditItem({
+                                id: entry.id,
+                                mood: entry.mood,
+                                content: entry.content,
+                              });
+                              setEditType('diary');
+                              setShowEditModal(true);
+                            }}
+                          >
+                            <Text style={styles.diaryPageActionIcon}>✏️</Text>
+                            <Text style={styles.diaryPageActionText}>Modifier</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.diaryPageActionBtn, styles.diaryPageDeleteBtn]}
+                            onPress={() => {
+                              Alert.alert(
+                                '🗑️ Supprimer cette page',
+                                'Cette entrée sera supprimée définitivement.',
+                                [
+                                  { text: 'Annuler', style: 'cancel' },
+                                  { 
+                                    text: 'Supprimer', 
+                                    style: 'destructive',
+                                    onPress: () => {
+                                      deleteDiaryEntry(entry.id);
+                                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                    }
+                                  }
+                                ]
+                              );
+                            }}
+                          >
+                            <Text style={styles.diaryPageActionIcon}>🗑️</Text>
+                            <Text style={[styles.diaryPageActionText, { color: '#EF4444' }]}>Supprimer</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
             ))}
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>📖</Text>
-            <Text style={styles.emptyText}>Votre journal est vide</Text>
-            <Text style={styles.emptyHint}>Commencez à écrire votre histoire ensemble !</Text>
+          <View style={styles.diaryEmptyState}>
+            <View style={styles.diaryEmptyBook}>
+              <Text style={styles.diaryEmptyIcon}>📖</Text>
+              <Text style={styles.diaryEmptyTitle}>Votre journal est vierge</Text>
+              <Text style={styles.diaryEmptyDesc}>
+                C'est ici que vous écrirez votre histoire ensemble.{"\n"}
+                Chaque page est un moment partagé, une émotion capturée.{"\n"}              
+                Commencez votre première page ! ✨
+              </Text>
+            </View>
           </View>
         )}
       </View>
@@ -1122,9 +1214,45 @@ export default function MemoriesScreen() {
                 )}
 
                 {addType === 'diary' && (
-                  <View style={{padding:20, alignItems:'center'}}>
-                    <Text style={{fontSize:18, fontWeight:'bold', color:'#333'}}>📔 Journal intime</Text>
-                    <Text style={{color:'#666', marginTop:10, textAlign:'center'}}>La fonctionnalité du journal intime n'est pas disponible pour le moment. Nous travaillons dessus ❤️</Text>
+                  <View style={styles.diaryFormContainer}>
+                    {/* Sélecteur d'humeur */}
+                    <Text style={styles.diaryFormLabel}>Comment te sens-tu ? 💭</Text>
+                    <View style={styles.diaryMoodGrid}>
+                      {MOOD_EMOJIS.map((emoji) => (
+                        <TouchableOpacity
+                          key={emoji}
+                          style={[
+                            styles.diaryMoodBtn,
+                            newDiaryEntry.mood === emoji && styles.diaryMoodBtnActive,
+                          ]}
+                          onPress={() => {
+                            setNewDiaryEntry({ ...newDiaryEntry, mood: emoji });
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          }}
+                        >
+                          <Text style={[
+                            styles.diaryMoodEmoji,
+                            newDiaryEntry.mood === emoji && styles.diaryMoodEmojiActive,
+                          ]}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {/* Zone de texte */}
+                    <Text style={styles.diaryFormLabel}>Écris ta page... ✍️</Text>
+                    <TextInput
+                      style={styles.diaryFormTextArea}
+                      placeholder="Qu'as-tu sur le cœur aujourd'hui ? Raconte ta journée, un moment spécial, ou ce que tu ressens..."
+                      placeholderTextColor="#aaa"
+                      multiline
+                      numberOfLines={8}
+                      textAlignVertical="top"
+                      value={newDiaryEntry.content}
+                      onChangeText={(text) => setNewDiaryEntry({ ...newDiaryEntry, content: text })}
+                    />
+                    <Text style={styles.diaryFormCharCount}>
+                      {newDiaryEntry.content.length} caractères
+                    </Text>
                   </View>
                 )}
 
@@ -2134,65 +2262,324 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#FFD700',
   },
-  // ===== STYLES JOURNAL =====
+  // ===== STYLES JOURNAL INTIME (REDESIGN) =====
   diaryContainer: {
-    padding: 15,
+    padding: 12,
   },
-  addDiaryButton: {
+  // En-tête livre
+  diaryBookHeader: {
+    flexDirection: 'row',
     marginBottom: 20,
-    borderRadius: 15,
+    borderRadius: 16,
     overflow: 'hidden',
   },
-  addDiaryGradient: {
-    padding: 15,
-    alignItems: 'center',
+  diaryBookSpine: {
+    width: 8,
+    backgroundColor: '#5B21B6',
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
   },
-  addDiaryText: {
+  diaryBookCover: {
+    flex: 1,
+    backgroundColor: 'rgba(91, 33, 182, 0.25)',
+    padding: 20,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  diaryBookIcon: {
+    fontSize: 36,
+    marginBottom: 8,
+  },
+  diaryBookTitle: {
+    fontSize: 22,
+    fontWeight: '800',
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+    letterSpacing: 0.5,
   },
-  diaryEntries: {
-    marginTop: 10,
+  diaryBookSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
-  diaryEntry: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
+  // Bouton écrire
+  diaryWriteBtn: {
+    marginBottom: 24,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#764ba2',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  diaryEntryHeader: {
+  diaryWriteGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    padding: 18,
+    paddingHorizontal: 20,
   },
-  diaryMood: {
+  diaryWriteIcon: {
     fontSize: 28,
-    marginRight: 10,
+    marginRight: 14,
   },
-  diaryMeta: {
+  diaryWriteTextWrap: {
     flex: 1,
   },
-  diaryAuthor: {
-    fontSize: 15,
-    fontWeight: 'bold',
+  diaryWriteTitle: {
+    fontSize: 17,
+    fontWeight: '700',
     color: '#fff',
   },
-  diaryDate: {
+  diaryWriteHint: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
   },
-  diaryDeleteBtn: {
-    padding: 8,
+  diaryWriteArrow: {
+    fontSize: 22,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '700',
   },
-  diaryDeleteText: {
-    fontSize: 16,
+  // Timeline
+  diaryTimeline: {
+    paddingLeft: 4,
+  },
+  diaryDateGroup: {
+    marginBottom: 8,
+  },
+  diaryDateSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  diaryDateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  diaryDateBadge: {
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginHorizontal: 10,
+  },
+  diaryDateBadgeText: {
+    fontSize: 12,
+    color: '#E0D4FF',
+    fontWeight: '600',
+  },
+  // Page card
+  diaryPageCard: {
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  diaryPageMine: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.25)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#8B5CF6',
+  },
+  diaryPagePartner: {
+    backgroundColor: 'rgba(236, 72, 153, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(236, 72, 153, 0.2)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#EC4899',
+  },
+  diaryPageCorner: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 0,
+    height: 0,
+    borderStyle: 'solid',
+    borderTopWidth: 28,
+    borderLeftWidth: 28,
+    borderLeftColor: 'transparent',
+  },
+  diaryPageCornerMine: {
+    borderTopColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  diaryPageCornerPartner: {
+    borderTopColor: 'rgba(236, 72, 153, 0.25)',
+  },
+  diaryPageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  diaryPageAuthorWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  diaryPageAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  diaryPageAvatarMine: {
+    backgroundColor: 'rgba(139, 92, 246, 0.35)',
+  },
+  diaryPageAvatarPartner: {
+    backgroundColor: 'rgba(236, 72, 153, 0.3)',
+  },
+  diaryPageAvatarText: {
+    fontSize: 18,
+  },
+  diaryPageAuthor: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  diaryPageTime: {
+    fontSize: 11,
     color: 'rgba(255,255,255,0.5)',
+    marginTop: 1,
   },
-  diaryContent: {
+  diaryPageMoodBig: {
+    fontSize: 32,
+  },
+  diaryPageDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 14,
+  },
+  diaryPageContent: {
     fontSize: 15,
     color: '#fff',
+    lineHeight: 24,
+    fontStyle: 'italic',
+    letterSpacing: 0.2,
+  },
+  diaryPageActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 14,
+    gap: 10,
+  },
+  diaryPageActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    gap: 5,
+  },
+  diaryPageDeleteBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  diaryPageActionIcon: {
+    fontSize: 14,
+  },
+  diaryPageActionText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
+  },
+  // Empty state
+  diaryEmptyState: {
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 10,
+  },
+  diaryEmptyBook: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderStyle: 'dashed',
+    width: '100%',
+  },
+  diaryEmptyIcon: {
+    fontSize: 56,
+    marginBottom: 16,
+  },
+  diaryEmptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  diaryEmptyDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
     lineHeight: 22,
+  },
+  // Formulaire ajout journal
+  diaryFormContainer: {
+    paddingVertical: 10,
+  },
+  diaryFormLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#444',
+    marginBottom: 10,
+    marginTop: 5,
+  },
+  diaryMoodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 18,
+    gap: 8,
+  },
+  diaryMoodBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  diaryMoodBtnActive: {
+    backgroundColor: '#EDE9FE',
+    borderColor: '#8B5CF6',
+    transform: [{ scale: 1.15 }],
+  },
+  diaryMoodEmoji: {
+    fontSize: 24,
+  },
+  diaryMoodEmojiActive: {
+    fontSize: 26,
+  },
+  diaryFormTextArea: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 15,
+    color: '#333',
+    minHeight: 160,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    textAlignVertical: 'top',
+    lineHeight: 24,
+  },
+  diaryFormCharCount: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'right',
+    marginTop: 6,
   },
   // ===== STYLES MODAL FORMULAIRES =====
   modalTextAreaLarge: {
@@ -2324,20 +2711,7 @@ const styles = StyleSheet.create({
   letterActionText: {
     fontSize: 16,
   },
-  // Styles pour les boutons d'action sur le journal
-  diaryActionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  diaryEditBtn: {
-    padding: 5,
-  },
-  diaryEditText: {
-    fontSize: 16,
-  },
-  diaryDeleteText: {
-    fontSize: 16,
-  },
+  // (diary action styles moved to redesigned section above)
   // Styles pour la modale d'édition
   textAreaLarge: {
     height: 200,
