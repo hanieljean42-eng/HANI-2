@@ -1,8 +1,12 @@
-# 💕 Couple H - Application Couple
+# 💕 HANI-2 - Application Couple
 
-Une application mobile romantique pour les couples, avec de nombreuses fonctionnalités interactives !
+Une application mobile React Native pour les couples, offrant une expérience interactive complète avec des jeux, des souvenirs et des défis partagés.
 
-## 📱 Fonctionnalités
+## 🎯 À propos
+
+HANI-2 est une application couple tout-en-un construite avec React Native et Expo. Elle permet aux couples de partager des moments spéciaux, de relever des défis ensemble et de créer des souvenirs durables.
+
+## 📱 Fonctionnalités principales
 
 ### 🔐 Authentification Couple
 - Inscription individuelle avec avatar personnalisé
@@ -36,13 +40,11 @@ Une application mobile romantique pour les couples, avec de nombreuses fonctionn
 - Capsules temporelles *(l'utilisateur peut choisir la **date et l'heure**)*
 - Ajout de photos *(**non disponible pour le moment**)* et notes
 - Souvenirs avec dates
-### 📔 Journal Intime *(non disponible pour le moment)*
-*La fonctionnalité du journal intime n'est **pas disponible pour le moment**.*
-
-### 💌 Love Notes
+### � Messages & Lettres
 - Messages rapides prédéfinis
 - Messages personnalisés
 - Historique des notes
+- ✉️ Lettres programmées (date/heure)
 
 ### 🪣 Bucket List
 - Liste de rêves à réaliser
@@ -54,43 +56,50 @@ Une application mobile romantique pour les couples, avec de nombreuses fonctionn
 - Action ou Vérité
 - Qui est le Plus...
 - Tu Préfères...
-### 💬 Chat *(non disponible pour le moment)*
-*La fonctionnalité d'envoi de messages dans le chat n'est **pas disponible pour le moment**.*
-### ✉️ Lettres programmées
-L'utilisateur peut choisir la **date et l'heure** d'envoi de la lettre.
 
-### 👤 Profil
+### 📊 Statistiques & Secrets
+- Statistiques du couple
+- Points et achèvements
+- Espace secrets partagé
+
+### 👤 Profil & Paramètres
 - Informations personnelles
 - Paramètres de l'app
 - Code couple partageable
+- Thème et préférences
 - Déconnexion
 
-## 🚀 Installation
+## 🚀 Démarrage Rapide
 
 ### Prérequis
 - Node.js (v18+)
 - npm ou yarn
 - Expo CLI
-- Android Studio (pour émulateur) ou téléphone Android
+- Android Studio (pour émulateur) OU téléphone Android avec Expo Go
 
-### Étapes
+### Installation
 
-1. **Installer les dépendances**
+1. **Cloner le dépôt**
 ```bash
-cd COUPLE
+git clone https://github.com/hanieljean42-eng/HANI-2.git
+cd HANI-2
+```
+
+2. **Installer les dépendances**
+```bash
 npm install
 ```
 
-2. **Lancer l'application**
+3. **Démarrer l'application**
 ```bash
 npx expo start
 ```
 
-3. **Tester sur appareil**
-- Scannez le QR code avec l'app Expo Go sur votre téléphone
+4. **Tester sur votre appareil**
+- Scannez le QR code avec l'app Expo Go
 - OU appuyez sur `a` pour lancer sur émulateur Android
 
-## 📦 Créer l'APK
+## 📦 Créer un APK
 
 ### Avec EAS Build (recommandé)
 
@@ -114,82 +123,84 @@ eas build:configure
 eas build -p android --profile preview
 ```
 
-### Avec Expo (méthode classique)
-
-```bash
-expo build:android -t apk
-```
-
-## 🎨 Personnalisation
-
-### Changer les couleurs
-Modifiez les couleurs dans chaque écran :
-- `#FF6B9D` - Rose principal
-- `#C44569` - Rose foncé
-- `#8B5CF6` - Violet
-
-### Ajouter des activités à la roue
-Modifiez le tableau `WHEEL_ITEMS` dans `src/screens/WheelScreen.js`
-
-### Ajouter des défis
-Modifiez les tableaux dans `src/screens/ChallengesScreen.js`
-
 ## 📂 Structure du Projet
 
 ```
-COUPLE/
-├── App.js                    # Point d'entrée
-├── package.json              # Dépendances
-├── app.json                  # Configuration Expo
-├── assets/                   # Images et icônes
-└── src/
-    ├── context/
-    │   ├── AuthContext.js    # Gestion authentification
-    │   └── DataContext.js    # Gestion données
-    ├── navigation/
-    │   └── MainTabs.js       # Navigation principale
-    └── screens/
-        ├── WelcomeScreen.js  # Écran d'accueil
-        ├── RegisterScreen.js # Inscription
-        ├── LoginScreen.js    # Connexion
-        ├── JoinCoupleScreen.js # Rejoindre couple
-        ├── HomeScreen.js     # Accueil
-        ├── WheelScreen.js    # Roue des dates
-        ├── ChallengesScreen.js # Défis
-        ├── MemoriesScreen.js # Souvenirs
-        ├── ProfileScreen.js  # Profil
-        └── GamesScreen.js    # Jeux
+HANI-2/
+├── App.js                          # Point d'entrée
+├── package.json                    # Dépendances
+├── app.json                        # Configuration Expo
+├── eas.json                        # Configuration EAS
+├── assets/                         # Images et icônes
+├── src/
+│   ├── components/
+│   │   └── AnimatedModal.js        # Modal animée
+│   ├── config/
+│   │   ├── firebase.js             # Config Firebase
+│   │   └── cloudinary.js           # Config Cloudinary
+│   ├── context/
+│   │   ├── AuthContext.js          # Authentification
+│   │   ├── GameContext.js          # État jeux
+│   │   ├── DataContext.js          # Données globales
+│   │   ├── ChatContext.js          # Messages
+│   │   ├── NotificationContext.js  # Notifications
+│   │   ├── SecurityContext.js      # Sécurité
+│   │   ├── SyncContext.js          # Synchronisation
+│   │   └── ThemeContext.js         # Thème
+│   ├── hooks/
+│   │   └── useNotifyPartner.js     # Notification partenaire
+│   ├── navigation/
+│   │   └── MainTabs.js             # Navigation principale
+│   ├── screens/                    # Tous les écrans
+│   └── utils/
+│       ├── encryption.js           # Chiffrement
+│       └── uploadToCloudinary.js   # Upload fichiers
+└── README.md                       # Documentation
 ```
 
 ## 🔧 Technologies Utilisées
 
-- **React Native** - Framework mobile
-- **Expo** - Plateforme de développement
+- **React Native** - Framework mobile cross-platform
+- **Expo** - Plateforme développement
+- **Firebase** - Backend & authentification
+- **Cloudinary** - Stockage images
 - **React Navigation** - Navigation
 - **AsyncStorage** - Stockage local
-- **Expo Linear Gradient** - Dégradés
+- **Expo Linear Gradient** - Dégradés visuels
 - **Expo Haptics** - Retour haptique
 - **Expo Image Picker** - Sélection photos
+- **Crypto-js** - Chiffrement des données
 
-## 💡 Idées d'Améliorations
+## 📋 Fonctionnalités en Développement
 
-- [ ] Synchronisation cloud entre les deux téléphones
+- [ ] Synchronisation temps réel (Firebase)
 - [ ] Notifications push
 - [ ] Widget écran d'accueil
-- [ ] Mode sombre
-- [ ] Plus de jeux
-- [ ] Partage sur réseaux sociaux
+- [ ] Mode sombre amélioré
+- [ ] Plus de mini-jeux
+- [ ] Partage réseaux sociaux
 - [ ] Rappels d'anniversaires
 - [ ] Playlist musicale partagée
-- [ ] Ajout de photos dans les souvenirs
-- [ ] Envoi de messages dans le chat
-- [ ] Journal intime
+- [ ] Recherche intelligente
 
-## ❤️ Fait avec amour
+## 👥 Contributeurs
 
-Cette application a été créée pour renforcer les liens entre amoureux !
+- **haniel-afk** - Développeur principal
+- **hanieljean42-eng** - Contributeur
+
+
+
+## 📝 Licence
+
+Ce projet est privé. Tous droits réservés © 2025
+
+## 💬 Support
+
+Pour toute question ou bug report, veuillez créer une issue sur GitHub.
 
 ---
+
+**Fait avec ❤️ pour les couples**
 
 **Version:** 1.0.0  
 **Auteur:** Couple H Team 💕
