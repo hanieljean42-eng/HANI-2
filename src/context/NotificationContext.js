@@ -5,6 +5,7 @@ import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, get, onValue, off } from 'firebase/database';
+import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext({});
 
@@ -20,61 +21,56 @@ Notifications.setNotificationHandler({
 });
 
 export function NotificationProvider({ children }) {
+  const { user: authUser, couple: authCouple } = useAuth();
   const [expoPushToken, setExpoPushToken] = useState('');
   const [notification, setNotification] = useState(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const notificationListener = useRef();
   const responseListener = useRef();
   const partnerTokenListenerRef = useRef(); // ✅ Ref pour cleanup propre
-  const tokenSavedRef = useRef(false); // ✅ Flag pour éviter double save
+  const tokenSavedForCoupleRef = useRef(null); // ✅ Track quel coupleId a déjà été sauvegardé
   const [userId, setUserId] = useState(null);
   const [coupleId, setCoupleId] = useState(null);
   const [partnerToken, setPartnerToken] = useState(null);
 
-  // Charger les données utilisateur
+  // ✅ Réagir aux changements d'authentification (login/logout/join couple)
   useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const user = await AsyncStorage.getItem('@user');
-      const couple = await AsyncStorage.getItem('@couple');
-      
-      if (user) {
-        const userData = JSON.parse(user);
-        setUserId(userData.id);
-      }
-      if (couple) {
-        const coupleData = JSON.parse(couple);
-        setCoupleId(coupleData.id);
-      }
-    } catch (error) {
-      console.error('Erreur chargement données:', error);
+    if (authUser?.id) {
+      console.log('🔔 NotificationContext: User détecté:', authUser.name);
+      setUserId(authUser.id);
+    } else {
+      setUserId(null);
     }
-  };
+  }, [authUser?.id]);
 
-  // Initialiser les notifications
+  useEffect(() => {
+    if (authCouple?.id) {
+      console.log('🔔 NotificationContext: Couple détecté:', authCouple.id);
+      setCoupleId(authCouple.id);
+    } else {
+      setCoupleId(null);
+    }
+  }, [authCouple?.id]);
+
+  // ✅ ÉTAPE 1: Obtenir le token push au démarrage (juste l'obtenir, pas le sauvegarder)
   useEffect(() => {
     registerForPushNotificationsAsync().then(token => {
       if (token) {
+        console.log('🔔 Token obtenu au démarrage:', token.substring(0, 25) + '...');
         setExpoPushToken(token);
         setNotificationsEnabled(true);
-        // Sauvegarder le token
-        saveTokenToFirebase(token);
       }
     });
 
     // Listener pour les notifications reçues quand l'app est ouverte
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('📬 Notification reçue:', notification);
-      setNotification(notification);
+    notificationListener.current = Notifications.addNotificationReceivedListener(notif => {
+      console.log('📬 Notification reçue:', notif);
+      setNotification(notif);
     });
 
     // Listener pour quand l'utilisateur clique sur la notification
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('👆 Notification cliquée:', response);
-      // Ici on peut naviguer vers un écran spécifique
     });
 
     return () => {
@@ -86,6 +82,50 @@ export function NotificationProvider({ children }) {
       }
     };
   }, []);
+
+  // ✅ ÉTAPE 2: Sauvegarder le token sur Firebase QUAND on a TOUTES les données nécessaires
+  // Ce useEffect se déclenche chaque fois que expoPushToken, authUser ou authCouple changent
+  // Il résout le problème de closure stale qui empêchait la sauvegarde
+  useEffect(() => {
+    if (!expoPushToken) {
+      return; // Pas encore de token
+    }
+    if (!authUser?.id || !authCouple?.id) {
+      console.log('🔔 Token prêt mais en attente de user/couple pour sauvegarder sur Firebase');
+      return; // Pas encore de user ou couple
+    }
+    // Éviter de re-sauvegarder si déjà fait pour ce couple
+    if (tokenSavedForCoupleRef.current === authCouple.id) {
+      console.log('⏭️ Token déjà sauvegardé pour ce couple, skip');
+      return;
+    }
+
+    console.log('🔔 ✅ Toutes les données prêtes → Sauvegarde token sur Firebase');
+    console.log('   User:', authUser.name, '| Couple:', authCouple.id);
+
+    const doSave = async () => {
+      try {
+        if (isConfigured && database) {
+          const tokenRef = ref(database, `couples/${authCouple.id}/pushTokens/${authUser.id}`);
+          await set(tokenRef, {
+            token: expoPushToken,
+            platform: Platform.OS,
+            updatedAt: new Date().toISOString(),
+            userName: authUser.name || 'User',
+          });
+          console.log('✅ Token push sauvegardé sur Firebase pour couple:', authCouple.id);
+          tokenSavedForCoupleRef.current = authCouple.id;
+          setUserId(authUser.id);
+          setCoupleId(authCouple.id);
+        }
+        await AsyncStorage.setItem('@pushToken', expoPushToken);
+      } catch (error) {
+        console.error('❌ Erreur sauvegarde token sur Firebase:', error);
+      }
+    };
+
+    doSave();
+  }, [expoPushToken, authUser?.id, authCouple?.id]);
 
   // ✅ AMÉLIORÉ: Écouter le token du partenaire sur Firebase avec cleanup propre
   useEffect(() => {
@@ -131,73 +171,62 @@ export function NotificationProvider({ children }) {
     };
   }, [coupleId, userId]);
 
-  // Sauvegarder le token sur Firebase
-  const saveTokenToFirebase = async (token) => {
-    // ✅ DEDUPLICATE: Ne sauvegarder qu'une fois
-    if (tokenSavedRef.current) {
-      console.log('⏭️ Token déjà sauvegardé, skip');
-      return;
-    }
-    
-    try {
-      const user = await AsyncStorage.getItem('@user');
-      const couple = await AsyncStorage.getItem('@couple');
-      
-      if (!user || !couple) {
-        console.log('⚠️ Données utilisateur/couple non disponibles');
-        return;
-      }
-      
-      const userData = JSON.parse(user);
-      const coupleData = JSON.parse(couple);
-      
-      setUserId(userData.id);
-      setCoupleId(coupleData.id);
-      
-      if (isConfigured && database) {
-        const tokenRef = ref(database, `couples/${coupleData.id}/pushTokens/${userData.id}`);
-        await set(tokenRef, {
-          token: token,
-          platform: Platform.OS,
-          updatedAt: new Date().toISOString(),
-          userName: userData.name,
-        });
-        console.log('✅ Token push sauvegardé sur Firebase');
-        tokenSavedRef.current = true; // ✅ MARQUER COMME SAUVEGARDÉ
-      }
-      
-      // Sauvegarder aussi localement
-      await AsyncStorage.setItem('@pushToken', token);
-    } catch (error) {
-      console.error('Erreur sauvegarde token:', error);
-    }
-  };
+  // ✅ SUPPRIMÉ: L'ancienne saveTokenToFirebase() est remplacée par le useEffect
+  // qui réagit à [expoPushToken, authUser?.id, authCouple?.id]
+  // Plus de problème de closure stale !
 
-  // ✅ SUPPRIMÉ: Ce useEffect causait un double appel
-  // Le saveTokenToFirebase dans registerForPushNotificationsAsync() suffit
-  // et il a un flag tokenSavedRef pour éviter les doubles écritures
-
-  // Fonction pour demander les permissions
+  // Fonction pour demander les permissions (Android 13+ compatible)
   async function registerForPushNotificationsAsync() {
     let token;
 
     if (Platform.OS === 'android') {
-      // Configuration du canal Android
+      // ✅ Créer TOUS les canaux de notification (requis Android 8+)
+      // Les canaux doivent être créés AVANT d'envoyer des notifications
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
+        name: 'Général',
+        description: 'Notifications générales de l\'application',
         importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF6B9D',
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+      });
+
+      await Notifications.setNotificationChannelAsync('love-messages', {
+        name: 'Messages d\'amour 💕',
+        description: 'Messages et notifications de votre partenaire',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF6B9D',
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+      });
+
+      await Notifications.setNotificationChannelAsync('game-invites', {
+        name: 'Invitations aux jeux 🎮',
+        description: 'Invitations et résultats de jeux en couple',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF6B9D',
+        sound: 'default',
+        enableVibrate: true,
+      });
+
+      await Notifications.setNotificationChannelAsync('challenges', {
+        name: 'Défis 🏆',
+        description: 'Nouveaux défis et accomplissements',
+        importance: Notifications.AndroidImportance.DEFAULT,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF6B9D',
         sound: 'default',
       });
 
-      // Canal pour les messages d'amour
-      await Notifications.setNotificationChannelAsync('love-messages', {
-        name: 'Messages d\'amour',
-        description: 'Notifications de votre partenaire',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF6B9D',
+      await Notifications.setNotificationChannelAsync('reminders', {
+        name: 'Rappels ⏰',
+        description: 'Rappels quotidiens et anniversaires',
+        importance: Notifications.AndroidImportance.DEFAULT,
         sound: 'default',
       });
     }
@@ -207,12 +236,26 @@ export function NotificationProvider({ children }) {
       let finalStatus = existingStatus;
       
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        // ✅ Android 13+ (API 33) : demande explicite de POST_NOTIFICATIONS
+        // Sur Android 13+, requestPermissionsAsync() affiche le dialogue système
+        // Sur Android 12 et moins, la permission est automatiquement accordée
+        console.log('🔔 Demande permission notifications (Android 13+ requis)...');
+        const { status } = await Notifications.requestPermissionsAsync({
+          android: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+            allowAnnouncements: true,
+          },
+        });
         finalStatus = status;
+        console.log('🔔 Résultat permission:', finalStatus);
       }
       
       if (finalStatus !== 'granted') {
-        console.log('⚠️ Permissions de notification non accordées');
+        console.log('⚠️ Permissions de notification non accordées - Android 13+ nécessite une permission explicite');
+        // ✅ Ne pas retourner null - on peut quand même essayer d'obtenir le token
+        // L'utilisateur pourra activer les notifications plus tard dans les paramètres
         return null;
       }
 

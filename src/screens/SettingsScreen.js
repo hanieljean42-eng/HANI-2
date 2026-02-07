@@ -33,7 +33,7 @@ export default function SettingsScreen({ navigation }) {
     lockSecretMode,
   } = useSecurity();
   const { logout, user, couple } = useAuth();
-  const { testNotification, testNotificationDelayed, notificationsEnabled, expoPushToken } = useNotifications();
+  const { testNotification, testNotificationDelayed, notificationsEnabled, expoPushToken, partnerToken } = useNotifications();
 
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -299,7 +299,7 @@ export default function SettingsScreen({ navigation }) {
             <View style={styles.settingInfo}>
               <Text style={styles.settingIcon}>📱</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.settingLabel}>Token Push</Text>
+                <Text style={styles.settingLabel}>Mon token Push</Text>
                 <Text style={[styles.settingValue, { fontSize: 10 }]} numberOfLines={1}>
                   {expoPushToken}
                 </Text>
@@ -307,6 +307,20 @@ export default function SettingsScreen({ navigation }) {
             </View>
           </View>
         )}
+
+        <View style={styles.settingCard}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingIcon}>{partnerToken ? '✅' : '❌'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.settingLabel}>Token partenaire</Text>
+              <Text style={[styles.settingValue, { fontSize: 11, color: partnerToken ? '#4CAF50' : '#F44336' }]}>
+                {partnerToken 
+                  ? (partnerToken.startsWith('ExponentPushToken') ? '🟢 Connecté - Push actif' : '🟡 Token dev (pas de push réel)')
+                  : '🔴 Non détecté - Le partenaire doit ouvrir l\'app'}
+              </Text>
+            </View>
+          </View>
+        </View>
 
         {/* Section Compte */}
         <Text style={styles.sectionTitle}>👤 Compte</Text>

@@ -14,9 +14,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
+  const { notifyLoginSuccess } = useNotifications();
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,7 +38,10 @@ export default function LoginScreen({ navigation }) {
     const result = await login(name.trim(), password);
     setLoading(false);
 
-    if (!result.success) {
+    if (result.success) {
+      // ✅ Notification de bienvenue après connexion réussie
+      await notifyLoginSuccess(name.trim());
+    } else {
       // Afficher plus de détails pour aider l'utilisateur
       Alert.alert(
         'Erreur de connexion', 

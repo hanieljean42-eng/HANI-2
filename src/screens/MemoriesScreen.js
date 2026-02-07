@@ -143,14 +143,25 @@ export default function MemoriesScreen() {
 
   const pickImage = async () => {
     try {
+      // Demander la permission galerie (nécessaire Android 13+)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          '📸 Permission requise',
+          'L\'accès à la galerie photo est nécessaire pour ajouter des images.\n\nAllez dans Paramètres > Applications > HANI 2 > Permissions > Photos pour l\'activer.',
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.7,
       });
 
-      if (!result.cancelled) {
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         setNewMemory({ ...newMemory, imageUri: result.assets[0].uri });
       }
     } catch (error) {

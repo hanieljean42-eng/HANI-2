@@ -83,8 +83,19 @@ export default function SecretScreen() {
     }
     
     try {
+      // Demander la permission galerie (nécessaire Android 13+)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          '📸 Permission requise',
+          'L\'accès à la galerie photo est nécessaire pour ajouter des images.\n\nAllez dans Paramètres > Applications > HANI 2 > Permissions > Photos pour l\'activer.',
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({ 
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+        mediaTypes: ['images'], 
         quality: 0.7 
       });
       

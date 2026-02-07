@@ -142,6 +142,17 @@ export default function ChatScreen({ navigation }) {
     }
 
     try {
+      // Demander la permission galerie (nécessaire Android 13+)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          '📸 Permission requise',
+          'L\'accès à la galerie photo est nécessaire pour envoyer des images.\n\nAllez dans Paramètres > Applications > HANI 2 > Permissions > Photos pour l\'activer.',
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.8,

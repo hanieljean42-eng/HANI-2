@@ -318,7 +318,32 @@ export default function GamesScreen() {
     coupleId,
   } = useGame();
 
-  // États pour Action/Vérité TOUR PAR TOUR (seul jeu local, pour couple au même endroit)
+  // États principaux des jeux
+  const [activeGame, setActiveGame] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [scores, setScores] = useState({ player1: 0, player2: 0 });
+  const [showResult, setShowResult] = useState(false);
+  const [truthOrDare, setTruthOrDare] = useState(null);
+  const [wyrChoice, setWyrChoice] = useState(null);
+  const [gameMode, setGameMode] = useState(null); // 'online'
+  
+  // États pour "Qui est le Plus" TOUR PAR TOUR
+  const [wimPhase, setWimPhase] = useState('player1'); // 'player1', 'passPhone', 'player2', 'reveal'
+  const [wimPlayer1Answer, setWimPlayer1Answer] = useState(null);
+  const [wimPlayer2Answer, setWimPlayer2Answer] = useState(null);
+  
+  // États pour "Tu Préfères" TOUR PAR TOUR
+  const [wyrPhase, setWyrPhase] = useState('player1'); // 'player1', 'passPhone', 'player2', 'reveal'
+  const [wyrPlayer1Choice, setWyrPlayer1Choice] = useState(null);
+  const [wyrPlayer2Choice, setWyrPlayer2Choice] = useState(null);
+  
+  // États pour Quiz
+  const [quizPhase, setQuizPhase] = useState('player1'); // 'player1', 'player2', 'reveal'
+  const [player1Answer, setPlayer1Answer] = useState(null);
+  const [player2Answer, setPlayer2Answer] = useState(null);
+  const [currentPlayer, setCurrentPlayer] = useState(1);
+
+  // États pour Action/Vérité TOUR PAR TOUR
   const [todResponse, setTodResponse] = useState('');
   const [todSubmitted, setTodSubmitted] = useState(false);
   const [todRound, setTodRound] = useState(0);
@@ -336,15 +361,7 @@ export default function GamesScreen() {
   const [isJoiningGame, setIsJoiningGame] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
-  // ========== ALERTE VERSION - TEST ==========
-  useEffect(() => {
-    Alert.alert(
-      '🚀 VERSION 3.0.0',
-      'Cette popup confirme que vous avez la NOUVELLE version !\n\n✅ Jeux à distance\n✅ 35 Vérités + 39 Actions\n✅ Contenu adulte',
-      [{ text: 'Super !', style: 'default' }]
-    );
-  }, []);
-  // ============================================
+  // Version 3.1.0 - 100% Online
 
   // Synchroniser le coupleId avec le couple de l'AuthContext
   useEffect(() => {
@@ -402,18 +419,6 @@ export default function GamesScreen() {
       }
     }
   }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todResponse, todSubmitted, user?.id]);
-
-  // Surveiller les changements de session pour le mode en ligne
-  useEffect(() => {
-    if (gameSession && gameMode === 'online') {
-      if (gameSession.status === 'ready' && !waitingForPartner) {
-        // Les deux joueurs sont là, démarrer le jeu
-        setShowLobby(false);
-        setShowInviteModal(false);
-        setActiveGame(gameSession.gameType);
-      }
-    }
-  }, [gameSession, waitingForPartner, gameMode]);
 
   const openGameLobby = (gameType) => {
     setSelectedGameForLobby(gameType);
@@ -479,26 +484,17 @@ export default function GamesScreen() {
   };
 
   const startGame = (game) => {
-    // TOUS LES JEUX SAUF TRUTH/DARE DOIVENT ALLER À ChallengesScreen (online/Firebase)
-    if (game === 'truthordare') {
-      openGameLobby(game);
+    // Ouvrir le lobby pour tous les jeux (online)
+    openGameLobby(game);
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestion < 9) {
+      setCurrentQuestion(currentQuestion + 1);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } else {
-      // Rediriger vers ChallengesScreen pour Quiz, Qui est le Plus, Tu Préfères
-      Alert.alert(
-        '🎮 Jeu en ligne',
-        'Les jeux se jouent maintenant à distance sur deux téléphones différents!',
-        [
-          { 
-            text: 'Jouer', 
-            onPress: () => {
-              // Navigation vers ChallengesScreen
-              // TODO: Implémente la navigation si nécessaire
-              console.log('Naviguer vers ChallengesScreen pour ' + game);
-            }
-          },
-          { text: 'Annuler', style: 'cancel' }
-        ]
-      );
+      setShowResult(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
