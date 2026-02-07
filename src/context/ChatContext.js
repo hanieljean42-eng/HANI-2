@@ -106,10 +106,11 @@ export function ChatProvider({ children }) {
       timestamp: new Date().toISOString(),
       read: false,
       reactions: {},
-      ..
-        // Retry logic pour réseau instable
-        let retries = 0;
-        const maxRetries = 3;
+    };
+
+    // Retry logic pour réseau instable
+    let retries = 0;
+    const maxRetries = 3;
         
         const attemptSend = async () => {
           try {
