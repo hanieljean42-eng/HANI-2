@@ -23,6 +23,7 @@ import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import AnimatedModal from '../components/AnimatedModal';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 const { width, height } = Dimensions.get('window');
 
@@ -141,12 +142,20 @@ export default function MemoriesScreen() {
   };
 
   const pickImage = async () => {
-    // Fonction désactivée — ajout de photos non disponible pour le moment
-    Alert.alert(
-      '📸 Ajout de photos non disponible',
-      "L'ajout de photos n'est pas disponible pour le moment. Cette fonctionnalité arrivera dans une prochaine mise à jour.",
-      [{ text: 'OK' }]
-    );
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+      });
+
+      if (!result.cancelled) {
+        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri });
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de sélectionner une image');
+    }
   };
 
   // Vidéos non disponibles actuellement
@@ -177,37 +186,45 @@ export default function MemoriesScreen() {
     setUploadProgress(0);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
-    let mediaBase64 = null;
+    let imageUrl = null;
+    let publicId = null;
     let syncMessage = 'Souvenir ajouté !';
     
-    // Si une image est sélectionnée, la convertir en base64
     if (newMemory.imageUri) {
       setUploadProgress(30);
       
-      // Vérifier la taille du fichier
-      const fileInfo = await getFileInfo(newMemory.imageUri);
-      
-      if (!fileInfo.canUpload) {
-        setIsUploading(false);
-        Alert.alert(
-          '📸 Image trop grande',
-          `L'image fait ${fileInfo.sizeMB?.toFixed(1) || '?'} MB.\n\nMaximum: 5 MB.\n\nConseil: Prenez une photo avec une résolution plus basse.`,
-          [{ text: 'Compris' }]
-        );
-        return;
-      }
-      
-      setUploadProgress(50);
-      
-      // Convertir en base64
-      mediaBase64 = await convertToBase64(newMemory.imageUri);
-      
-      setUploadProgress(80);
-      
-      if (mediaBase64) {
+      try {
+        const fileInfo = await getFileInfo(newMemory.imageUri);
+        
+        if (!fileInfo.canUpload) {
+          setIsUploading(false);
+          Alert.alert(
+            '📸 Image trop grande',
+            `L'image fait ${fileInfo.sizeMB?.toFixed(1) || '?'} MB.\n\nMaximum: 5 MB.`,
+            [{ text: 'Compris' }]
+          );
+          return;
+        }
+        
+        setUploadProgress(50);
+        
+        const file = {
+          uri: newMemory.imageUri,
+          type: 'image/jpeg',
+          name: `memory_${Date.now()}.jpg`
+        };
+        
+        const cloudinaryResult = await uploadToCloudinary(file);
+        imageUrl = cloudinaryResult.url;
+        publicId = cloudinaryResult.publicId;
+        
+        setUploadProgress(80);
         syncMessage = 'Souvenir ajouté et synchronisé ! 💕';
-      } else {
-        syncMessage = 'Souvenir ajouté localement';
+      } catch (error) {
+        console.error('Upload Cloudinary error:', error);
+        Alert.alert('Erreur', 'Impossible de télécharger l\'image');
+        setIsUploading(false);
+        return;
       }
     }
     
@@ -220,15 +237,14 @@ export default function MemoriesScreen() {
       date: new Date().toLocaleDateString('fr-FR'),
       emoji: newMemory.imageUri ? '📸' : '💌',
       color: ['#FF6B9D', '#8B5CF6', '#10B981', '#F59E0B'][Math.floor(Math.random() * 4)],
-      imageUri: newMemory.imageUri,
+      imageUri: imageUrl || newMemory.imageUri,
+      publicId: publicId,
       mediaType: 'image',
-      mediaBase64: mediaBase64,
-      isSynced: mediaBase64 !== null,
+      isSynced: imageUrl !== null,
     };
 
     await addMemory(memory);
     
-    // Envoyer notification au partenaire
     await notifyMemory();
     
     setNewMemory({ title: '', note: '', date: '', time: '', imageUri: null, mediaType: 'image' });

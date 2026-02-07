@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, onValue, off, push } from 'firebase/database';
 import { useAuth } from './AuthContext';
+import { encryptMessageObject, decryptMessageObject } from '../utils/encryption';
 
 const ChatContext = createContext({});
 
@@ -29,10 +30,17 @@ export function ChatProvider({ children }) {
     const messagesListener = onValue(messagesRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const messagesArray = Object.entries(data).map(([key, value]) => ({
-          id: key,
-          ...value,
-        }));
+        const messagesArray = Object.entries(data).map(([key, value]) => {
+          // Déchiffrer les messages texte
+          if (value.type === 'text' && value.content) {
+            return {
+              id: key,
+              ...value,
+              content: decryptMessageObject({ content: value.content }, couple.id).content,
+            };
+          }
+          return { id: key, ...value };
+        });
         // Trier par date
         messagesArray.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
         setMessages(messagesArray);
@@ -91,25 +99,45 @@ export function ChatProvider({ children }) {
     if (!couple?.id || !user?.id) return null;
 
     const message = {
-      content,
+      content: type === 'text' ? encryptMessageObject({ content }, couple.id).content : content,
       type, // 'text', 'image', 'voice', 'sticker'
       senderId: user.id,
       senderName: user.name,
       timestamp: new Date().toISOString(),
       read: false,
       reactions: {},
-      ...(Object.keys(metadata).length > 0 && { metadata }),
-    };
-
-    try {
-      if (isConfigured && database) {
-        const messagesRef = ref(database, `couples/${couple.id}/chat/messages`);
-        const newMessageRef = push(messagesRef);
-        await set(newMessageRef, message);
-        return { success: true, id: newMessageRef.key };
+      ..
+        // Retry logic pour réseau instable
+        let retries = 0;
+        const maxRetries = 3;
+        
+        const attemptSend = async () => {
+          try {
+            await set(newMessageRef, message);
+            return { success: true, id: newMessageRef.key };
+          } catch (error) {
+            if (retries < maxRetries && error.message?.includes('NETWORK')) {
+              retries++;
+              console.warn(`⚠️ Retry ${retries}/${maxRetries} d'envoi du message...`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Backoff
+              return attemptSend();
+            }
+            throw error;
+          }
+        };
+        
+        return attemptSend();
       } else {
         // Mode local
         const localMessage = { id: Date.now().toString(), ...message };
+        const updated = [...messages, localMessage];
+        setMessages(updated);
+        await AsyncStorage.setItem('@chatMessages', JSON.stringify(updated));
+        console.warn('📱 Mode local - message en attente de sync');
+        return { success: true, id: localMessage.id };
+      }
+    } catch (error) {
+      console.error('❌ Erreur envoi message:', error.messageString(), ...message };
         const updated = [...messages, localMessage];
         setMessages(updated);
         await AsyncStorage.setItem('@chatMessages', JSON.stringify(updated));

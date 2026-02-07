@@ -74,6 +74,58 @@ const QUIZ_QUESTIONS = [
     question: "Qu'est-ce qui me rend le plus heureux/heureuse ?",
     type: "open",
   },
+  {
+    id: 11,
+    question: "Quel est mon plus beau souvenir avec toi ?",
+    type: "open",
+  },
+  {
+    id: 12,
+    question: "Quel artiste ou musicien j'aime le plus ?",
+    type: "open",
+  },
+  {
+    id: 13,
+    question: "Quel type d'animal j'aimerais avoir ?",
+    type: "choice",
+    options: ["Chat", "Chien", "Oiseau", "Poisson", "Aucun", "Autre"],
+  },
+  {
+    id: 14,
+    question: "Quelle est ma saison préférée ?",
+    type: "choice",
+    options: ["Printemps", "Été", "Automne", "Hiver"],
+  },
+  {
+    id: 15,
+    question: "Quel est mon nombre porte-bonheur ?",
+    type: "open",
+  },
+  {
+    id: 16,
+    question: "Quel hobby je pratique le plus souvent ?",
+    type: "open",
+  },
+  {
+    id: 17,
+    question: "Quelle est ma plus grande qualité selon moi ?",
+    type: "open",
+  },
+  {
+    id: 18,
+    question: "Si j'avais un jour de libre, je ferais quoi ?",
+    type: "open",
+  },
+  {
+    id: 19,
+    question: "Quel est mon plus grand rêve professionnel ?",
+    type: "open",
+  },
+  {
+    id: 20,
+    question: "Quel moment avec toi je voudrais revivre ?",
+    type: "open",
+  },
 ];
 
 const TRUTH_OR_DARE = {
@@ -179,6 +231,24 @@ const WHO_IS_MORE = [
   "Qui est le/la plus câlin(e) ?",
   "Qui s'endort en premier ?",
   "Qui prend le plus de temps pour se préparer ?",
+  "Qui est le/la plus désordre ?",
+  "Qui est le/la plus sportif/sportive ?",
+  "Qui est le/la plus stressé(e) ?",
+  "Qui contrôle le plus la télécommande ?",
+  "Qui est le/la plus emo ?",
+  "Qui aime le plus les animaux ?",
+  "Qui a le plus d'amis ?",
+  "Qui est le/la plus heureux/heureuse maintenant ?",
+  "Qui est le/la plus patient(e) ?",
+  "Qui est le/la plus aventurier/aventurière ?",
+  "Qui est le/la plus gourmand(e) ?",
+  "Qui est le/la plus matinal(e) ?",
+  "Qui est le/la plus extravagant(e) en dépenses ?",
+  "Qui me connaît le mieux ?",
+  "Qui est le/la plus jaloux/jalouse au lit ?",
+  "Qui est le/la plus passionné(e) ?",
+  "Qui est le/la plus attentionné(e) ?",
+  "Qui nous aime le plus ?",
 ];
 
 const WOULD_YOU_RATHER = [

@@ -17,7 +17,7 @@ import NetInfo from '@react-native-community/netinfo';
 
 export default function JoinCoupleScreen() {
   const { user, joinCouple, createCouple, logout } = useAuth();
-  const { notifyCoupleJoined } = useNotifications();
+  const { notifyCoupleJoined, notifyPartnerJoinedCreator } = useNotifications();
   const [mode, setMode] = useState('choice'); // 'choice', 'create', 'join'
   const [coupleCode, setCoupleCode] = useState('');
   const [formData, setFormData] = useState({
@@ -70,6 +70,8 @@ export default function JoinCoupleScreen() {
     if (result.success) {
       // Notification quand on rejoint un couple
       await notifyCoupleJoined(formData.partnerName);
+      // Aussi notifier via push notification au créateur que quelqu'un a rejoint
+      await notifyPartnerJoinedCreator(user?.name || 'Partenaire');
       if (result.synced) {
         Alert.alert(
           '🎉 Connectés !',

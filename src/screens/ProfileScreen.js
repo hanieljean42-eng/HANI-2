@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import AnimatedModal from '../components/AnimatedModal';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 const { width } = Dimensions.get('window');
 
@@ -199,12 +200,22 @@ export default function ProfileScreen({ navigation }) {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await updateUser({ profilePhoto: result.assets[0].uri });
-        setShowPhotoModal(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Notifier le partenaire
-        await notifyPhotoChanged('profil');
-        Alert.alert('✅', 'Photo de profil mise à jour !');
+        const file = {
+          uri: result.assets[0].uri,
+          type: 'image/jpeg',
+          name: `profile_${Date.now()}.jpg`
+        };
+
+        try {
+          const { url, publicId } = await uploadToCloudinary(file);
+          await updateUser({ profilePhoto: url, profilePhotoPublicId: publicId });
+          setShowPhotoModal(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await notifyPhotoChanged('profil');
+          Alert.alert('✅', 'Photo de profil mise à jour !');
+        } catch (error) {
+          Alert.alert('Erreur', 'Impossible de télécharger la photo');
+        }
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');
@@ -227,12 +238,22 @@ export default function ProfileScreen({ navigation }) {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await updateUser({ profilePhoto: result.assets[0].uri });
-        setShowPhotoModal(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Notifier le partenaire
-        await notifyPhotoChanged('profil');
-        Alert.alert('✅', 'Photo de profil mise à jour !');
+        const file = {
+          uri: result.assets[0].uri,
+          type: 'image/jpeg',
+          name: `profile_camera_${Date.now()}.jpg`
+        };
+
+        try {
+          const { url, publicId } = await uploadToCloudinary(file);
+          await updateUser({ profilePhoto: url, profilePhotoPublicId: publicId });
+          setShowPhotoModal(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await notifyPhotoChanged('profil');
+          Alert.alert('✅', 'Photo de profil mise à jour !');
+        } catch (error) {
+          Alert.alert('Erreur', 'Impossible de télécharger la photo');
+        }
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible d\'accéder à la caméra');
@@ -250,12 +271,22 @@ export default function ProfileScreen({ navigation }) {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await updateCouple({ couplePhoto: result.assets[0].uri });
-        setShowCouplePhotoModal(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Notifier le partenaire
-        await notifyPhotoChanged('couple');
-        Alert.alert('✅', 'Photo de couple mise à jour !');
+        const file = {
+          uri: result.assets[0].uri,
+          type: 'image/jpeg',
+          name: `couple_${Date.now()}.jpg`
+        };
+
+        try {
+          const { url, publicId } = await uploadToCloudinary(file);
+          await updateCouple({ couplePhoto: url, couplePhotoPublicId: publicId });
+          setShowCouplePhotoModal(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await notifyPhotoChanged('couple');
+          Alert.alert('✅', 'Photo de couple mise à jour !');
+        } catch (error) {
+          Alert.alert('Erreur', 'Impossible de télécharger la photo');
+        }
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');

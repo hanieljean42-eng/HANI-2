@@ -31,37 +31,51 @@ L'application est configurée pour fonctionner **100% gratuitement** avec Fireba
   "rules": {
     "couples": {
       "$coupleId": {
-        ".read": true,
-        ".write": true,
+        ".read": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
+        ".write": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
+        
+        "members": {
+          "$userId": {
+            ".read": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
+            ".write": "$userId === auth.uid || root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
+            "isOnline": {
+              ".validate": "newData.isBoolean()"
+            }
+          }
+        },
         
         "data": {
-          ".read": true,
-          ".write": true,
+          ".read": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
+          ".write": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
           
           "scheduledLetters": {
             "$letterId": {
-              ".read": true,
-              ".write": true
+              ".read": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
+              ".write": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()"
             }
           }
         },
         
         "pushTokens": {
-          ".read": true,
-          ".write": true
+          ".read": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
+          ".write": "$userId === auth.uid || root.child('couplesMembers').child($coupleId).child(auth.uid).exists()"
         },
         
-        "members": {
-          ".read": true,
-          ".write": true
+        "chat": {
+          "messages": {
+            ".read": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()",
+            ".write": "root.child('couplesMembers').child($coupleId).child(auth.uid).exists()"
+          }
         }
       }
     },
     
-    "games": {
+    "couplesMembers": {
       "$coupleId": {
-        ".read": true,
-        ".write": true
+        "$userId": {
+          ".read": "$userId === auth.uid",
+          ".write": "$userId === auth.uid"
+        }
       }
     }
   }

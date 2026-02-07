@@ -37,7 +37,7 @@ const WHEEL_ITEMS = [
 
 export default function WheelScreen() {
   const { theme } = useTheme();
-  const { notifyWheelSpin } = useNotifyPartner();
+  const { notifyWheelSpin, notifyPartnerWheelSpin } = useNotifyPartner();
   const [spinning, setSpinning] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -67,8 +67,9 @@ export default function WheelScreen() {
       setSelectedItem(WHEEL_ITEMS[randomIndex]);
       setShowModal(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Notifier le partenaire du résultat
+      // Notifier les deux partenaires du résultat
       await notifyWheelSpin(WHEEL_ITEMS[randomIndex].text);
+      await notifyPartnerWheelSpin(WHEEL_ITEMS[randomIndex].text);
     });
   };
 

@@ -30,9 +30,29 @@ export default function RegisterScreen({ navigation }) {
   const [showAvatars, setShowAvatars] = useState(false);
 
   const handleRegister = async () => {
-    if (!formData.name || !formData.password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
+    // Valider le nom
+    if (!formData.name || !formData.name.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer votre prénom');
       return;
+    }
+    
+    if (formData.name.trim().length < 2) {
+      Alert.alert('Erreur', 'Le prénom doit contenir au moins 2 caractères');
+      return;
+    }
+    
+    if (formData.name.length > 50) {
+      Alert.alert('Erreur', 'Le prénom ne peut pas dépasser 50 caractères');
+      return;
+    }
+
+    // Valider l'email (si fourni)
+    if (formData.email && formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        Alert.alert('Erreur', 'Veuillez entrer un email valide');
+        return;
+      }
     }
     
     // Construire la date de naissance si fournie
@@ -40,13 +60,24 @@ export default function RegisterScreen({ navigation }) {
       formData.birthday = `${formData.birthDay.padStart(2, '0')}/${formData.birthMonth.padStart(2, '0')}/${formData.birthYear}`;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+    // Valider les mots de passe
+    if (!formData.password || formData.password.length === 0) {
+      Alert.alert('Erreur', 'Veuillez entrer un mot de passe');
       return;
     }
 
     if (formData.password.length < 6) {
       Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (formData.password.length > 100) {
+      Alert.alert('Erreur', 'Le mot de passe ne peut pas dépasser 100 caractères');
       return;
     }
 

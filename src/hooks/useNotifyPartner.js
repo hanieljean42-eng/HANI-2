@@ -20,12 +20,8 @@ export const useNotifyPartner = () => {
   };
 
   const notifyCapsuleOpened = async (title) => {
-    if (notifications?.sendPushNotification && user?.name) {
-      await notifications.sendPushNotification(
-        '💊 Capsule ouverte !',
-        `${user.name} a ouvert la capsule "${title}" !`,
-        { type: 'capsule_opened' }
-      );
+    if (notifications?.notifyCapsuleOpened && user?.name) {
+      await notifications.notifyCapsuleOpened(user.name, title);
     }
   };
 
@@ -54,12 +50,8 @@ export const useNotifyPartner = () => {
   };
 
   const notifyNewChallenge = async (challengeName) => {
-    if (notifications?.sendPushNotification && user?.name) {
-      await notifications.sendPushNotification(
-        '⚡ Nouveau défi !',
-        `${user.name} a ajouté un défi : "${challengeName}"`,
-        { type: 'new_challenge' }
-      );
+    if (notifications?.notifyChallengeAssigned && user?.name) {
+      await notifications.notifyChallengeAssigned(user.name, challengeName);
     }
   };
 
@@ -196,6 +188,27 @@ export const useNotifyPartner = () => {
     }
   };
 
+  const notifyPartnerWheelSpin = async (result) => {
+    if (notifications?.sendPushNotification && user?.name) {
+      await notifications.sendPushNotification(
+        '🎰 À ton tour !',
+        `${user.name} a obtenu "${result}" ! 🎲 Veux-tu essayer aussi ? 😉`,
+        { type: 'wheel_spin_partner' }
+      );
+    }
+  };
+
+  // === CONNEXION & COUPLE ===
+  const notifyPartnerJoined = async (partnerName) => {
+    if (notifications?.sendPushNotification && user?.name) {
+      await notifications.sendPushNotification(
+        '👫 Partenaire connecté !',
+        `${partnerName} a rejoint votre espace couple ! 🎉 Maintenant tout se synchronise en temps réel 💕`,
+        { type: 'partner_joined' }
+      );
+    }
+  };
+
   // === LETTRES D'AMOUR PROGRAMMÉES ===
   const notifyScheduledLetter = async () => {
     if (notifications?.sendPushNotification && user?.name) {
@@ -236,6 +249,20 @@ export const useNotifyPartner = () => {
         `${user.name} a rejoint votre couple ! Bienvenue ! 💕`,
         { type: 'partner_joined' }
       );
+    }
+  };
+
+  // === RAPPELS INTELLIGENTS ===
+  const sendDailyReminder = async () => {
+    if (notifications?.scheduleDailyReminder) {
+      await notifications.scheduleDailyReminder();
+    }
+  };
+
+  const sendSmartReminder = async (isChallengeIncomplete = false) => {
+    if (notifications?.scheduleSmartReminder && user?.name) {
+      // Passer le nom du partenaire si dispo
+      await notifications.scheduleSmartReminder(user.name, isChallengeIncomplete);
     }
   };
 
@@ -292,13 +319,17 @@ export const useNotifyPartner = () => {
     notifyLoveMeterMilestone,
     // Roue
     notifyWheelSpin,
+    notifyPartnerWheelSpin,
+    // Connexion & Couple
+    notifyPartnerJoined,
     // Lettres d'amour programmées
     notifyScheduledLetter,
     notifyLetterDelivered,
     // Journal intime
     notifyDiaryEntry,
-    // Connexion
-    notifyPartnerJoined,
+    // Rappels intelligents
+    sendDailyReminder,
+    sendSmartReminder,
     // Custom
     sendCustomNotification,
     notifyMissYou,

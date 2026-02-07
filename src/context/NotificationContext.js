@@ -362,12 +362,30 @@ export function NotificationProvider({ children }) {
     );
   };
 
+  // Notification quand un défi EST ASSIGNÉ (nouveau défi à faire)
+  const notifyChallengeAssigned = async (userName, challengeName) => {
+    await sendPushNotification(
+      '⚡ Nouveau défi !',
+      `${userName} t'a assigné le défi "${challengeName}" ! Tu peux le faire ? 💪`,
+      { type: 'challenge_assigned' }
+    );
+  };
+
   // Notification quand une capsule temporelle est créée
   const notifyTimeCapsule = async (userName) => {
     await sendPushNotification(
       '💊 Capsule temporelle',
       `${userName} a créé une capsule temporelle secrète ! 🔒`,
       { type: 'capsule' }
+    );
+  };
+
+  // Notification quand une capsule temporelle est OUVERTE
+  const notifyCapsuleOpened = async (userName, capsuleTitle) => {
+    await sendPushNotification(
+      '💊 Capsule ouverte !',
+      `${userName} a ouvert la capsule "${capsuleTitle}" ! Venez revivre ce moment ensemble 💕`,
+      { type: 'capsule_opened' }
     );
   };
 
@@ -416,12 +434,46 @@ export function NotificationProvider({ children }) {
         title: '💕 Bonjour !',
         body: 'N\'oublie pas de dire bonjour à ton amour aujourd\'hui !',
         sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.HIGH,
       },
       trigger: {
         seconds: seconds,
         repeats: false,
       },
     });
+  };
+
+  // RAPPELS INTELLIGENTS - À faire si défi pas complété
+  const scheduleSmartReminder = async (partnerName, isChallengeIncomplete = false) => {
+    // Programmer pour 14h
+    const now = new Date();
+    const scheduledTime = new Date(now);
+    scheduledTime.setHours(14, 0, 0, 0);
+    
+    if (scheduledTime <= now) {
+      scheduledTime.setDate(scheduledTime.getDate() + 1);
+    }
+    
+    const seconds = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
+    
+    const title = isChallengeIncomplete ? '⚡ Le défi t\'attend !' : '💬 Prends du temps ensemble';
+    const body = isChallengeIncomplete 
+      ? `Vous n'avez pas encore complété le défi d'aujourd'hui ! C'est le moment ? 🎯`
+      : `Ça fait un moment que tu n'as pas parlé avec ${partnerName}... Elle/il te manque peut-être ? 💭`;
+    
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: title,
+        body: body,
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.DEFAULT,
+      },
+      trigger: {
+        seconds: seconds,
+        repeats: false,
+      },
+    });
+    console.log('📅 Rappel intelligent programmé');
   };
 
   // Notification pour anniversaire
@@ -649,7 +701,7 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // Notification quand on rejoint un couple
+  // Notification quand on rejoint ou crée un couple
   const notifyCoupleJoined = async (partnerName) => {
     try {
       await Notifications.scheduleNotificationAsync({
@@ -659,11 +711,26 @@ export function NotificationProvider({ children }) {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: null, // Immédiat
+        trigger: { seconds: 1 }, // Immédiat (après 1 seconde pour s'assurer que tout est chargé)
       });
       return true;
     } catch (error) {
       console.error('❌ Erreur notification couple:', error);
+      return false;
+    }
+  };
+
+  // Notification quand un partenaire rejoint après création
+  const notifyPartnerJoinedCreator = async (partnerName) => {
+    try {
+      await sendPushNotification(
+        '👫 Partenaire connecté !',
+        `${partnerName} a rejoint votre espace couple ! 🎉 Synchronisation en temps réel activée 💕`,
+        { type: 'partner_joined_creator' }
+      );
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur notification partenaire rejoint:', error);
       return false;
     }
   };
@@ -699,12 +766,15 @@ export function NotificationProvider({ children }) {
     notifyNewMemory,
     notifyLoveNote,
     notifyChallengeCompleted,
+    notifyChallengeAssigned,
     notifyTimeCapsule,
+    notifyCapsuleOpened,
     notifyPartnerOnline,
     notifyBucketCompleted,
     notifyGameInvite,
     // Rappels
     scheduleDailyReminder,
+    scheduleSmartReminder,
     scheduleAnniversaryReminder,
     cancelAllNotifications,
     // Lettres programmées
@@ -715,6 +785,7 @@ export function NotificationProvider({ children }) {
     testNotification,
     testNotificationDelayed,
     notifyCoupleJoined,
+    notifyPartnerJoinedCreator,
     notifyLoginSuccess,
   };
 

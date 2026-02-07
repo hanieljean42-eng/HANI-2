@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, onValue, off } from 'firebase/database';
 import { useAuth } from './AuthContext';
+import { encryptLoveNote, decryptLoveNote } from '../utils/encryption';
 
 const DataContext = createContext({});
 
@@ -71,8 +72,10 @@ export function DataProvider({ children }) {
         
         if (data.loveNotes && typeof data.loveNotes === 'object') {
           const notesArray = Object.values(data.loveNotes).filter(Boolean);
-          setLoveNotes(notesArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-          AsyncStorage.setItem('@loveNotes', JSON.stringify(notesArray));
+          // Déchiffrer les notes d'amour
+          const decryptedNotes = notesArray.map(note => decryptLoveNote(note, couple.id));
+          setLoveNotes(decryptedNotes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+          AsyncStorage.setItem('@loveNotes', JSON.stringify(decryptedNotes));
         }
         
         if (data.timeCapsules && typeof data.timeCapsules === 'object') {
@@ -116,17 +119,28 @@ export function DataProvider({ children }) {
     };
     
     const handleError = (error) => {
-      console.error('❌ Erreur écoute données Firebase:', error);
+      console.error('❌ Erreur écoute données Firebase:', error.message);
       setIsDataSynced(false);
       
-      // Tentative de reconnexion après 5 secondes
+      // Log détaillé pour debugging
+      const errorType = error.code || 'UNKNOWN_ERROR';
+      if (errorType === 'PERMISSION_DENIED') {
+        console.error('🔒 Accès refusé - vérifier les règles Firebase');
+      } else if (errorType === 'NETWORK_ERROR') {
+        console.warn('📡 Erreur réseau - mode local activé');
+      } else {
+        console.warn('⚠️ Erreur Firebase:', errorType, error.message);
+      }
+      
+      // Tentative de reconnexion après 5 secondes (avec backoff progressif)
+      const retryDelay = Math.min(5000, isListeningRef.current ? 5000 : 10000);
       setTimeout(() => {
-        if (coupleIdRef.current === couple.id) {
+        if (coupleIdRef.current === couple.id && !isListeningRef.current) {
           console.log('🔄 Tentative de reconnexion Firebase...');
           isListeningRef.current = false;
           // Le useEffect se redéclenchera
         }
-      }, 5000);
+      }, retryDelay);
     };
     
     const unsubscribe = onValue(dataRef, handleSnapshot, handleError);
@@ -463,7 +477,7 @@ export function DataProvider({ children }) {
     return updatedItem;
   };
 
-  // Love Notes - avec sync Firebase
+  // Love Notes - avec sync Firebase et chiffrement
   const addLoveNote = async (note) => {
     const newNote = { 
       id: Date.now().toString(), 
@@ -473,7 +487,10 @@ export function DataProvider({ children }) {
       fromId: user?.id
     };
     
-    const updated = [newNote, ...loveNotes];
+    // Chiffrer la note avant de la sauvegarder
+    const encryptedNote = encryptLoveNote(newNote, couple?.id);
+    
+    const updated = [encryptedNote, ...loveNotes];
     setLoveNotes(updated);
     await AsyncStorage.setItem('@loveNotes', JSON.stringify(updated));
     
@@ -481,8 +498,8 @@ export function DataProvider({ children }) {
     if (couple?.id && isConfigured && database) {
       try {
         const noteRef = ref(database, `couples/${couple.id}/data/loveNotes/${newNote.id}`);
-        await set(noteRef, newNote);
-        console.log('✅ Note d\'amour synchronisée');
+        await set(noteRef, encryptedNote);
+        console.log('✅ Note d\'amour synchronisée (chiffrée)');
       } catch (e) {
         console.log('⚠️ Erreur sync note:', e.message);
       }

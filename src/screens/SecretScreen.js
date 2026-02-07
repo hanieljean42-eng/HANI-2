@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useSecurity } from '../context/SecurityContext';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 export default function SecretScreen() {
   const { theme } = useTheme();
@@ -37,14 +38,38 @@ export default function SecretScreen() {
     }
     
     if (note.trim().length === 0 && !image) return;
-    await addPrivateContent({ type: image ? 'image' : 'note', data: image ? image : note });
+    
+    let imageUrl = null;
+    let publicId = null;
+    
+    if (image) {
+      try {
+        const file = {
+          uri: image,
+          type: 'image/jpeg',
+          name: `secret_${Date.now()}.jpg`
+        };
+        
+        const { url, publicId: pubId } = await uploadToCloudinary(file);
+        imageUrl = url;
+        publicId = pubId;
+      } catch (error) {
+        Alert.alert('Erreur', 'Impossible de télécharger l\'image');
+        return;
+      }
+    }
+    
+    await addPrivateContent({ 
+      type: imageUrl ? 'image' : 'note', 
+      data: imageUrl ? imageUrl : note,
+      publicId: publicId
+    });
     setNote('');
     setImage(null);
     setAdding(false);
   };
 
   const pickImage = async () => {
-    // Vérifier si le code PIN est configuré
     if (!isSecretModeEnabled) {
       Alert.alert(
         '🔐 Code secret requis',
@@ -57,9 +82,17 @@ export default function SecretScreen() {
       return;
     }
     
-    let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImage(result.assets[0].uri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({ 
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+        quality: 0.7 
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de sélectionner une image');
     }
   };
 

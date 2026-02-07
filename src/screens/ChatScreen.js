@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useData } from '../context/DataContext';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,8 +42,8 @@ export default function ChatScreen({ navigation }) {
     deleteMessage,
   } = useChat();
 
-  // Chat temporarily disabled (feature in development)
-  const chatAvailable = false;
+  // Chat is now available
+  const chatAvailable = true;
   const { notifyLoveNote } = useNotifyPartner();
   const { addDiaryEntry } = useData();
 
@@ -147,8 +148,19 @@ export default function ChatScreen({ navigation }) {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await sendMessage(result.assets[0].uri, 'image');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const file = {
+          uri: result.assets[0].uri,
+          type: 'image/jpeg',
+          name: `chat_${Date.now()}.jpg`
+        };
+
+        try {
+          const { url, publicId } = await uploadToCloudinary(file);
+          await sendMessage(url, 'image', publicId);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (error) {
+          Alert.alert('Erreur', 'Impossible de télécharger l\'image');
+        }
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible d\'envoyer l\'image');
