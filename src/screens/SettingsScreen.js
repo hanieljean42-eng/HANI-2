@@ -10,6 +10,8 @@ import {
   Switch,
   Alert,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -415,6 +417,7 @@ export default function SettingsScreen({ navigation }) {
           setPinStep(1);
         }}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🔐 Code PIN</Text>
@@ -475,6 +478,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </LinearGradient>
   );

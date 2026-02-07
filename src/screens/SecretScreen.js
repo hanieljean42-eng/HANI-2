@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useSecurity } from '../context/SecurityContext';
@@ -175,7 +175,8 @@ export default function SecretScreen() {
 
   return (
     <LinearGradient colors={theme.primary} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={[styles.title, { color: theme.text }]}>🔐 Espace Secret</Text>
         <Text style={[styles.subtitle, { color: theme.text }]}>Ici, tu peux écrire des notes intimes ou stocker des photos privées, protégées par ton code secret.</Text>
 
@@ -283,6 +284,7 @@ export default function SecretScreen() {
           </>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Modal Configuration PIN */}
       <Modal
@@ -296,6 +298,7 @@ export default function SecretScreen() {
           setPinStep(1);
         }}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🔐 Créer ton code secret</Text>
@@ -352,6 +355,7 @@ export default function SecretScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </LinearGradient>
   );

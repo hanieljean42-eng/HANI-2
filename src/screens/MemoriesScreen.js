@@ -11,6 +11,8 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
@@ -1108,10 +1110,17 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {addType === 'capsule' ? '⏰ Nouvelle Capsule' : 
+          <ScrollView 
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+          <View style={styles.modalContent}> 
                addType === 'letter' ? '💌 Nouvelle Lettre' :
                addType === 'diary' ? '📖 Nouvelle Entrée' :
                '✨ Nouveau Souvenir'}
@@ -1324,7 +1333,9 @@ export default function MemoriesScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* View Memory Modal */}
@@ -1474,10 +1485,17 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowEditModal(false)}
       >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editType === 'memory' ? '✏️ Modifier le souvenir' : 
+          <ScrollView 
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+          <View style={styles.modalContent}> 
                editType === 'letter' ? '✏️ Modifier la lettre' : 
                '✏️ Modifier l\'entrée'}
             </Text>
@@ -1602,7 +1620,9 @@ export default function MemoriesScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </LinearGradient>
   );

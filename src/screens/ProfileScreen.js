@@ -13,6 +13,8 @@ import {
   Share,
   Clipboard,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme, THEMES } from '../context/ThemeContext';
@@ -1151,6 +1153,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowNoteModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💌 Love Note</Text>
@@ -1178,6 +1181,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Bucket List Modal */}
@@ -1187,6 +1191,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowBucketModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>✨ Nouveau Rêve</Text>
@@ -1213,6 +1218,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Profile Modal */}
@@ -1222,6 +1228,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditProfileModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>👤 Modifier le profil</Text>
@@ -1248,6 +1255,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Avatar Selection Modal */}
@@ -1291,6 +1299,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditAnniversaryModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>📅 Date d'anniversaire</Text>
@@ -1324,6 +1333,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Photo de profil Modal */}
@@ -1456,6 +1466,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditPartnerModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💕 Modifier le nom du partenaire</Text>
@@ -1485,6 +1496,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Couple Name Modal */}
@@ -1494,6 +1506,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditCoupleNameModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💑 Modifier le nom du couple</Text>
@@ -1523,6 +1536,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Bucket Item Modal */}
@@ -1532,6 +1546,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditBucketModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>✏️ Modifier le rêve</Text>
@@ -1569,6 +1584,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Theme Modal */}
@@ -1626,6 +1642,7 @@ export default function ProfileScreen({ navigation }) {
           setPinStep(1);
         }}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🔐 Code PIN</Text>
@@ -1686,6 +1703,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* About Modal - Animée */}

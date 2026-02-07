@@ -11,6 +11,8 @@ import {
   Animated,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -393,6 +395,7 @@ export default function ChallengesScreen() {
     const game = COUPLE_GAMES.find(g => g.type === activeGame);
     
     return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View style={styles.gameFullScreen}>
         <LinearGradient colors={game?.color || ['#8B5CF6', '#A855F7']} style={styles.setupContainer}>
           <Text style={styles.setupEmoji}>{game?.icon}</Text>
@@ -427,6 +430,7 @@ export default function ChallengesScreen() {
           </TouchableOpacity>
         </LinearGradient>
       </View>
+      </KeyboardAvoidingView>
     );
   };
 
