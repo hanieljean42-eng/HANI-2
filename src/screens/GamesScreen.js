@@ -550,12 +550,12 @@ export default function GamesScreen() {
   useEffect(() => {
     if (activeGame === 'truthordare' && gameMode === 'online' && gameSession) {
       // Le créateur de la session commence à poser
-      const iAmCreator = gameSession.createdBy === coupleId;
+      const iAmCreator = gameSession.createdBy === myPlayerId;
       // Tour pair = créateur pose, tour impair = l'autre pose
       const creatorAsks = todRound % 2 === 0;
       setIsMyTurnToAsk(iAmCreator ? creatorAsks : !creatorAsks);
     }
-  }, [activeGame, gameMode, gameSession, todRound]);
+  }, [activeGame, gameMode, gameSession, todRound, myPlayerId]);
 
   const openGameLobby = (gameType) => {
     setSelectedGameForLobby(gameType);
@@ -994,7 +994,18 @@ export default function GamesScreen() {
                 if (isOnline) nextOnlineQuestion();
               }}
             >
-              <Text style={styles.playAgainText}>Rejouer</Text>
+              <Text style={styles.playAgainText}>🔄 Rejouer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quitGameButton}
+              onPress={() => {
+                setActiveGame(null);
+                endGameSession();
+                setGameMode(null);
+                resetAllGameStates();
+              }}
+            >
+              <Text style={styles.quitGameText}>🚪 Quitter</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1578,7 +1589,18 @@ export default function GamesScreen() {
                 if (isOnline) nextOnlineQuestion();
               }}
             >
-              <Text style={styles.playAgainText}>Rejouer</Text>
+              <Text style={styles.playAgainText}>🔄 Rejouer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quitGameButton}
+              onPress={() => {
+                setActiveGame(null);
+                endGameSession();
+                setGameMode(null);
+                resetAllGameStates();
+              }}
+            >
+              <Text style={styles.quitGameText}>🚪 Quitter</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1685,8 +1707,8 @@ export default function GamesScreen() {
               <Text style={styles.todResultText}>{truthOrDare.text}</Text>
             </View>
 
-            {/* Zone de réponse - uniquement si c'est mon tour de répondre */}
-            {todAnswerer === myName && !todSubmitted && (
+            {/* Zone de réponse - uniquement si c'est mon tour de répondre (ou en mode local après passage du tel) */}
+            {((todAnswerer === myName) || (gameMode !== 'online' && todPhase === 'answer')) && !todSubmitted && (
               <View style={styles.todResponseContainer}>
                 <Text style={styles.todResponseLabel}>
                   {truthOrDare.type === 'truth' 
@@ -1749,8 +1771,8 @@ export default function GamesScreen() {
               </View>
             )}
 
-            {/* Attente de réponse - si c'est moi qui ai posé */}
-            {todAsker === myName && !todSubmitted && (
+            {/* Attente de réponse - si c'est moi qui ai posé (pas en phase answer locale) */}
+            {todAsker === myName && !todSubmitted && todPhase !== 'answer' && (
               <View style={styles.todWaitingResponse}>
                 <ActivityIndicator size="small" color="#FF6B9D" />
                 <Text style={styles.todWaitingResponseText}>
@@ -1764,8 +1786,14 @@ export default function GamesScreen() {
                     <TouchableOpacity
                       style={styles.todPassPhoneButton}
                       onPress={() => {
-                        // Simuler que le partenaire va répondre
-                        setIsMyTurnToAsk(false);
+                        // En mode local: simuler que c'est maintenant le répondeur qui a le téléphone
+                        // Inverser les rôles temporairement pour que la zone de réponse s'affiche
+                        const tempAsker = todAsker;
+                        const tempAnswerer = todAnswerer;
+                        setTodAsker(tempAsker);
+                        setTodAnswerer(tempAnswerer);
+                        // Forcer l'affichage de la zone de réponse en mode local
+                        setTodPhase('answer');
                       }}
                     >
                       <Text style={styles.todPassPhoneText}>
@@ -1856,6 +1884,30 @@ export default function GamesScreen() {
             </ScrollView>
           </View>
         )}
+
+        {/* Boutons Rejouer / Quitter */}
+        <View style={styles.todEndButtons}>
+          <TouchableOpacity
+            style={styles.todReplayButton}
+            onPress={() => {
+              resetAllGameStates();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }}
+          >
+            <Text style={styles.todReplayText}>🔄 Recommencer à zéro</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.todQuitButton}
+            onPress={() => {
+              setActiveGame(null);
+              endGameSession();
+              setGameMode(null);
+              resetAllGameStates();
+            }}
+          >
+            <Text style={styles.todQuitText}>🚪 Quitter le jeu</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -2094,7 +2146,18 @@ export default function GamesScreen() {
                 if (isOnline) nextOnlineQuestion();
               }}
             >
-              <Text style={styles.playAgainText}>Rejouer</Text>
+              <Text style={styles.playAgainText}>🔄 Rejouer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quitGameButton}
+              onPress={() => {
+                setActiveGame(null);
+                endGameSession();
+                setGameMode(null);
+                resetAllGameStates();
+              }}
+            >
+              <Text style={styles.quitGameText}>🚪 Quitter</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -2498,11 +2561,55 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 50,
     borderRadius: 30,
+    marginBottom: 12,
   },
   playAgainText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#C44569',
+  },
+  quitGameButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  quitGameText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  todEndButtons: {
+    marginTop: 20,
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 20,
+  },
+  todReplayButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+  },
+  todReplayText: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#C44569',
+  },
+  todQuitButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  todQuitText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
   wyrTitle: {
     fontSize: 28,
