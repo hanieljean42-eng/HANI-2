@@ -343,6 +343,7 @@ export default function GamesScreen() {
   const [player1Answer, setPlayer1Answer] = useState(null);
   const [player2Answer, setPlayer2Answer] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(1);
+  const [quizOpenAnswer, setQuizOpenAnswer] = useState(''); // Réponse texte libre pour questions open
 
   // États pour Action/Vérité TOUR PAR TOUR
   const [todResponse, setTodResponse] = useState('');
@@ -405,6 +406,7 @@ export default function GamesScreen() {
     setPlayer1Answer(null);
     setPlayer2Answer(null);
     setCurrentPlayer(1);
+    setQuizOpenAnswer('');
     // Who is More
     setWimPhase('player1');
     setWimPlayer1Answer(null);
@@ -1335,6 +1337,7 @@ export default function GamesScreen() {
         setQuizPhase('player1');
         setPlayer1Answer(null);
         setPlayer2Answer(null);
+        setQuizOpenAnswer('');
         if (isOnline) nextOnlineQuestion();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
@@ -1367,12 +1370,39 @@ export default function GamesScreen() {
           ))}
         </View>
       ) : (
-        <TouchableOpacity
-          style={styles.quizReadyButton}
-          onPress={() => onAnswer('open')}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.quizOpenContainer}
         >
-          <Text style={styles.quizReadyButtonText}>J'ai ma réponse en tête ✓</Text>
-        </TouchableOpacity>
+          <Text style={styles.quizOpenLabel}>📝 Écris ta réponse :</Text>
+          <TextInput
+            style={styles.quizOpenInput}
+            value={quizOpenAnswer}
+            onChangeText={setQuizOpenAnswer}
+            placeholder="Tape ta réponse ici..."
+            placeholderTextColor="#999"
+            multiline
+            maxLength={200}
+            returnKeyType="done"
+          />
+          <TouchableOpacity
+            style={[
+              styles.quizOpenSubmitButton,
+              !quizOpenAnswer.trim() && styles.quizOpenSubmitDisabled
+            ]}
+            onPress={() => {
+              if (quizOpenAnswer.trim()) {
+                onAnswer(quizOpenAnswer.trim());
+                setQuizOpenAnswer('');
+              }
+            }}
+            disabled={!quizOpenAnswer.trim()}
+          >
+            <Text style={styles.quizOpenSubmitText}>
+              {quizOpenAnswer.trim() ? 'Envoyer ma réponse ✓' : 'Écris ta réponse...'}
+            </Text>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       )
     );
 
@@ -1467,21 +1497,26 @@ export default function GamesScreen() {
               <View style={styles.quizRevealContainer}>
                 <Text style={styles.quizRevealTitle}>🎯 Comparez vos réponses !</Text>
                 
-                {question.type === 'choice' && (
-                  <View style={styles.quizRevealAnswers}>
-                    <View style={styles.quizRevealAnswer}>
-                      <Text style={styles.quizRevealLabel}>{myName} :</Text>
-                      <Text style={styles.quizRevealValue}>{player1Answer}</Text>
-                    </View>
-                    <View style={styles.quizRevealAnswer}>
-                      <Text style={styles.quizRevealLabel}>{partnerName} :</Text>
-                      <Text style={styles.quizRevealValue}>{isOnline ? onlinePartnerAnswer : player2Answer}</Text>
-                    </View>
-                    {(isOnline ? player1Answer === onlinePartnerAnswer : player1Answer === player2Answer) && (
-                      <Text style={styles.quizMatch}>✨ Match parfait !</Text>
-                    )}
+                <View style={styles.quizRevealAnswers}>
+                  <View style={question.type === 'open' ? styles.quizRevealAnswerOpen : styles.quizRevealAnswer}>
+                    <Text style={styles.quizRevealLabel}>{myName} :</Text>
+                    <Text style={question.type === 'open' ? styles.quizRevealValueOpen : styles.quizRevealValue}>
+                      {player1Answer}
+                    </Text>
                   </View>
-                )}
+                  <View style={question.type === 'open' ? styles.quizRevealAnswerOpen : styles.quizRevealAnswer}>
+                    <Text style={styles.quizRevealLabel}>{partnerName} :</Text>
+                    <Text style={question.type === 'open' ? styles.quizRevealValueOpen : styles.quizRevealValue}>
+                      {isOnline ? onlinePartnerAnswer : player2Answer}
+                    </Text>
+                  </View>
+                  {question.type === 'choice' && (isOnline ? player1Answer === onlinePartnerAnswer : player1Answer === player2Answer) && (
+                    <Text style={styles.quizMatch}>✨ Match parfait !</Text>
+                  )}
+                  {question.type === 'open' && (
+                    <Text style={styles.quizOpenCompareHint}>💬 Discutez de vos réponses !</Text>
+                  )}
+                </View>
 
                 <Text style={styles.quizRevealQuestion}>Qui a bien deviné ?</Text>
                 
@@ -1539,6 +1574,7 @@ export default function GamesScreen() {
                 setQuizPhase('player1');
                 setPlayer1Answer(null);
                 setPlayer2Answer(null);
+                setQuizOpenAnswer('');
                 if (isOnline) nextOnlineQuestion();
               }}
             >
@@ -2592,6 +2628,63 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  // Styles pour les questions ouvertes du Quiz
+  quizOpenContainer: {
+    width: '100%',
+    marginTop: 10,
+  },
+  quizOpenLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  quizOpenInput: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 15,
+    padding: 15,
+    fontSize: 16,
+    color: '#fff',
+    minHeight: 80,
+    textAlignVertical: 'top',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    marginBottom: 12,
+  },
+  quizOpenSubmitButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 15,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  quizOpenSubmitDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  quizOpenSubmitText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  quizRevealAnswerOpen: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  quizRevealValueOpen: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  quizOpenCompareHint: {
+    fontSize: 16,
+    color: '#8B5CF6',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 15,
   },
   quizRevealContainer: {
     alignItems: 'center',
