@@ -26,7 +26,7 @@ export function GameProvider({ children }) {
   const [pendingGameInvite, setPendingGameInvite] = useState(null);
   const [hasActiveSession, setHasActiveSession] = useState(false);
   
-  // Référence pour éviter les doubles listeners
+  // Références pour gérer les listeners
   const sessionListenerRef = useRef(null);
 
   // Surveiller la connexion réseau
@@ -44,17 +44,24 @@ export function GameProvider({ children }) {
     setIsFirebaseReady(isConfigured && database !== null);
   }, []);
   
-  // Écouter automatiquement les sessions de jeu quand on a un coupleId
+  // ✅ LISTENER PERMANENT UNIQUE - Écouter les sessions de jeu quand on a un coupleId
   useEffect(() => {
+    // Si on a un listener actif, le fermer d'abord
+    if (sessionListenerRef.current) {
+      console.log('🔕 Fermeture ancien listener');
+      sessionListenerRef.current();
+      sessionListenerRef.current = null;
+    }
+
     if (!coupleId || !isFirebaseReady || !database || !myPlayerId) return;
     
-    console.log('🎮 Démarrage écoute permanente des sessions pour:', coupleId);
+    console.log('🎮 Démarrage listener permanent pour:', coupleId);
     const sessionRef = ref(database, `games/${coupleId}/session`);
     
     const unsubscribe = onValue(sessionRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        console.log('📥 Session détectée:', data.gameType, 'status:', data.status);
+        console.log('📥 Session mise à jour:', data.gameType, 'status:', data.status);
         
         setGameSession(data);
         setGameData(data);
@@ -99,12 +106,15 @@ export function GameProvider({ children }) {
       }
     });
     
+    // ✅ Stocker la référence pour cleanup ultérieur
     sessionListenerRef.current = unsubscribe;
     
     return () => {
-      console.log('🔕 Arrêt écoute permanente');
-      unsubscribe();
-      sessionListenerRef.current = null;
+      console.log('🔕 Cleanup listener permanent');
+      if (sessionListenerRef.current) {
+        sessionListenerRef.current();
+        sessionListenerRef.current = null;
+      }
     };
   }, [coupleId, isFirebaseReady, myPlayerId]);
 
@@ -391,72 +401,40 @@ export function GameProvider({ children }) {
   };
 
   // Écouter les changements de session en temps réel
-  const listenToGameSession = useCallback(() => {
-    // Mode local - pas besoin d'écouter
-    if (!isFirebaseReady) {
-      return () => {};
-    }
+  // ✅ FONCTION SUPPRIMÉE - Le listener permanent suffit !
+  // Cette fonction créait un double listener (bug #1)
+  // Le listener permanent (useEffect ligne 60) gère déjà tout
 
-    if (!coupleId || !database) return () => {};
-
-    const sessionRef = ref(database, `games/${coupleId}/session`);
+  // ✅ RESTRUCTURÉ: Soumettre une réponse (COHÉRENT pour tous les types)
+  const submitAnswer = async (answerKey, answerData, playerName = null) => {
+    // answerKey: peut être "0" (quiz), "tod_question_0" (vérité question), "tod_response_0" (vérité réponse)
+    // answerData: objet avec {answer, response, type, text, ...} ou string simple
+    // playerName: le nom du joueur qui répond
     
-    const unsubscribe = onValue(sessionRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        console.log('🎮 Session mise à jour:', data);
-        setGameSession(data);
-        setGameData(data);
-
-        // Vérifier si le partenaire est connecté
-        const players = data.players || {};
-        const playerIds = Object.keys(players);
-        const hasPartner = playerIds.length >= 2;
-        setPartnerOnline(hasPartner);
-        setWaitingForPartner(!hasPartner);
-
-        // Si les deux joueurs sont prêts, mettre à jour le statut
-        if (hasPartner && data.status === 'waiting') {
-          update(sessionRef, { status: 'ready' }).then(() => {
-            console.log('✅ Statut mis à jour: ready');
-          });
-        }
-      } else {
-        console.log('❌ Session supprimée');
-        setGameSession(null);
-        setGameData(null);
-        setPartnerOnline(false);
-        setWaitingForPartner(false);
-      }
-    });
-
-    return () => {
-      console.log('🔕 Arrêt écoute session');
-      unsubscribe();
-    };
-  }, [coupleId, isFirebaseReady, myPlayerId]);
-
-  // Soumettre une réponse
-  const submitAnswer = async (questionIndex, answer, playerName = null) => {
     // Mode local - mettre à jour l'état local directement
     if (!isFirebaseReady) {
       setGameSession(prev => {
         const newSession = { ...prev };
         if (!newSession.answers) newSession.answers = {};
-        if (!newSession.answers[questionIndex]) newSession.answers[questionIndex] = {};
+        if (!newSession.answers[answerKey]) newSession.answers[answerKey] = {};
         
-        // En mode local, simuler les deux réponses
-        newSession.answers[questionIndex][myPlayerId] = {
-          answer,
+        // En mode local, ajouter la réponse
+        const playerId = myPlayerId;
+        newSession.answers[answerKey][playerId] = {
+          ...answerData,
           timestamp: Date.now(),
           playerName: playerName || 'Joueur',
+          playerId,
         };
-        // Simuler la réponse du partenaire pour les tests
-        newSession.answers[questionIndex]['partner'] = {
-          answer: answer, // Même réponse pour simplifier
+        
+        // En mode local, simuler la réponse du partenaire (pour tests)
+        newSession.answers[answerKey]['partner_' + playerId] = {
+          ...answerData,
           timestamp: Date.now(),
           playerName: 'Partenaire',
+          playerId: 'partner_' + playerId,
         };
+        
         return newSession;
       });
       return true;
@@ -468,17 +446,19 @@ export function GameProvider({ children }) {
     }
 
     try {
-      console.log('📤 Soumission réponse:', { questionIndex, answer, myPlayerId });
+      console.log('📤 Soumission réponse:', { answerKey, answerData, myPlayerId });
       
-      const answerRef = ref(database, `games/${coupleId}/session/answers/${questionIndex}/${myPlayerId}`);
+      // ✅ PATH COHÉRENT pour tous les types:
+      // games/{coupleId}/session/answers/{answerKey}/{myPlayerId}
+      const answerRef = ref(database, `games/${coupleId}/session/answers/${answerKey}/${myPlayerId}`);
       await set(answerRef, {
-        answer,
+        ...answerData,
         timestamp: Date.now(),
         playerName: playerName || 'Joueur',
         playerId: myPlayerId,
       });
       
-      console.log('✅ Réponse soumise avec succès');
+      console.log('✅ Réponse soumise avec succès à:', answerKey);
       return true;
     } catch (error) {
       console.error('❌ Erreur soumission réponse:', error);
@@ -486,15 +466,24 @@ export function GameProvider({ children }) {
     }
   };
 
-  // Vérifier si les deux joueurs ont répondu à une question
-  const checkBothAnswered = (questionIndex) => {
+  // ✅ AMÉLIORÉ: Vérifier si les deux joueurs ont répondu à une question
+  const checkBothAnswered = (answerKey) => {
     // Utiliser gameData qui est mis à jour en temps réel via Firebase
     const sessionData = gameData || gameSession;
-    if (!sessionData?.answers?.[questionIndex]) return false;
-    const answers = sessionData.answers[questionIndex];
+    if (!sessionData?.answers?.[answerKey]) return false;
+    
+    const answers = sessionData.answers[answerKey];
     const answerCount = Object.keys(answers).length;
-    console.log(`📊 Question ${questionIndex}: ${answerCount} réponse(s)`);
-    return answerCount >= 2;
+    
+    console.log(`📊 Clé ${answerKey}: ${answerCount} réponse(s)`, Object.keys(answers));
+    
+    // Besoin d'au moins 2 réponses de joueurs DIFFÉRENTS
+    // (Exclure les fausses réponses 'partner_xxx' en mode local)
+    const realAnswers = Object.entries(answers).filter(([playerId, data]) => {
+      return !playerId.startsWith('partner_') && playerId !== 'partner';
+    });
+    
+    return realAnswers.length >= 2;
   };
 
   // Obtenir les réponses des deux joueurs
@@ -709,7 +698,6 @@ export function GameProvider({ children }) {
     setPlayerReady,
     getPartnerInfo,
     getMyInfo,
-    listenToGameSession,
     toggleOnlineMode,
   };
 

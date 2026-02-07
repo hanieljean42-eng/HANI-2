@@ -18,7 +18,6 @@ import * as Haptics from 'expo-haptics';
 import { useGame } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
-import { useGameInvites } from '../hooks/useGameInvites';
 
 const { width } = Dimensions.get('window');
 
@@ -298,7 +297,6 @@ const WOULD_YOU_RATHER = [
 export default function GamesScreen() {
   const { user, couple, partner } = useAuth();
   const { notifyGame, notifyGameAnswer, notifyGameWin } = useNotifyPartner();
-  const { sendGameInvite } = useGameInvites();
   const { 
     createGameSession, 
     joinGameSession, 
@@ -317,7 +315,6 @@ export default function GamesScreen() {
     pendingGameInvite,
     hasActiveSession,
     updateCoupleId,
-    listenToGameSession,
     coupleId,
   } = useGame();
 
@@ -342,6 +339,7 @@ export default function GamesScreen() {
   const [todAnswerer, setTodAnswerer] = useState(null); // qui doit répondre
   const [todHistory, setTodHistory] = useState([]); // historique des réponses du tour
   const [isMyTurnToAsk, setIsMyTurnToAsk] = useState(true); // est-ce mon tour de poser?
+  const [todPartnerResponse, setTodPartnerResponse] = useState(null); // ✅ NOUVEAU: Réponse du partenaire en temps réel
   
   // États pour "Qui est le Plus" TOUR PAR TOUR
   const [wimPhase, setWimPhase] = useState('player1'); // 'player1', 'passPhone', 'player2', 'reveal'
@@ -400,6 +398,46 @@ export default function GamesScreen() {
     }
   }, [gameSession, waitingForPartner, gameMode]);
 
+  // ✅ NOUVEAU: Écouter les réponses du partenaire en Vérité/Action (bug #5)
+  useEffect(() => {
+    if (activeGame !== 'truthordare' || gameMode !== 'online' || !isFirebaseReady) return;
+    
+    // Si on est en phase d'attente (questioner attend la réponse)
+    if (todPhase === 'waiting' || (todSubmitted && !todResponse?.trim())) {
+      console.log(`👂 Écoute réponse partenaire pour tour ${todRound}...`);
+      
+      // Écouter la réponse du partenaire
+      const responseKey = `tod_response_${todRound}`;
+      
+      // Vérifier les réponses existantes
+      if (gameData?.answers?.[responseKey]) {
+        const responses = gameData.answers[responseKey];
+        const partnerResponse = Object.entries(responses).find(
+          ([playerId, data]) => playerId !== user?.id && !playerId.startsWith('partner_')
+        );
+        
+        if (partnerResponse) {
+          const [playerId, responseData] = partnerResponse;
+          console.log('✅ Réponse du partenaire reçue:', responseData);
+          setTodPartnerResponse(responseData);
+          setTodPhase('reveal'); // Passer à révélation
+        }
+      }
+    }
+  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todResponse, todSubmitted, user?.id]);
+
+  // Surveiller les changements de session pour le mode en ligne
+  useEffect(() => {
+    if (gameSession && gameMode === 'online') {
+      if (gameSession.status === 'ready' && !waitingForPartner) {
+        // Les deux joueurs sont là, démarrer le jeu
+        setShowLobby(false);
+        setShowInviteModal(false);
+        setActiveGame(gameSession.gameType);
+      }
+    }
+  }, [gameSession, waitingForPartner, gameMode]);
+
   const openGameLobby = (gameType) => {
     setSelectedGameForLobby(gameType);
     setShowLobby(true);
@@ -413,8 +451,7 @@ export default function GamesScreen() {
     
     if (session && !session.error) {
       setGameMode('online');
-      // Démarrer l'écoute Firebase
-      listenToGameSession();
+      // ✅ Plus besoin d'appeler listenToGameSession() - le listener permanent dans GameContext gère tout
       
       // Envoyer une notification push au partenaire
       const gameTitle = getGameTitle(selectedGameForLobby);
@@ -447,8 +484,7 @@ export default function GamesScreen() {
     
     if (result && !result.error) {
       setGameMode('online');
-      // Démarrer l'écoute Firebase
-      listenToGameSession();
+      // ✅ Plus besoin d'appeler listenToGameSession() - le listener permanent dans GameContext gère tout
       
       // Vérifier si le jeu peut démarrer immédiatement
       if (result.status === 'ready') {
