@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useGame } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import { useGameInvites } from '../hooks/useGameInvites';
 
 const { width } = Dimensions.get('window');
 
@@ -297,6 +298,7 @@ const WOULD_YOU_RATHER = [
 export default function GamesScreen() {
   const { user, couple, partner } = useAuth();
   const { notifyGame, notifyGameAnswer, notifyGameWin } = useNotifyPartner();
+  const { sendGameInvite } = useGameInvites();
   const { 
     createGameSession, 
     joinGameSession, 
