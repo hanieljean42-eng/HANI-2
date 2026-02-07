@@ -25,6 +25,8 @@ export function NotificationProvider({ children }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const notificationListener = useRef();
   const responseListener = useRef();
+  const partnerTokenListenerRef = useRef(); // ✅ Ref pour cleanup propre
+  const tokenSavedRef = useRef(false); // ✅ Flag pour éviter double save
   const [userId, setUserId] = useState(null);
   const [coupleId, setCoupleId] = useState(null);
   const [partnerToken, setPartnerToken] = useState(null);
@@ -85,36 +87,66 @@ export function NotificationProvider({ children }) {
     };
   }, []);
 
-  // Écouter le token du partenaire sur Firebase
+  // ✅ AMÉLIORÉ: Écouter le token du partenaire sur Firebase avec cleanup propre
   useEffect(() => {
     if (!coupleId || !userId || !isConfigured || !database) return;
 
+    console.log('👂 Écoute tokens partenaire pour:', coupleId);
     const tokensRef = ref(database, `couples/${coupleId}/pushTokens`);
     
-    const unsubscribe = onValue(tokensRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const tokens = snapshot.val();
-        // Trouver le token du partenaire (pas le nôtre)
-        for (const [id, tokenData] of Object.entries(tokens)) {
-          if (id !== userId && tokenData.token) {
-            setPartnerToken(tokenData.token);
-            console.log('🔔 Token partenaire trouvé');
-            break;
+    const unsubscribe = onValue(
+      tokensRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const tokens = snapshot.val();
+          console.log('📋 Tokens trouvés:', Object.keys(tokens));
+          
+          // Chercher le token du partenaire (pas le nôtre)
+          for (const [id, tokenData] of Object.entries(tokens)) {
+            if (id !== userId && tokenData?.token) {
+              setPartnerToken(tokenData.token);
+              console.log('✅ Token partenaire détecté:', tokenData.token.substring(0, 20) + '...');
+              break;
+            }
           }
+        } else {
+          console.log('⚠️ Pas de tokens trouvés - partenaire pas encore en ligne');
+          setPartnerToken(null);
         }
+      },
+      (error) => {
+        console.error('❌ Erreur écoute tokens:', error);
       }
-    });
+    );
 
-    return () => off(tokensRef);
+    // ✅ Stocker la référence pour cleanup propre
+    partnerTokenListenerRef.current = unsubscribe;
+
+    return () => {
+      console.log('🔕 Arrêt écoute tokens partenaire');
+      if (partnerTokenListenerRef.current) {
+        partnerTokenListenerRef.current();
+        partnerTokenListenerRef.current = null;
+      }
+    };
   }, [coupleId, userId]);
 
   // Sauvegarder le token sur Firebase
   const saveTokenToFirebase = async (token) => {
+    // ✅ DEDUPLICATE: Ne sauvegarder qu'une fois
+    if (tokenSavedRef.current) {
+      console.log('⏭️ Token déjà sauvegardé, skip');
+      return;
+    }
+    
     try {
       const user = await AsyncStorage.getItem('@user');
       const couple = await AsyncStorage.getItem('@couple');
       
-      if (!user || !couple) return;
+      if (!user || !couple) {
+        console.log('⚠️ Données utilisateur/couple non disponibles');
+        return;
+      }
       
       const userData = JSON.parse(user);
       const coupleData = JSON.parse(couple);
@@ -131,6 +163,7 @@ export function NotificationProvider({ children }) {
           userName: userData.name,
         });
         console.log('✅ Token push sauvegardé sur Firebase');
+        tokenSavedRef.current = true; // ✅ MARQUER COMME SAUVEGARDÉ
       }
       
       // Sauvegarder aussi localement
@@ -140,12 +173,9 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // Ré-sauvegarder le token quand on récupère le couple/user (utile si on s'enregistre avant d'avoir joint le couple)
-  useEffect(() => {
-    if (expoPushToken && userId && coupleId) {
-      saveTokenToFirebase(expoPushToken);
-    }
-  }, [expoPushToken, userId, coupleId]);
+  // ✅ SUPPRIMÉ: Ce useEffect causait un double appel
+  // Le saveTokenToFirebase dans registerForPushNotificationsAsync() suffit
+  // et il a un flag tokenSavedRef pour éviter les doubles écritures
 
   // Fonction pour demander les permissions
   async function registerForPushNotificationsAsync() {
@@ -221,23 +251,23 @@ export function NotificationProvider({ children }) {
     return token;
   }
 
-  // Envoyer une notification au partenaire via Expo Push
+  // ✅ RESTRUCTURÉ: Envoyer une notification au partenaire via Expo Push
   const sendPushNotification = async (title, body, data = {}) => {
+    console.log('📤 Tentative envoi notification push:', { title, body, hasPartnerToken: !!partnerToken });
+    
+    // ÉTAPE 1: Vérifier si on a un token partenaire valide
     if (!partnerToken) {
-      console.log('⚠️ Pas de token partenaire disponible - envoi local de secours');
-      // Envoyer une notification locale en secours pour confirmation
-      await scheduleLocalNotification(title, body, data, 1);
-      return true;
+      console.log('⚠️ Pas de token partenaire - impossible d\'envoyer push');
+      return false;
     }
 
-    // Vérifier si c'est un vrai token Expo
+    // ÉTAPE 2: Vérifier que c'est un vrai token Expo (pas mode dev)
     if (!partnerToken.startsWith('ExponentPushToken')) {
-      console.log('⚠️ Token partenaire non valide (mode dev)');
-      // En mode dev, on peut simuler avec une notification locale
-      await scheduleLocalNotification(title, body, data, 1);
-      return true;
+      console.log('⚠️ Token partenaire non valide (mode dev/simulator)');
+      return false;
     }
 
+    // ÉTAPE 3: Essayer d'envoyer via Expo Push Service
     try {
       const message = {
         to: partnerToken,
@@ -249,6 +279,7 @@ export function NotificationProvider({ children }) {
         channelId: 'love-messages',
       };
 
+      console.log('🔗 Appel Expo Push Service...');
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers: {
@@ -260,12 +291,16 @@ export function NotificationProvider({ children }) {
       });
 
       const result = await response.json();
-      console.log('📤 Notification envoyée:', result);
-      return true;
+      
+      if (response.ok) {
+        console.log('✅ Notification push envoyée avec succès:', result);
+        return true;
+      } else {
+        console.error('❌ Expo répondu avec erreur:', result);
+        return false;
+      }
     } catch (error) {
-      console.error('❌ Erreur envoi notification:', error);
-      // En cas d'erreur réseau, retomber sur une notification locale
-      await scheduleLocalNotification(title, body, data, 1);
+      console.error('❌ Erreur envoi notification push:', error.message);
       return false;
     }
   };
@@ -413,6 +448,15 @@ export function NotificationProvider({ children }) {
       '🎮 Invitation à jouer',
       `${userName} t'invite à jouer à ${gameName} !`,
       { type: 'game_invite' }
+    );
+  };
+
+  // Notification quand la roue est tournée
+  const notifyWheelSpin = async (userName, result) => {
+    await sendPushNotification(
+      '🎡 Roue tournée !',
+      `${userName} a tourné la roue ! Résultat: ${result} 🎯`,
+      { type: 'wheel_spin', result }
     );
   };
 
@@ -772,6 +816,7 @@ export function NotificationProvider({ children }) {
     notifyPartnerOnline,
     notifyBucketCompleted,
     notifyGameInvite,
+    notifyWheelSpin,
     // Rappels
     scheduleDailyReminder,
     scheduleSmartReminder,

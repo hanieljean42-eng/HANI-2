@@ -318,45 +318,22 @@ export default function GamesScreen() {
     coupleId,
   } = useGame();
 
-  const [activeGame, setActiveGame] = useState(null);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [scores, setScores] = useState({ player1: 0, player2: 0 });
-  const [showResult, setShowResult] = useState(false);
-  const [truthOrDare, setTruthOrDare] = useState(null);
-  const [wyrChoice, setWyrChoice] = useState(null);
-  const [quizPhase, setQuizPhase] = useState('player1'); // 'player1', 'player2', 'reveal'
-  const [player1Answer, setPlayer1Answer] = useState(null);
-  const [player2Answer, setPlayer2Answer] = useState(null);
-  const [currentPlayer, setCurrentPlayer] = useState(1);
-  
-  // États pour Action/Vérité TOUR PAR TOUR
+  // États pour Action/Vérité TOUR PAR TOUR (seul jeu local, pour couple au même endroit)
   const [todResponse, setTodResponse] = useState('');
   const [todSubmitted, setTodSubmitted] = useState(false);
   const [todRound, setTodRound] = useState(0);
-  const [todCurrentPlayer, setTodCurrentPlayer] = useState(null); // qui doit répondre
   const [todPhase, setTodPhase] = useState('choose'); // 'choose', 'waiting', 'answer', 'view'
-  const [todAsker, setTodAsker] = useState(null); // qui pose la question (c'est lui qui commence)
-  const [todAnswerer, setTodAnswerer] = useState(null); // qui doit répondre
-  const [todHistory, setTodHistory] = useState([]); // historique des réponses du tour
-  const [isMyTurnToAsk, setIsMyTurnToAsk] = useState(true); // est-ce mon tour de poser?
-  const [todPartnerResponse, setTodPartnerResponse] = useState(null); // ✅ NOUVEAU: Réponse du partenaire en temps réel
-  
-  // États pour "Qui est le Plus" TOUR PAR TOUR
-  const [wimPhase, setWimPhase] = useState('player1'); // 'player1', 'passPhone', 'player2', 'reveal'
-  const [wimPlayer1Answer, setWimPlayer1Answer] = useState(null);
-  const [wimPlayer2Answer, setWimPlayer2Answer] = useState(null);
-  
-  // États pour "Tu Préfères" TOUR PAR TOUR  
-  const [wyrPhase, setWyrPhase] = useState('player1'); // 'player1', 'passPhone', 'player2', 'reveal'
-  const [wyrPlayer1Choice, setWyrPlayer1Choice] = useState(null);
-  const [wyrPlayer2Choice, setWyrPlayer2Choice] = useState(null)
+  const [todAsker, setTodAsker] = useState(null);
+  const [todAnswerer, setTodAnswerer] = useState(null);
+  const [todHistory, setTodHistory] = useState([]);
+  const [isMyTurnToAsk, setIsMyTurnToAsk] = useState(true);
+  const [todPartnerResponse, setTodPartnerResponse] = useState(null);
   
   // États pour le mode multijoueur à distance
   const [showLobby, setShowLobby] = useState(false);
   const [selectedGameForLobby, setSelectedGameForLobby] = useState(null);
   const [isCreatingGame, setIsCreatingGame] = useState(false);
   const [isJoiningGame, setIsJoiningGame] = useState(false);
-  const [gameMode, setGameMode] = useState(null); // 'local' ou 'online'
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   // ========== ALERTE VERSION - TEST ==========
@@ -501,42 +478,27 @@ export default function GamesScreen() {
     }
   };
 
-  const startLocalGame = (game) => {
-    setShowLobby(false);
-    setGameMode('local');
-    setActiveGame(game);
-    setCurrentQuestion(0);
-    setScores({ player1: 0, player2: 0 });
-    setShowResult(false);
-    setTruthOrDare(null);
-    setWyrChoice(null);
-    setQuizPhase('player1');
-    setPlayer1Answer(null);
-    setPlayer2Answer(null);
-    setCurrentPlayer(1);
-    // Reset pour "Qui est le Plus" tour par tour
-    setWimPhase('player1');
-    setWimPlayer1Answer(null);
-    setWimPlayer2Answer(null);
-    // Reset pour "Tu Préfères" tour par tour
-    setWyrPhase('player1');
-    setWyrPlayer1Choice(null);
-    setWyrPlayer2Choice(null);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  };
-
   const startGame = (game) => {
-    // Ouvrir le lobby pour choisir le mode
-    openGameLobby(game);
-  };
-
-  const nextQuestion = () => {
-    if (currentQuestion < 9) {
-      setCurrentQuestion(currentQuestion + 1);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // TOUS LES JEUX SAUF TRUTH/DARE DOIVENT ALLER À ChallengesScreen (online/Firebase)
+    if (game === 'truthordare') {
+      openGameLobby(game);
     } else {
-      setShowResult(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Rediriger vers ChallengesScreen pour Quiz, Qui est le Plus, Tu Préfères
+      Alert.alert(
+        '🎮 Jeu en ligne',
+        'Les jeux se jouent maintenant à distance sur deux téléphones différents!',
+        [
+          { 
+            text: 'Jouer', 
+            onPress: () => {
+              // Navigation vers ChallengesScreen
+              // TODO: Implémente la navigation si nécessaire
+              console.log('Naviguer vers ChallengesScreen pour ' + game);
+            }
+          },
+          { text: 'Annuler', style: 'cancel' }
+        ]
+      );
     }
   };
 
@@ -598,6 +560,8 @@ export default function GamesScreen() {
         round: todRound,
         timestamp: Date.now()
       }, user?.name);
+      // Notifier le partenaire que j'ai répondu
+      await notifyGameAnswer();
     }
   };
 
@@ -615,6 +579,8 @@ export default function GamesScreen() {
         round: todRound,
         timestamp: Date.now()
       }, user?.name);
+      // Notifier le partenaire que j'ai complété l'action
+      await notifyGameAnswer();
     }
   };
 
@@ -877,28 +843,7 @@ export default function GamesScreen() {
       <View style={styles.lobbyOverlay}>
         <View style={styles.lobbyContent}>
           <Text style={styles.lobbyTitle}>{getGameTitle(selectedGameForLobby)}</Text>
-          <Text style={styles.lobbySubtitle}>Choisissez comment jouer</Text>
-
-          {/* Mode Local */}
-          <TouchableOpacity
-            style={styles.lobbyOption}
-            onPress={() => startLocalGame(selectedGameForLobby)}
-          >
-            <LinearGradient colors={['#10B981', '#059669']} style={styles.lobbyOptionGradient}>
-              <Text style={styles.lobbyOptionIcon}>👫</Text>
-              <View style={styles.lobbyOptionTextContainer}>
-                <Text style={styles.lobbyOptionTitle}>Jouer ensemble</Text>
-                <Text style={styles.lobbyOptionDesc}>Sur le même téléphone</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {/* Séparateur */}
-          <View style={styles.lobbySeparator}>
-            <View style={styles.lobbySeparatorLine} />
-            <Text style={styles.lobbySeparatorText}>ou à distance</Text>
-            <View style={styles.lobbySeparatorLine} />
-          </View>
+          <Text style={styles.lobbySubtitle}>Jouez à distance, chacun sur votre téléphone</Text>
 
           {/* Mode En ligne - Créer */}
           <TouchableOpacity

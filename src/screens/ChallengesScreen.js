@@ -375,6 +375,8 @@ export default function ChallengesScreen() {
     const currentQ = gameSession?.currentQuestion || 0;
     await submitAnswer(currentQ, answer);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Notifier le partenaire que j'ai répondu
+    await notifyGameAnswer();
   };
 
   const handleNextQuestion = async () => {
