@@ -3,12 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, onValue, remove, update, push, get, off } from 'firebase/database';
+import { useAuth } from './AuthContext';
 
 const GameContext = createContext({});
 
 export const useGame = () => useContext(GameContext);
 
 export function GameProvider({ children }) {
+  const { couple: authCouple } = useAuth();
   const [coupleId, setCoupleId] = useState(null);
   const [currentGame, setCurrentGame] = useState(null);
   const [gameSession, setGameSession] = useState(null);
@@ -17,6 +19,7 @@ export function GameProvider({ children }) {
   const [waitingForPartner, setWaitingForPartner] = useState(false);
   const [gameData, setGameData] = useState(null);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+  const [firebaseError, setFirebaseError] = useState(null);
   
   // Mode en ligne / hors ligne
   const [isOnlineMode, setIsOnlineMode] = useState(true);
@@ -43,6 +46,56 @@ export function GameProvider({ children }) {
     generatePlayerId();
     setIsFirebaseReady(isConfigured && database !== null);
   }, []);
+
+  // ✅ NOUVEAU: Synchroniser coupleId depuis AuthContext automatiquement
+  // Quand l'utilisateur crée ou rejoint un couple, AuthContext met à jour authCouple
+  // Ce useEffect réagit et met à jour le coupleId dans GameContext
+  useEffect(() => {
+    if (authCouple?.id && authCouple.id !== coupleId) {
+      console.log('🔄 GameContext: coupleId sync depuis AuthContext:', authCouple.id);
+      setCoupleId(authCouple.id);
+      AsyncStorage.setItem('@coupleId', authCouple.id).catch(e => 
+        console.log('⚠️ Erreur sauvegarde coupleId:', e.message)
+      );
+    }
+  }, [authCouple?.id]);
+
+  // ✅ NOUVEAU: Tester la connexion Firebase au démarrage
+  useEffect(() => {
+    if (isConfigured && database && coupleId) {
+      const testFirebaseConnection = async () => {
+        try {
+          const testRef = ref(database, `.info/connected`);
+          const unsubscribe = onValue(testRef, (snapshot) => {
+            if (snapshot.val() === true) {
+              console.log('✅ Firebase Realtime Database connecté !');
+              setFirebaseError(null);
+            } else {
+              console.log('⚠️ Firebase déconnecté (hors ligne)');
+            }
+          }, (error) => {
+            console.log('❌ Firebase erreur connexion:', error.message);
+            setFirebaseError(error.message);
+          });
+          
+          // Tester un read/write sur le chemin games
+          const testGameRef = ref(database, `games/${coupleId}/_connectionTest`);
+          await set(testGameRef, { timestamp: Date.now(), test: true });
+          console.log('✅ Firebase: écriture sur games/ OK');
+          // Nettoyer le test
+          await remove(testGameRef);
+          
+          return () => unsubscribe();
+        } catch (error) {
+          console.log('❌ Firebase: ERREUR écriture sur games/:', error.message);
+          console.log('❌ Cause probable: Règles Firebase interdisent l\'accès');
+          console.log('❌ Solution: Mettre les règles en mode ouvert ou ajouter le noeud games/');
+          setFirebaseError('Règles Firebase bloquent l\'accès aux jeux: ' + error.message);
+        }
+      };
+      testFirebaseConnection();
+    }
+  }, [coupleId, isConfigured]);
   
   // ✅ LISTENER PERMANENT UNIQUE - Écouter les sessions de jeu quand on a un coupleId
   useEffect(() => {
@@ -725,6 +778,7 @@ export function GameProvider({ children }) {
     isFirebaseReady,
     isOnlineMode,
     isConnected,
+    firebaseError,
     
     // Nouveaux états pour invitations
     pendingGameInvite,

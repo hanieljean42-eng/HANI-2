@@ -1,0 +1,56 @@
+{
+  "rules": {
+    "couples": {
+      ".read": true,
+      ".write": true,
+      "$coupleId": {
+        ".read": true,
+        ".write": true,
+        "pushTokens": {
+          ".read": true,
+          ".write": true
+        },
+        "members": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    },
+    "couplesMembers": {
+      ".read": true,
+      ".write": true
+    },
+    "games": {
+      ".read": true,
+      ".write": true,
+      "$coupleId": {
+        ".read": true,
+        ".write": true,
+        "session": {
+          ".read": true,
+          ".write": true
+        },
+        "_connectionTest": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    },
+    "messages": {
+      ".read": true,
+      ".write": true
+    },
+    "memories": {
+      ".read": true,
+      ".write": true
+    },
+    "challenges": {
+      ".read": true,
+      ".write": true
+    },
+    "notifications": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

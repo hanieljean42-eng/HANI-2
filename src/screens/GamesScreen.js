@@ -312,6 +312,7 @@ export default function GamesScreen() {
     gameData,
     nextQuestion: nextGameQuestion,
     isFirebaseReady,
+    firebaseError,
     pendingGameInvite,
     hasActiveSession,
     updateCoupleId,
@@ -2190,6 +2191,18 @@ export default function GamesScreen() {
           <Text style={styles.title}>🎮 Jeux Couple</Text>
         )}
       </View>
+
+      {/* ⚠️ Bandeau d'erreur Firebase */}
+      {firebaseError && !activeGame && (
+        <View style={{ backgroundColor: '#FF4444', padding: 12, marginHorizontal: 16, borderRadius: 10, marginBottom: 8 }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, textAlign: 'center' }}>
+            ⚠️ Connexion Firebase impossible
+          </Text>
+          <Text style={{ color: '#FFD4D4', fontSize: 11, textAlign: 'center', marginTop: 4 }}>
+            Les jeux en ligne ne fonctionneront pas. Vérifiez les règles Firebase.
+          </Text>
+        </View>
+      )}
 
       {!activeGame && renderGameSelector()}
       {activeGame === 'quiz' && renderQuizGame()}
