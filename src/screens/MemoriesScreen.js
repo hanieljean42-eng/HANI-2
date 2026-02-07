@@ -658,7 +658,7 @@ export default function MemoriesScreen() {
     }
   };
 
-  const openLetter = (letter) => {
+  const openLetter = async (letter) => {
     if (letter.fromId === user?.id) {
       // C'est sa propre lettre
       Alert.alert(
@@ -1121,6 +1121,7 @@ export default function MemoriesScreen() {
             showsVerticalScrollIndicator={false}
           >
           <View style={styles.modalContent}> 
+            <Text style={styles.modalTitle}>{
                addType === 'letter' ? '💌 Nouvelle Lettre' :
                addType === 'diary' ? '📖 Nouvelle Entrée' :
                '✨ Nouveau Souvenir'}
@@ -1496,6 +1497,7 @@ export default function MemoriesScreen() {
             showsVerticalScrollIndicator={false}
           >
           <View style={styles.modalContent}> 
+            <Text style={styles.modalTitle}>{
                editType === 'letter' ? '✏️ Modifier la lettre' : 
                '✏️ Modifier l\'entrée'}
             </Text>

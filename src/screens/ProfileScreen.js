@@ -11,12 +11,12 @@ import {
   Dimensions,
   Switch,
   Share,
-  Clipboard,
   Image,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 import { useTheme, THEMES } from '../context/ThemeContext';
 import { useSecurity } from '../context/SecurityContext';
 import * as Haptics from 'expo-haptics';
@@ -519,9 +519,9 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const handleCopyCode = () => {
+  const handleCopyCode = async () => {
     const code = couple?.code || 'LOVE-XXXXX';
-    Clipboard.setString(code);
+    await Clipboard.setStringAsync(code);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('📋', 'Code copié !');
   };
