@@ -241,16 +241,7 @@ export const useNotifyPartner = () => {
     }
   };
 
-  // === CONNEXION / PRÉSENCE ===
-  const notifyPartnerJoined = async () => {
-    if (notifications?.sendPushNotification && user?.name) {
-      await notifications.sendPushNotification(
-        '🎉 Partenaire connecté !',
-        `${user.name} a rejoint votre couple ! Bienvenue ! 💕`,
-        { type: 'partner_joined' }
-      );
-    }
-  };
+
 
   // === RAPPELS INTELLIGENTS ===
   const sendDailyReminder = async () => {
