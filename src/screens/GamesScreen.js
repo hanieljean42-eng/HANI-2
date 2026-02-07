@@ -316,6 +316,7 @@ export default function GamesScreen() {
     hasActiveSession,
     updateCoupleId,
     coupleId,
+    myPlayerId,
   } = useGame();
 
   // États principaux des jeux
@@ -424,6 +425,74 @@ export default function GamesScreen() {
     setTodHistory([]);
     setIsMyTurnToAsk(true);
     setTodPartnerResponse(null);
+    // Online states
+    setOnlineAnswerSent(false);
+    setOnlinePartnerAnswer(null);
+    setOnlineWaitingPartner(false);
+  };
+
+  // ═══════════════════════════════════════════════════════
+  // ✅ ÉTATS MODE ONLINE POUR QUIZ, WIM, WYR
+  // ═══════════════════════════════════════════════════════
+  const [onlineAnswerSent, setOnlineAnswerSent] = useState(false);
+  const [onlinePartnerAnswer, setOnlinePartnerAnswer] = useState(null);
+  const [onlineWaitingPartner, setOnlineWaitingPartner] = useState(false);
+
+  // ✅ LISTENER: Détecte les réponses du partenaire pour Quiz/WIM/WYR en mode online
+  useEffect(() => {
+    if (!activeGame || activeGame === 'truthordare') return;
+    if (gameMode !== 'online' || !isFirebaseReady) return;
+    if (!gameData?.answers) return;
+
+    const answerKey = `${activeGame}_${currentQuestion}`;
+    const answers = gameData.answers[answerKey];
+    if (!answers) return;
+
+    // Chercher la réponse du partenaire (pas la mienne)
+    const partnerEntry = Object.entries(answers).find(
+      ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+    );
+
+    if (partnerEntry) {
+      const [, partnerData] = partnerEntry;
+      console.log(`📥 Réponse partenaire reçue pour ${answerKey}:`, partnerData.answer);
+      setOnlinePartnerAnswer(partnerData.answer);
+      setOnlineWaitingPartner(false);
+      
+      // Si j'ai déjà répondu, passer en phase reveal
+      if (onlineAnswerSent) {
+        if (activeGame === 'quiz') setQuizPhase('reveal');
+        if (activeGame === 'whoismore') setWimPhase('reveal');
+        if (activeGame === 'wouldyourather') setWyrPhase('reveal');
+      }
+    }
+  }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, onlineAnswerSent, myPlayerId]);
+
+  // Helper: Soumettre ma réponse online pour Quiz/WIM/WYR
+  const submitOnlineAnswer = async (answer) => {
+    const answerKey = `${activeGame}_${currentQuestion}`;
+    await submitAnswer(answerKey, {
+      answer,
+      questionIndex: currentQuestion,
+      playerName: user?.name || 'Joueur',
+    }, user?.name);
+    setOnlineAnswerSent(true);
+    setOnlineWaitingPartner(true);
+    
+    // Vérifier si le partenaire a déjà répondu
+    if (onlinePartnerAnswer !== null) {
+      setOnlineWaitingPartner(false);
+      if (activeGame === 'quiz') setQuizPhase('reveal');
+      if (activeGame === 'whoismore') setWimPhase('reveal');
+      if (activeGame === 'wouldyourather') setWyrPhase('reveal');
+    }
+  };
+
+  // Helper: Passer à la question suivante en mode online (reset online states)
+  const nextOnlineQuestion = () => {
+    setOnlineAnswerSent(false);
+    setOnlinePartnerAnswer(null);
+    setOnlineWaitingPartner(false);
   };
 
   // ✅ NOUVEAU: Écouter les réponses du partenaire en Vérité/Action (bug #5)
@@ -435,7 +504,7 @@ export default function GamesScreen() {
     if (gameData?.answers?.[questionKey] && !truthOrDare) {
       const questions = gameData.answers[questionKey];
       const partnerQuestion = Object.entries(questions).find(
-        ([playerId, data]) => playerId !== user?.id && !playerId.startsWith('partner_')
+        ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
       );
       
       if (partnerQuestion && gameMode === 'online') {
@@ -462,7 +531,7 @@ export default function GamesScreen() {
       if (gameData?.answers?.[responseKey]) {
         const responses = gameData.answers[responseKey];
         const partnerResponse = Object.entries(responses).find(
-          ([playerId, data]) => playerId !== user?.id && !playerId.startsWith('partner_')
+          ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
         );
         
         if (partnerResponse) {
@@ -473,7 +542,7 @@ export default function GamesScreen() {
         }
       }
     }
-  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todResponse, todSubmitted, user?.id, user?.name, truthOrDare]);
+  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todResponse, todSubmitted, myPlayerId, user?.name, truthOrDare]);
 
   // ✅ Synchroniser le tour de question en mode online via gameSession
   useEffect(() => {
@@ -738,7 +807,17 @@ export default function GamesScreen() {
     const myName = user?.name || 'Moi';
     const partnerName = partner?.name || 'Partenaire';
     const currentQ = WOULD_YOU_RATHER[currentQuestion];
+    const isOnline = gameMode === 'online';
 
+    // ══════ MODE ONLINE ══════
+    const handleWyrAnswerOnline = async (choice) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setWyrPlayer1Choice(choice);
+      setWyrPhase('waitingPartner');
+      await submitOnlineAnswer(choice);
+    };
+
+    // ══════ MODE LOCAL ══════
     const handleWyrAnswer = (choice) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
@@ -757,14 +836,38 @@ export default function GamesScreen() {
         setWyrPhase('player1');
         setWyrPlayer1Choice(null);
         setWyrPlayer2Choice(null);
+        if (isOnline) nextOnlineQuestion();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
         setShowResult(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // ✅ Notifier le partenaire de la fin du jeu
         notifyGameWin('Tu Préfères');
       }
     };
+
+    // Options partagées
+    const renderWyrOptions = (onAnswer) => (
+      <>
+        <TouchableOpacity
+          style={styles.wyrOption}
+          onPress={() => onAnswer(1)}
+        >
+          <Text style={styles.wyrOptionText}>{currentQ.option1}</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.wyrOr}>OU</Text>
+
+        <TouchableOpacity
+          style={styles.wyrOption}
+          onPress={() => onAnswer(2)}
+        >
+          <Text style={styles.wyrOptionText}>{currentQ.option2}</Text>
+        </TouchableOpacity>
+      </>
+    );
+
+    // Déterminer la réponse du partenaire (online vs local)
+    const partnerChoice = isOnline ? onlinePartnerAnswer : wyrPlayer2Choice;
 
     return (
       <View style={styles.gameContainer}>
@@ -777,31 +880,36 @@ export default function GamesScreen() {
             
             <Text style={styles.wyrTitle}>Tu préfères...</Text>
 
-            {/* PHASE 1: Premier joueur choisit */}
-            {wyrPhase === 'player1' && (
+            {/* ══════ MODE ONLINE: Chaque joueur choisit sur son tel ══════ */}
+            {isOnline && wyrPhase === 'player1' && (
               <View style={styles.wyrPhaseContainer}>
-                <Text style={styles.wyrPhaseTitle}>🎯 C'est au tour de {myName}</Text>
-                
-                <TouchableOpacity
-                  style={styles.wyrOption}
-                  onPress={() => handleWyrAnswer(1)}
-                >
-                  <Text style={styles.wyrOptionText}>{currentQ.option1}</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.wyrOr}>OU</Text>
-
-                <TouchableOpacity
-                  style={styles.wyrOption}
-                  onPress={() => handleWyrAnswer(2)}
-                >
-                  <Text style={styles.wyrOptionText}>{currentQ.option2}</Text>
-                </TouchableOpacity>
+                <Text style={styles.wyrPhaseTitle}>🌐 Fais ton choix !</Text>
+                {renderWyrOptions(handleWyrAnswerOnline)}
               </View>
             )}
 
-            {/* PHASE PASS: Passer le téléphone */}
-            {wyrPhase === 'passPhone' && (
+            {/* MODE ONLINE: En attente */}
+            {isOnline && wyrPhase === 'waitingPartner' && (
+              <View style={styles.onlineWaitingContainer}>
+                <Text style={styles.onlineWaitingEmoji}>⏳</Text>
+                <Text style={styles.onlineWaitingTitle}>Choix envoyé !</Text>
+                <ActivityIndicator size="large" color="#fff" style={{ marginVertical: 15 }} />
+                <Text style={styles.onlineWaitingText}>
+                  En attente du choix de {partnerName}...
+                </Text>
+              </View>
+            )}
+
+            {/* ══════ MODE LOCAL: Phase 1 ══════ */}
+            {!isOnline && wyrPhase === 'player1' && (
+              <View style={styles.wyrPhaseContainer}>
+                <Text style={styles.wyrPhaseTitle}>🎯 C'est au tour de {myName}</Text>
+                {renderWyrOptions(handleWyrAnswer)}
+              </View>
+            )}
+
+            {/* MODE LOCAL: Passer le téléphone */}
+            {!isOnline && wyrPhase === 'passPhone' && (
               <View style={styles.passPhoneContainer}>
                 <Text style={styles.passPhoneEmoji}>📱</Text>
                 <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
@@ -821,30 +929,15 @@ export default function GamesScreen() {
               </View>
             )}
 
-            {/* PHASE 2: Deuxième joueur choisit */}
-            {wyrPhase === 'player2' && (
+            {/* MODE LOCAL: Phase 2 */}
+            {!isOnline && wyrPhase === 'player2' && (
               <View style={styles.wyrPhaseContainer}>
                 <Text style={styles.wyrPhaseTitle}>🎯 C'est au tour de {partnerName}</Text>
-                
-                <TouchableOpacity
-                  style={styles.wyrOption}
-                  onPress={() => handleWyrAnswer(1)}
-                >
-                  <Text style={styles.wyrOptionText}>{currentQ.option1}</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.wyrOr}>OU</Text>
-
-                <TouchableOpacity
-                  style={styles.wyrOption}
-                  onPress={() => handleWyrAnswer(2)}
-                >
-                  <Text style={styles.wyrOptionText}>{currentQ.option2}</Text>
-                </TouchableOpacity>
+                {renderWyrOptions(handleWyrAnswer)}
               </View>
             )}
 
-            {/* PHASE REVEAL: Comparer les choix */}
+            {/* ══════ REVEAL (online + local) ══════ */}
             {wyrPhase === 'reveal' && (
               <View style={styles.quizRevealContainer}>
                 <Text style={styles.quizRevealTitle}>🔮 Révélation !</Text>
@@ -859,11 +952,11 @@ export default function GamesScreen() {
                   <View style={styles.quizRevealAnswer}>
                     <Text style={styles.quizRevealLabel}>{partnerName} préfère :</Text>
                     <Text style={styles.quizRevealValue}>
-                      {wyrPlayer2Choice === 1 ? currentQ.option1 : currentQ.option2}
+                      {partnerChoice === 1 ? currentQ.option1 : currentQ.option2}
                     </Text>
                   </View>
                   
-                  {wyrPlayer1Choice === wyrPlayer2Choice ? (
+                  {wyrPlayer1Choice === partnerChoice ? (
                     <Text style={styles.quizMatch}>✨ Vous êtes d'accord !</Text>
                   ) : (
                     <Text style={styles.wimDisagree}>🤔 Goûts différents !</Text>
@@ -896,6 +989,7 @@ export default function GamesScreen() {
                 setWyrPlayer1Choice(null);
                 setWyrPlayer2Choice(null);
                 setShowResult(false);
+                if (isOnline) nextOnlineQuestion();
               }}
             >
               <Text style={styles.playAgainText}>Rejouer</Text>
@@ -1212,13 +1306,23 @@ export default function GamesScreen() {
     const question = QUIZ_QUESTIONS[currentQuestion];
     const myName = user?.name || 'Joueur 1';
     const partnerName = partner?.name || 'Joueur 2';
+    const isOnline = gameMode === 'online';
     
+    // ══════ MODE ONLINE ══════
+    const handleQuizAnswerOnline = async (answer) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setPlayer1Answer(answer);
+      setQuizPhase('waitingPartner');
+      await submitOnlineAnswer(answer);
+    };
+
+    // ══════ MODE LOCAL (passe le téléphone) ══════
     const handleQuizAnswer = (answer) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
       if (quizPhase === 'player1') {
         setPlayer1Answer(answer);
-        setQuizPhase('passPhone1'); // Passer le téléphone
+        setQuizPhase('passPhone1');
       } else if (quizPhase === 'player2') {
         setPlayer2Answer(answer);
         setQuizPhase('reveal');
@@ -1231,20 +1335,46 @@ export default function GamesScreen() {
         setQuizPhase('player1');
         setPlayer1Answer(null);
         setPlayer2Answer(null);
+        if (isOnline) nextOnlineQuestion();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
         setShowResult(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notifyGameWin('Quiz Couple');
       }
     };
 
     const handleCorrect = (player) => {
-      setScores({
-        ...scores,
-        [player]: scores[player] + 1,
-      });
+      setScores(prev => ({
+        ...prev,
+        [player]: prev[player] + 1,
+      }));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     };
+
+    // Afficher les options de réponse (partagé)
+    const renderQuizOptions = (onAnswer) => (
+      question.type === 'choice' ? (
+        <View style={styles.quizOptions}>
+          {question.options.map((option, idx) => (
+            <TouchableOpacity
+              key={`opt-${idx}`}
+              style={styles.quizOptionButton}
+              onPress={() => onAnswer(option)}
+            >
+              <Text style={styles.quizOptionText}>{option}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.quizReadyButton}
+          onPress={() => onAnswer('open')}
+        >
+          <Text style={styles.quizReadyButtonText}>J'ai ma réponse en tête ✓</Text>
+        </TouchableOpacity>
+      )
+    );
 
     return (
       <View style={styles.gameContainer}>
@@ -1272,36 +1402,38 @@ export default function GamesScreen() {
               <Text style={styles.questionText}>{question.question}</Text>
             </View>
 
-            {/* PHASE 1: Premier joueur répond */}
-            {quizPhase === 'player1' && (
+            {/* ══════ MODE ONLINE: Chaque joueur répond sur son tel ══════ */}
+            {isOnline && quizPhase === 'player1' && (
               <View style={styles.quizPhaseContainer}>
-                <Text style={styles.quizPhaseTitle}>🎯 C'est au tour de {myName}</Text>
-                <Text style={styles.quizPhaseHint}>{partnerName} doit deviner ta réponse ensuite !</Text>
-                {question.type === 'choice' ? (
-                  <View style={styles.quizOptions}>
-                    {question.options.map((option, idx) => (
-                      <TouchableOpacity
-                        key={`opt-${idx}`}
-                        style={styles.quizOptionButton}
-                        onPress={() => handleQuizAnswer(option)}
-                      >
-                        <Text style={styles.quizOptionText}>{option}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.quizReadyButton}
-                    onPress={() => handleQuizAnswer('open')}
-                  >
-                    <Text style={styles.quizReadyButtonText}>J'ai ma réponse en tête ✓</Text>
-                  </TouchableOpacity>
-                )}
+                <Text style={styles.quizPhaseTitle}>🌐 Réponds à la question !</Text>
+                <Text style={styles.quizPhaseHint}>{partnerName} répond aussi de son côté</Text>
+                {renderQuizOptions(handleQuizAnswerOnline)}
               </View>
             )}
 
-            {/* PHASE PASS: Passer le téléphone */}
-            {quizPhase === 'passPhone1' && (
+            {/* MODE ONLINE: En attente du partenaire */}
+            {isOnline && quizPhase === 'waitingPartner' && (
+              <View style={styles.onlineWaitingContainer}>
+                <Text style={styles.onlineWaitingEmoji}>⏳</Text>
+                <Text style={styles.onlineWaitingTitle}>Réponse envoyée !</Text>
+                <ActivityIndicator size="large" color="#fff" style={{ marginVertical: 15 }} />
+                <Text style={styles.onlineWaitingText}>
+                  En attente de la réponse de {partnerName}...
+                </Text>
+              </View>
+            )}
+
+            {/* ══════ MODE LOCAL: Phase 1 ══════ */}
+            {!isOnline && quizPhase === 'player1' && (
+              <View style={styles.quizPhaseContainer}>
+                <Text style={styles.quizPhaseTitle}>🎯 C'est au tour de {myName}</Text>
+                <Text style={styles.quizPhaseHint}>{partnerName} doit deviner ta réponse ensuite !</Text>
+                {renderQuizOptions(handleQuizAnswer)}
+              </View>
+            )}
+
+            {/* MODE LOCAL: Passer le téléphone */}
+            {!isOnline && quizPhase === 'passPhone1' && (
               <View style={styles.passPhoneContainer}>
                 <Text style={styles.passPhoneEmoji}>📱</Text>
                 <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
@@ -1321,35 +1453,16 @@ export default function GamesScreen() {
               </View>
             )}
 
-            {/* PHASE 2: Deuxième joueur devine */}
-            {quizPhase === 'player2' && (
+            {/* MODE LOCAL: Phase 2 */}
+            {!isOnline && quizPhase === 'player2' && (
               <View style={styles.quizPhaseContainer}>
                 <Text style={styles.quizPhaseTitle}>🤔 C'est au tour de {partnerName}</Text>
                 <Text style={styles.quizPhaseHint}>Devine la réponse de {myName} !</Text>
-                {question.type === 'choice' ? (
-                  <View style={styles.quizOptions}>
-                    {question.options.map((option, idx) => (
-                      <TouchableOpacity
-                        key={`opt2-${idx}`}
-                        style={styles.quizOptionButton}
-                        onPress={() => handleQuizAnswer(option)}
-                      >
-                        <Text style={styles.quizOptionText}>{option}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.quizReadyButton}
-                    onPress={() => handleQuizAnswer('open')}
-                  >
-                    <Text style={styles.quizReadyButtonText}>J'ai deviné ! ✓</Text>
-                  </TouchableOpacity>
-                )}
+                {renderQuizOptions(handleQuizAnswer)}
               </View>
             )}
 
-            {/* PHASE REVEAL: Comparer les réponses */}
+            {/* ══════ REVEAL (online + local) ══════ */}
             {quizPhase === 'reveal' && (
               <View style={styles.quizRevealContainer}>
                 <Text style={styles.quizRevealTitle}>🎯 Comparez vos réponses !</Text>
@@ -1362,9 +1475,9 @@ export default function GamesScreen() {
                     </View>
                     <View style={styles.quizRevealAnswer}>
                       <Text style={styles.quizRevealLabel}>{partnerName} :</Text>
-                      <Text style={styles.quizRevealValue}>{player2Answer}</Text>
+                      <Text style={styles.quizRevealValue}>{isOnline ? onlinePartnerAnswer : player2Answer}</Text>
                     </View>
-                    {player1Answer === player2Answer && (
+                    {(isOnline ? player1Answer === onlinePartnerAnswer : player1Answer === player2Answer) && (
                       <Text style={styles.quizMatch}>✨ Match parfait !</Text>
                     )}
                   </View>
@@ -1426,6 +1539,7 @@ export default function GamesScreen() {
                 setQuizPhase('player1');
                 setPlayer1Answer(null);
                 setPlayer2Answer(null);
+                if (isOnline) nextOnlineQuestion();
               }}
             >
               <Text style={styles.playAgainText}>Rejouer</Text>
@@ -1713,7 +1827,17 @@ export default function GamesScreen() {
   const renderWhoIsMore = () => {
     const myName = user?.name || 'Moi';
     const partnerName = partner?.name || 'Partenaire';
+    const isOnline = gameMode === 'online';
 
+    // ══════ MODE ONLINE ══════
+    const handleWimAnswerOnline = async (answer) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setWimPlayer1Answer(answer);
+      setWimPhase('waitingPartner');
+      await submitOnlineAnswer(answer);
+    };
+
+    // ══════ MODE LOCAL ══════
     const handleWimAnswer = (answer) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
@@ -1732,16 +1856,17 @@ export default function GamesScreen() {
         setWimPhase('player1');
         setWimPlayer1Answer(null);
         setWimPlayer2Answer(null);
+        if (isOnline) nextOnlineQuestion();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
         setShowResult(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notifyGameWin('Qui est le Plus');
       }
     };
 
     const handleWimScore = (bothAgree, who) => {
       if (bothAgree) {
-        // Les deux sont d'accord - donner un point à la personne désignée
         if (who === 'player1') {
           setScores(prev => ({ ...prev, player1: prev.player1 + 1 }));
         } else {
@@ -1751,6 +1876,29 @@ export default function GamesScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       handleWimNext();
     };
+
+    // Boutons partagés
+    const renderWimButtons = (onAnswer) => (
+      <View style={styles.whoIsMoreButtons}>
+        <TouchableOpacity
+          style={styles.whoButton}
+          onPress={() => onAnswer('player1')}
+        >
+          <Text style={styles.whoButtonEmoji}>👈</Text>
+          <Text style={styles.whoButtonText}>{myName}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.whoButton}
+          onPress={() => onAnswer('player2')}
+        >
+          <Text style={styles.whoButtonEmoji}>👉</Text>
+          <Text style={styles.whoButtonText}>{partnerName}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+
+    // Déterminer la réponse du partenaire
+    const partnerAnswer = isOnline ? onlinePartnerAnswer : wimPlayer2Answer;
 
     return (
       <View style={styles.gameContainer}>
@@ -1765,33 +1913,38 @@ export default function GamesScreen() {
               <Text style={styles.questionText}>{WHO_IS_MORE[currentQuestion]}</Text>
             </View>
 
-            {/* PHASE 1: Premier joueur pointe */}
-            {wimPhase === 'player1' && (
+            {/* ══════ MODE ONLINE: Chaque joueur pointe sur son tel ══════ */}
+            {isOnline && wimPhase === 'player1' && (
               <View style={styles.wimPhaseContainer}>
-                <Text style={styles.wimPhaseTitle}>🎯 C'est au tour de {myName}</Text>
-                <Text style={styles.wimPhaseHint}>Qui correspond le plus à cette question ?</Text>
-                
-                <View style={styles.whoIsMoreButtons}>
-                  <TouchableOpacity
-                    style={styles.whoButton}
-                    onPress={() => handleWimAnswer('player1')}
-                  >
-                    <Text style={styles.whoButtonEmoji}>👈</Text>
-                    <Text style={styles.whoButtonText}>{myName}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.whoButton}
-                    onPress={() => handleWimAnswer('player2')}
-                  >
-                    <Text style={styles.whoButtonEmoji}>👉</Text>
-                    <Text style={styles.whoButtonText}>{partnerName}</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.wimPhaseTitle}>🌐 Qui est le plus... ?</Text>
+                <Text style={styles.wimPhaseHint}>{partnerName} répond aussi de son côté</Text>
+                {renderWimButtons(handleWimAnswerOnline)}
               </View>
             )}
 
-            {/* PHASE PASS: Passer le téléphone */}
-            {wimPhase === 'passPhone' && (
+            {/* MODE ONLINE: En attente */}
+            {isOnline && wimPhase === 'waitingPartner' && (
+              <View style={styles.onlineWaitingContainer}>
+                <Text style={styles.onlineWaitingEmoji}>⏳</Text>
+                <Text style={styles.onlineWaitingTitle}>Réponse envoyée !</Text>
+                <ActivityIndicator size="large" color="#fff" style={{ marginVertical: 15 }} />
+                <Text style={styles.onlineWaitingText}>
+                  En attente de la réponse de {partnerName}...
+                </Text>
+              </View>
+            )}
+
+            {/* ══════ MODE LOCAL: Phase 1 ══════ */}
+            {!isOnline && wimPhase === 'player1' && (
+              <View style={styles.wimPhaseContainer}>
+                <Text style={styles.wimPhaseTitle}>🎯 C'est au tour de {myName}</Text>
+                <Text style={styles.wimPhaseHint}>Qui correspond le plus à cette question ?</Text>
+                {renderWimButtons(handleWimAnswer)}
+              </View>
+            )}
+
+            {/* MODE LOCAL: Passer le téléphone */}
+            {!isOnline && wimPhase === 'passPhone' && (
               <View style={styles.passPhoneContainer}>
                 <Text style={styles.passPhoneEmoji}>📱</Text>
                 <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
@@ -1811,32 +1964,16 @@ export default function GamesScreen() {
               </View>
             )}
 
-            {/* PHASE 2: Deuxième joueur pointe */}
-            {wimPhase === 'player2' && (
+            {/* MODE LOCAL: Phase 2 */}
+            {!isOnline && wimPhase === 'player2' && (
               <View style={styles.wimPhaseContainer}>
                 <Text style={styles.wimPhaseTitle}>🎯 C'est au tour de {partnerName}</Text>
                 <Text style={styles.wimPhaseHint}>Qui correspond le plus à cette question ?</Text>
-                
-                <View style={styles.whoIsMoreButtons}>
-                  <TouchableOpacity
-                    style={styles.whoButton}
-                    onPress={() => handleWimAnswer('player1')}
-                  >
-                    <Text style={styles.whoButtonEmoji}>👈</Text>
-                    <Text style={styles.whoButtonText}>{myName}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.whoButton}
-                    onPress={() => handleWimAnswer('player2')}
-                  >
-                    <Text style={styles.whoButtonEmoji}>👉</Text>
-                    <Text style={styles.whoButtonText}>{partnerName}</Text>
-                  </TouchableOpacity>
-                </View>
+                {renderWimButtons(handleWimAnswer)}
               </View>
             )}
 
-            {/* PHASE REVEAL: Comparer les réponses */}
+            {/* ══════ REVEAL (online + local) ══════ */}
             {wimPhase === 'reveal' && (
               <View style={styles.quizRevealContainer}>
                 <Text style={styles.quizRevealTitle}>🔮 Révélation !</Text>
@@ -1851,12 +1988,11 @@ export default function GamesScreen() {
                   <View style={styles.quizRevealAnswer}>
                     <Text style={styles.quizRevealLabel}>{partnerName} a pointé :</Text>
                     <Text style={styles.quizRevealValue}>
-                      {wimPlayer2Answer === 'player1' ? `👈 ${myName}` : `👉 ${partnerName}`}
+                      {partnerAnswer === 'player1' ? `👈 ${myName}` : `👉 ${partnerName}`}
                     </Text>
                   </View>
                   
-                  {/* Vérifier si les deux sont d'accord */}
-                  {wimPlayer1Answer === wimPlayer2Answer ? (
+                  {wimPlayer1Answer === partnerAnswer ? (
                     <Text style={styles.quizMatch}>✨ Vous êtes d'accord !</Text>
                   ) : (
                     <Text style={styles.wimDisagree}>🤔 Vous n'êtes pas d'accord !</Text>
@@ -1864,7 +2000,7 @@ export default function GamesScreen() {
                 </View>
 
                 <View style={styles.quizRevealButtons}>
-                  {wimPlayer1Answer === wimPlayer2Answer ? (
+                  {wimPlayer1Answer === partnerAnswer ? (
                     <TouchableOpacity
                       style={[styles.quizRevealBtn, styles.quizRevealBtnBoth]}
                       onPress={() => handleWimScore(true, wimPlayer1Answer)}
@@ -1919,6 +2055,7 @@ export default function GamesScreen() {
                 setWimPhase('player1');
                 setWimPlayer1Answer(null);
                 setWimPlayer2Answer(null);
+                if (isOnline) nextOnlineQuestion();
               }}
             >
               <Text style={styles.playAgainText}>Rejouer</Text>
@@ -3053,5 +3190,32 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  // ===== STYLES MODE ONLINE ATTENTE =====
+  onlineWaitingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 25,
+    marginVertical: 20,
+  },
+  onlineWaitingEmoji: {
+    fontSize: 60,
+    marginBottom: 10,
+  },
+  onlineWaitingTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  onlineWaitingText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
