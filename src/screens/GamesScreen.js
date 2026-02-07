@@ -603,13 +603,10 @@ export default function GamesScreen() {
     
     if (result && !result.error) {
       setGameMode('online');
-      // ✅ Plus besoin d'appeler listenToGameSession() - le listener permanent dans GameContext gère tout
-      
-      // Vérifier si le jeu peut démarrer immédiatement
-      if (result.status === 'ready') {
-        setShowLobby(false);
-        setActiveGame(result.gameType);
-      }
+      // ✅ Toujours démarrer le jeu après join réussi
+      setShowLobby(false);
+      resetAllGameStates();
+      setActiveGame(result.gameType);
       Alert.alert('🎉 Connecté !', 'Vous avez rejoint la partie !');
     } else {
       Alert.alert(
@@ -1146,9 +1143,8 @@ export default function GamesScreen() {
                 if (session && !session.error) {
                   setGameMode('online');
                   resetAllGameStates();
-                  if (session.status === 'ready' || gameSession?.status === 'ready') {
-                    setActiveGame(pendingGameInvite.gameType);
-                  }
+                  // ✅ Toujours démarrer le jeu après join réussi
+                  setActiveGame(pendingGameInvite.gameType);
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
               }}
@@ -1209,8 +1205,18 @@ export default function GamesScreen() {
           <TouchableOpacity 
             style={styles.distanceButton}
             onPress={() => {
-              setSelectedGameForLobby('quiz');
-              setShowLobby(true);
+              // ✅ Proposer le choix du jeu au lieu de forcer quiz
+              Alert.alert(
+                '🎮 Choisir un jeu',
+                'Quel jeu voulez-vous jouer \u00e0 distance ?',
+                [
+                  { text: '🧠 Quiz Couple', onPress: () => openGameLobby('quiz') },
+                  { text: '🏆 Qui est le Plus', onPress: () => openGameLobby('whoismore') },
+                  { text: '🤔 Tu Pr\u00e9f\u00e8res', onPress: () => openGameLobby('wouldyourather') },
+                  { text: '🎲 Action/V\u00e9rit\u00e9', onPress: () => openGameLobby('truthordare') },
+                  { text: 'Annuler', style: 'cancel' },
+                ]
+              );
             }}
           >
             <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.distanceButtonGradient}>
@@ -1232,10 +1238,10 @@ export default function GamesScreen() {
                 setGameMode('online');
                 const gameType = result.gameType || gameSession?.gameType;
                 Alert.alert('🎉 Connecté !', `Vous rejoignez ${getGameTitle(gameType)}`);
-                if (result.status === 'ready' || gameSession?.status === 'ready') {
-                  resetAllGameStates();
-                  setActiveGame(gameType);
-                }
+                // ✅ Toujours démarrer le jeu après join réussi
+                // (joinGameSession retourne maintenant les données fraîches avec status='ready')
+                resetAllGameStates();
+                setActiveGame(gameType);
               } else {
                 Alert.alert(
                   '😕 Aucune partie',

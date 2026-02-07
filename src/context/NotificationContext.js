@@ -299,13 +299,38 @@ export function NotificationProvider({ children }) {
     console.log('📤 Tentative envoi notification push:', { title, body, hasPartnerToken: !!partnerToken });
     
     // ÉTAPE 1: Vérifier si on a un token partenaire valide
-    if (!partnerToken) {
+    // Si pas en mémoire, tenter de le récupérer depuis Firebase
+    let tokenToUse = partnerToken;
+    
+    if (!tokenToUse && authCouple?.id && authUser?.id && isConfigured && database) {
+      try {
+        console.log('🔄 Token partenaire absent en mémoire, récupération depuis Firebase...');
+        const tokensRef = ref(database, `couples/${authCouple.id}/pushTokens`);
+        const snapshot = await get(tokensRef);
+        if (snapshot.exists()) {
+          const tokens = snapshot.val();
+          for (const [id, tokenData] of Object.entries(tokens)) {
+            if (id !== authUser.id && tokenData?.token) {
+              tokenToUse = tokenData.token;
+              setPartnerToken(tokenToUse);
+              console.log('✅ Token partenaire récupéré depuis Firebase:', tokenToUse.substring(0, 20) + '...');
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.log('⚠️ Erreur récupération token partenaire:', e.message);
+      }
+    }
+    
+    if (!tokenToUse) {
       console.log('⚠️ Pas de token partenaire - impossible d\'envoyer push');
+      console.log('   (Le partenaire doit ouvrir l\'app au moins une fois pour recevoir des notifications)');
       return false;
     }
 
     // ÉTAPE 2: Vérifier que c'est un vrai token Expo (pas mode dev)
-    if (!partnerToken.startsWith('ExponentPushToken')) {
+    if (!tokenToUse.startsWith('ExponentPushToken')) {
       console.log('⚠️ Token partenaire non valide (mode dev/simulator)');
       return false;
     }
@@ -313,7 +338,7 @@ export function NotificationProvider({ children }) {
     // ÉTAPE 3: Essayer d'envoyer via Expo Push Service
     try {
       const message = {
-        to: partnerToken,
+        to: tokenToUse,
         sound: 'default',
         title: title,
         body: body,

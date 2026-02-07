@@ -45,8 +45,8 @@ const convertToBase64 = async (uri) => {
 // Fonction pour obtenir les infos d'un fichier
 const getFileInfo = async (uri) => {
   try {
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    const sizeMB = fileInfo.size / (1024 * 1024);
+    const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
+    const sizeMB = (fileInfo.size || 0) / (1024 * 1024);
     const extension = uri.split('.').pop()?.toLowerCase();
     const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'].includes(extension);
     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(extension);
@@ -108,8 +108,8 @@ export default function MemoriesScreen() {
   const convertToBase64 = async (uri, mediaType = 'image') => {
     try {
       // Vérifier d'abord la taille du fichier
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      const fileSizeMB = fileInfo.size / (1024 * 1024);
+      const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
+      const fileSizeMB = (fileInfo.size || 0) / (1024 * 1024);
       
       // Limiter à 5MB pour les images (Firebase Realtime DB a des limites)
       if (mediaType === 'image' && fileSizeMB > 5) {

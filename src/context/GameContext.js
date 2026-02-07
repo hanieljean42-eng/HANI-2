@@ -385,11 +385,15 @@ export function GameProvider({ children }) {
           setPartnerOnline(true);
         }
 
-        setCurrentGame(session.gameType);
-        setGameSession(session);
-        setGameData(session);
+        // ✅ Re-lire la session APRÈS les modifications pour avoir les données à jour
+        const freshSnapshot = await get(sessionRef);
+        const freshSession = freshSnapshot.exists() ? freshSnapshot.val() : session;
         
-        return session;
+        setCurrentGame(freshSession.gameType);
+        setGameSession(freshSession);
+        setGameData(freshSession);
+        
+        return freshSession;
       } else {
         console.log('❌ Aucune session trouvée pour:', currentCoupleId);
         return { error: 'Votre partenaire n\'a pas encore créé de partie. Demandez-lui de créer une partie d\'abord!' };
@@ -441,16 +445,39 @@ export function GameProvider({ children }) {
     }
 
     if (!coupleId || !database || !myPlayerId) {
-      console.log('❌ Impossible de soumettre: coupleId, database ou myPlayerId manquant');
-      return false;
+      // ✅ Tenter de recharger coupleId depuis AsyncStorage
+      let reloadedCoupleId = null;
+      try {
+        const storedCouple = await AsyncStorage.getItem('@couple');
+        if (storedCouple) {
+          const couple = JSON.parse(storedCouple);
+          if (couple.id) reloadedCoupleId = couple.id;
+        }
+        if (!reloadedCoupleId) {
+          reloadedCoupleId = await AsyncStorage.getItem('@coupleId');
+        }
+        if (reloadedCoupleId) {
+          setCoupleId(reloadedCoupleId);
+        }
+      } catch (e) {
+        console.log('❌ Erreur rechargement coupleId:', e.message);
+      }
+      
+      if ((!coupleId && !reloadedCoupleId) || !database || !myPlayerId) {
+        console.log('❌ Impossible de soumettre: coupleId, database ou myPlayerId manquant');
+        return false;
+      }
     }
 
+    // ✅ Utiliser le coupleId le plus récent
+    const effectiveCoupleId = coupleId || (await AsyncStorage.getItem('@coupleId'));
+
     try {
-      console.log('📤 Soumission réponse:', { answerKey, answerData, myPlayerId });
+      console.log('📤 Soumission réponse:', { answerKey, answerData, myPlayerId, effectiveCoupleId });
       
       // ✅ PATH COHÉRENT pour tous les types:
       // games/{coupleId}/session/answers/{answerKey}/{myPlayerId}
-      const answerRef = ref(database, `games/${coupleId}/session/answers/${answerKey}/${myPlayerId}`);
+      const answerRef = ref(database, `games/${effectiveCoupleId}/session/answers/${answerKey}/${myPlayerId}`);
       await set(answerRef, {
         ...answerData,
         timestamp: Date.now(),
