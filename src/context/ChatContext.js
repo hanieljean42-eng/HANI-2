@@ -98,38 +98,42 @@ export function ChatProvider({ children }) {
   const sendMessage = async (content, type = 'text', metadata = {}) => {
     if (!couple?.id || !user?.id) return null;
 
-    const message = {
-      content: type === 'text' ? encryptMessageObject({ content }, couple.id).content : content,
-      type, // 'text', 'image', 'voice', 'sticker'
-      senderId: user.id,
-      senderName: user.name,
-      timestamp: new Date().toISOString(),
-      read: false,
-      reactions: {},
-    };
+    try {
+      const message = {
+        content: type === 'text' ? encryptMessageObject({ content }, couple.id).content : content,
+        type, // 'text', 'image', 'voice', 'sticker'
+        senderId: user.id,
+        senderName: user.name,
+        timestamp: new Date().toISOString(),
+        read: false,
+        reactions: {},
+      };
 
-    // Retry logic pour réseau instable
-    let retries = 0;
-    const maxRetries = 3;
-        
+      if (isConfigured && database) {
+        // Mode Firebase
+        let retries = 0;
+        const maxRetries = 3;
+
         const attemptSend = async () => {
           try {
+            const messagesRef = ref(database, `couples/${couple.id}/chat/messages`);
+            const newMessageRef = push(messagesRef);
             await set(newMessageRef, message);
             return { success: true, id: newMessageRef.key };
           } catch (error) {
             if (retries < maxRetries && error.message?.includes('NETWORK')) {
               retries++;
               console.warn(`⚠️ Retry ${retries}/${maxRetries} d'envoi du message...`);
-              await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Backoff
+              await new Promise(resolve => setTimeout(resolve, 1000 * retries));
               return attemptSend();
             }
             throw error;
           }
         };
-        
+
         return attemptSend();
       } else {
-        // Mode local
+        // Mode local (Firebase pas configuré)
         const localMessage = { id: Date.now().toString(), ...message };
         const updated = [...messages, localMessage];
         setMessages(updated);
@@ -138,14 +142,7 @@ export function ChatProvider({ children }) {
         return { success: true, id: localMessage.id };
       }
     } catch (error) {
-      console.error('❌ Erreur envoi message:', error.messageString(), ...message };
-        const updated = [...messages, localMessage];
-        setMessages(updated);
-        await AsyncStorage.setItem('@chatMessages', JSON.stringify(updated));
-        return { success: true, id: localMessage.id };
-      }
-    } catch (error) {
-      console.log('Erreur envoi message:', error);
+      console.error('❌ Erreur envoi message:', error.message);
       return { success: false, error: error.message };
     }
   };
