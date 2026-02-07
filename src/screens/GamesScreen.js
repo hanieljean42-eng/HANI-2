@@ -387,15 +387,70 @@ export default function GamesScreen() {
         // Les deux joueurs sont là, démarrer le jeu
         setShowLobby(false);
         setShowInviteModal(false);
+        // ✅ Reset des états avant de démarrer un nouveau jeu
+        resetAllGameStates();
         setActiveGame(gameSession.gameType);
       }
     }
   }, [gameSession, waitingForPartner, gameMode]);
 
+  // ✅ Fonction centralisée de reset de TOUS les états de jeu
+  const resetAllGameStates = () => {
+    setCurrentQuestion(0);
+    setScores({ player1: 0, player2: 0 });
+    setShowResult(false);
+    // Quiz
+    setQuizPhase('player1');
+    setPlayer1Answer(null);
+    setPlayer2Answer(null);
+    setCurrentPlayer(1);
+    // Who is More
+    setWimPhase('player1');
+    setWimPlayer1Answer(null);
+    setWimPlayer2Answer(null);
+    // Would You Rather
+    setWyrPhase('player1');
+    setWyrPlayer1Choice(null);
+    setWyrPlayer2Choice(null);
+    setWyrChoice(null);
+    // Truth or Dare
+    setTruthOrDare(null);
+    setTodResponse('');
+    setTodSubmitted(false);
+    setTodRound(0);
+    setTodPhase('choose');
+    setTodAsker(null);
+    setTodAnswerer(null);
+    setTodHistory([]);
+    setIsMyTurnToAsk(true);
+    setTodPartnerResponse(null);
+  };
+
   // ✅ NOUVEAU: Écouter les réponses du partenaire en Vérité/Action (bug #5)
   useEffect(() => {
-    if (activeGame !== 'truthordare' || gameMode !== 'online' || !isFirebaseReady) return;
+    if (activeGame !== 'truthordare' || !isFirebaseReady) return;
     
+    // Écouter les questions posées par le partenaire (pour synchroniser la même question)
+    const questionKey = `tod_question_${todRound}`;
+    if (gameData?.answers?.[questionKey] && !truthOrDare) {
+      const questions = gameData.answers[questionKey];
+      const partnerQuestion = Object.entries(questions).find(
+        ([playerId, data]) => playerId !== user?.id && !playerId.startsWith('partner_')
+      );
+      
+      if (partnerQuestion && gameMode === 'online') {
+        const [, questionData] = partnerQuestion;
+        // Le partenaire a posé une question — l'afficher chez moi
+        if (questionData.mustAnswerBy === (user?.name || 'Moi')) {
+          console.log('📨 Question du partenaire reçue:', questionData);
+          setTruthOrDare({ type: questionData.type, text: questionData.text, round: questionData.round });
+          setTodAsker(questionData.askedBy);
+          setTodAnswerer(questionData.mustAnswerBy);
+          setTodPhase('answer');
+        }
+      }
+    }
+
     // Si on est en phase d'attente (questioner attend la réponse)
     if (todPhase === 'waiting' || (todSubmitted && !todResponse?.trim())) {
       console.log(`👂 Écoute réponse partenaire pour tour ${todRound}...`);
@@ -418,7 +473,18 @@ export default function GamesScreen() {
         }
       }
     }
-  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todResponse, todSubmitted, user?.id]);
+  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todResponse, todSubmitted, user?.id, user?.name, truthOrDare]);
+
+  // ✅ Synchroniser le tour de question en mode online via gameSession
+  useEffect(() => {
+    if (activeGame === 'truthordare' && gameMode === 'online' && gameSession) {
+      // Le créateur de la session commence à poser
+      const iAmCreator = gameSession.createdBy === coupleId;
+      // Tour pair = créateur pose, tour impair = l'autre pose
+      const creatorAsks = todRound % 2 === 0;
+      setIsMyTurnToAsk(iAmCreator ? creatorAsks : !creatorAsks);
+    }
+  }, [activeGame, gameMode, gameSession, todRound]);
 
   const openGameLobby = (gameType) => {
     setSelectedGameForLobby(gameType);
@@ -484,8 +550,26 @@ export default function GamesScreen() {
   };
 
   const startGame = (game) => {
-    // Ouvrir le lobby pour tous les jeux (online)
-    openGameLobby(game);
+    // Proposer le choix : online (lobby) ou local (même téléphone)
+    Alert.alert(
+      getGameTitle(game),
+      'Comment voulez-vous jouer ?',
+      [
+        {
+          text: '🌐 À distance',
+          onPress: () => openGameLobby(game),
+        },
+        {
+          text: '📱 Même téléphone',
+          onPress: () => {
+            resetAllGameStates();
+            setGameMode('local');
+            setActiveGame(game);
+          },
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    );
   };
 
   const nextQuestion = () => {
@@ -907,18 +991,6 @@ export default function GamesScreen() {
             </View>
           )}
 
-          {/* Info de synchronisation (pour débogage) */}
-          <View style={styles.syncInfo}>
-            <Text style={styles.syncInfoText}>
-              📡 ID Couple: {coupleId ? coupleId.slice(-8) : 'Non défini'}
-            </Text>
-            {couple?.code && (
-              <Text style={styles.syncInfoText}>
-                🔑 Code: {couple.code}
-              </Text>
-            )}
-          </View>
-
           {/* Bouton Annuler */}
           <TouchableOpacity
             style={styles.lobbyCancelButton}
@@ -964,8 +1036,9 @@ export default function GamesScreen() {
                 const session = await joinGameSession(user?.name || 'Joueur 2');
                 setIsJoiningGame(false);
                 
-                if (session) {
+                if (session && !session.error) {
                   setGameMode('online');
+                  resetAllGameStates();
                   if (session.status === 'ready' || gameSession?.status === 'ready') {
                     setActiveGame(pendingGameInvite.gameType);
                   }
@@ -1017,27 +1090,6 @@ export default function GamesScreen() {
         </TouchableOpacity>
       )}
 
-      {/* VERSION BANNER - TRÈS VISIBLE */}
-      <View style={{backgroundColor: '#00AA00', padding: 15, borderRadius: 10, marginBottom: 15, alignItems: 'center'}}>
-        <Text style={{color: '#FFFFFF', fontSize: 20, fontWeight: 'bold'}}>✅ JEUX V2.0.0 ✅</Text>
-        <Text style={{color: '#FFFFFF', fontSize: 14}}>Jeux à distance activés !</Text>
-      </View>
-
-      {/* Indicateur de connexion Firebase */}
-      <View style={styles.connectionStatus}>
-        <Text style={styles.connectionStatusText}>
-          {isFirebaseReady ? '🟢 Firebase OK' : '🔴 Hors ligne'}
-        </Text>
-        <Text style={styles.connectionStatusText}>
-          📱 ID Couple: {coupleId ? coupleId.slice(-8) : 'Non défini'}
-        </Text>
-        {partner && (
-          <Text style={styles.connectionStatusText}>
-            👫 {partner.name} {partnerOnline ? '(en ligne)' : ''}
-          </Text>
-        )}
-      </View>
-
       {/* SECTION JOUER À DISTANCE */}
       <View style={styles.distanceSection}>
         <Text style={styles.distanceSectionTitle}>🌐 JOUER À DISTANCE</Text>
@@ -1066,19 +1118,21 @@ export default function GamesScreen() {
             style={styles.distanceButton}
             onPress={async () => {
               setIsJoiningGame(true);
-              const session = await joinGameSession(user?.name || 'Joueur 2');
+              const result = await joinGameSession(user?.name || 'Joueur 2');
               setIsJoiningGame(false);
               
-              if (session) {
+              if (result && !result.error) {
                 setGameMode('online');
-                Alert.alert('🎉 Connecté !', `Vous rejoignez ${getGameTitle(session.gameType)}`);
-                if (session.status === 'ready' || gameSession?.status === 'ready') {
-                  setActiveGame(session.gameType);
+                const gameType = result.gameType || gameSession?.gameType;
+                Alert.alert('🎉 Connecté !', `Vous rejoignez ${getGameTitle(gameType)}`);
+                if (result.status === 'ready' || gameSession?.status === 'ready') {
+                  resetAllGameStates();
+                  setActiveGame(gameType);
                 }
               } else {
                 Alert.alert(
                   '😕 Aucune partie',
-                  'Votre partenaire n\'a pas encore créé de partie.\n\nDemandez-lui de cliquer sur "CRÉER une partie" d\'abord !',
+                  result?.error || 'Votre partenaire n\'a pas encore créé de partie.\n\nDemandez-lui de cliquer sur "CRÉER une partie" d\'abord !',
                   [{ text: 'OK' }]
                 );
               }
@@ -1365,7 +1419,14 @@ export default function GamesScreen() {
             <Text style={styles.quizResultHint}>Vous vous connaissez {Math.round((scores.player1 + scores.player2) / 20 * 100)}% 💕</Text>
             <TouchableOpacity
               style={styles.playAgainButton}
-              onPress={() => startGame('quiz')}
+              onPress={() => {
+                setCurrentQuestion(0);
+                setScores({ player1: 0, player2: 0 });
+                setShowResult(false);
+                setQuizPhase('player1');
+                setPlayer1Answer(null);
+                setPlayer2Answer(null);
+              }}
             >
               <Text style={styles.playAgainText}>Rejouer</Text>
             </TouchableOpacity>
@@ -1421,24 +1482,33 @@ export default function GamesScreen() {
           </View>
         )}
 
-        {/* Phase: Attente du partenaire (mode local - pas online) */}
-        {!truthOrDare && !isMyTurnToAsk && gameMode !== 'online' && (
+        {/* Phase: Attente du partenaire qui doit poser */}
+        {!truthOrDare && !isMyTurnToAsk && (
           <View style={styles.todWaitingTurn}>
             <Text style={styles.todWaitingIcon}>🔄</Text>
             <Text style={styles.todWaitingTitle}>
               C'est au tour de {partnerName} !
             </Text>
             <Text style={styles.todWaitingHint}>
-              Passe le téléphone à ton partenaire pour qu'il/elle choisisse Action ou Vérité pour toi.
+              {gameMode === 'online' 
+                ? `${partnerName} est en train de choisir une question pour toi...`
+                : 'Passe le téléphone à ton partenaire pour qu\'il/elle choisisse Action ou Vérité pour toi.'}
             </Text>
-            <TouchableOpacity
-              style={styles.todReadyButton}
-              onPress={() => setIsMyTurnToAsk(true)}
-            >
-              <Text style={styles.todReadyButtonText}>
-                👋 {partnerName} est prêt(e) à choisir
-              </Text>
-            </TouchableOpacity>
+            {gameMode === 'online' ? (
+              <View style={styles.todWaitingResponse}>
+                <ActivityIndicator size="small" color="#FF6B9D" />
+                <Text style={styles.todWaitingResponseText}>En attente...</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.todReadyButton}
+                onPress={() => setIsMyTurnToAsk(true)}
+              >
+                <Text style={styles.todReadyButtonText}>
+                  👋 {partnerName} est prêt(e) à choisir
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1530,26 +1600,30 @@ export default function GamesScreen() {
             )}
 
             {/* Attente de réponse - si c'est moi qui ai posé */}
-            {todAsker === myName && !todSubmitted && gameMode !== 'online' && (
+            {todAsker === myName && !todSubmitted && (
               <View style={styles.todWaitingResponse}>
                 <ActivityIndicator size="small" color="#FF6B9D" />
                 <Text style={styles.todWaitingResponseText}>
                   En attente de la réponse de {todAnswerer}...
                 </Text>
-                <Text style={styles.todWaitingResponseHint}>
-                  Passe le téléphone à {todAnswerer} pour qu'il/elle réponde.
-                </Text>
-                <TouchableOpacity
-                  style={styles.todPassPhoneButton}
-                  onPress={() => {
-                    // Simuler que le partenaire va répondre
-                    setIsMyTurnToAsk(false);
-                  }}
-                >
-                  <Text style={styles.todPassPhoneText}>
-                    📱 Téléphone passé à {todAnswerer}
-                  </Text>
-                </TouchableOpacity>
+                {gameMode !== 'online' && (
+                  <>
+                    <Text style={styles.todWaitingResponseHint}>
+                      Passe le téléphone à {todAnswerer} pour qu'il/elle réponde.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.todPassPhoneButton}
+                      onPress={() => {
+                        // Simuler que le partenaire va répondre
+                        setIsMyTurnToAsk(false);
+                      }}
+                    >
+                      <Text style={styles.todPassPhoneText}>
+                        📱 Téléphone passé à {todAnswerer}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
 
@@ -1667,8 +1741,8 @@ export default function GamesScreen() {
 
     const handleWimScore = (bothAgree, who) => {
       if (bothAgree) {
-        // Les deux sont d'accord
-        if (who === 'me') {
+        // Les deux sont d'accord - donner un point à la personne désignée
+        if (who === 'player1') {
           setScores(prev => ({ ...prev, player1: prev.player1 + 1 }));
         } else {
           setScores(prev => ({ ...prev, player2: prev.player2 + 1 }));
@@ -1700,14 +1774,14 @@ export default function GamesScreen() {
                 <View style={styles.whoIsMoreButtons}>
                   <TouchableOpacity
                     style={styles.whoButton}
-                    onPress={() => handleWimAnswer('me')}
+                    onPress={() => handleWimAnswer('player1')}
                   >
                     <Text style={styles.whoButtonEmoji}>👈</Text>
-                    <Text style={styles.whoButtonText}>Moi</Text>
+                    <Text style={styles.whoButtonText}>{myName}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.whoButton}
-                    onPress={() => handleWimAnswer('partner')}
+                    onPress={() => handleWimAnswer('player2')}
                   >
                     <Text style={styles.whoButtonEmoji}>👉</Text>
                     <Text style={styles.whoButtonText}>{partnerName}</Text>
@@ -1746,17 +1820,17 @@ export default function GamesScreen() {
                 <View style={styles.whoIsMoreButtons}>
                   <TouchableOpacity
                     style={styles.whoButton}
-                    onPress={() => handleWimAnswer('me')}
+                    onPress={() => handleWimAnswer('player1')}
                   >
                     <Text style={styles.whoButtonEmoji}>👈</Text>
                     <Text style={styles.whoButtonText}>{myName}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.whoButton}
-                    onPress={() => handleWimAnswer('partner')}
+                    onPress={() => handleWimAnswer('player2')}
                   >
                     <Text style={styles.whoButtonEmoji}>👉</Text>
-                    <Text style={styles.whoButtonText}>Moi</Text>
+                    <Text style={styles.whoButtonText}>{partnerName}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1771,13 +1845,13 @@ export default function GamesScreen() {
                   <View style={styles.quizRevealAnswer}>
                     <Text style={styles.quizRevealLabel}>{myName} a pointé :</Text>
                     <Text style={styles.quizRevealValue}>
-                      {wimPlayer1Answer === 'me' ? `👈 ${myName}` : `👉 ${partnerName}`}
+                      {wimPlayer1Answer === 'player1' ? `👈 ${myName}` : `👉 ${partnerName}`}
                     </Text>
                   </View>
                   <View style={styles.quizRevealAnswer}>
                     <Text style={styles.quizRevealLabel}>{partnerName} a pointé :</Text>
                     <Text style={styles.quizRevealValue}>
-                      {wimPlayer2Answer === 'me' ? `👈 ${myName}` : `👉 ${partnerName}`}
+                      {wimPlayer2Answer === 'player1' ? `👈 ${myName}` : `👉 ${partnerName}`}
                     </Text>
                   </View>
                   
@@ -1796,7 +1870,7 @@ export default function GamesScreen() {
                       onPress={() => handleWimScore(true, wimPlayer1Answer)}
                     >
                       <Text style={styles.quizRevealBtnText}>
-                        +1 point pour {wimPlayer1Answer === 'me' ? myName : partnerName} !
+                        +1 point pour {wimPlayer1Answer === 'player1' ? myName : partnerName} !
                       </Text>
                     </TouchableOpacity>
                   ) : (
@@ -1866,6 +1940,7 @@ export default function GamesScreen() {
             setActiveGame(null);
             endGameSession();
             setGameMode(null);
+            resetAllGameStates();
           }}>
             <Text style={styles.backButton}>← Retour</Text>
           </TouchableOpacity>

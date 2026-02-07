@@ -506,20 +506,45 @@ export function GameProvider({ children }) {
     return getMyAnswer(questionIndex) !== null && getMyAnswer(questionIndex) !== undefined;
   };
 
-  // Attendre que le partenaire réponde (avec timeout)
+  // Attendre que le partenaire réponde (réactif via gameData au lieu de polling)
   const waitForPartnerAnswer = async (questionIndex, timeoutMs = 60000) => {
+    // Vérification immédiate
+    if (checkBothAnswered(questionIndex)) return true;
+    
     return new Promise((resolve) => {
       const startTime = Date.now();
       
-      const checkInterval = setInterval(() => {
-        if (checkBothAnswered(questionIndex)) {
-          clearInterval(checkInterval);
-          resolve(true);
-        } else if (Date.now() - startTime > timeoutMs) {
-          clearInterval(checkInterval);
+      // Utiliser un listener Firebase direct au lieu de polling
+      if (isFirebaseReady && database && coupleId) {
+        const answerRef = ref(database, `games/${coupleId}/session/answers/${questionIndex}`);
+        const unsubscribe = onValue(answerRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const answers = snapshot.val();
+            const realAnswers = Object.keys(answers).filter(id => !id.startsWith('partner_'));
+            if (realAnswers.length >= 2) {
+              unsubscribe();
+              resolve(true);
+            }
+          }
+        });
+        
+        // Timeout de sécurité
+        setTimeout(() => {
+          unsubscribe();
           resolve(false);
-        }
-      }, 500); // Vérifier toutes les 500ms
+        }, timeoutMs);
+      } else {
+        // Mode local - vérifier périodiquement
+        const checkInterval = setInterval(() => {
+          if (checkBothAnswered(questionIndex)) {
+            clearInterval(checkInterval);
+            resolve(true);
+          } else if (Date.now() - startTime > timeoutMs) {
+            clearInterval(checkInterval);
+            resolve(false);
+          }
+        }, 500);
+      }
     });
   };
 
