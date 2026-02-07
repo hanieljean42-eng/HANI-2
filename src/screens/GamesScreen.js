@@ -495,6 +495,8 @@ export default function GamesScreen() {
     } else {
       setShowResult(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // ✅ Notifier le partenaire de la fin du jeu
+      notifyGameWin('Quiz Couple');
     }
   };
 
@@ -643,6 +645,8 @@ export default function GamesScreen() {
     } else {
       setShowResult(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // ✅ Notifier le partenaire de la fin du jeu
+      notifyGameWin('Tu Préfères');
     }
   };
 
@@ -673,6 +677,8 @@ export default function GamesScreen() {
       } else {
         setShowResult(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // ✅ Notifier le partenaire de la fin du jeu
+        notifyGameWin('Tu Préfères');
       }
     };
 

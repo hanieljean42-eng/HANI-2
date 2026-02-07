@@ -44,7 +44,7 @@ export default function ChatScreen({ navigation }) {
 
   // Chat is now available
   const chatAvailable = true;
-  const { notifyLoveNote } = useNotifyPartner();
+  const { notifyLoveNote, notifyNoteRead } = useNotifyPartner();
   const { addDiaryEntry } = useData();
 
   const [inputText, setInputText] = useState('');
@@ -100,9 +100,18 @@ export default function ChatScreen({ navigation }) {
     };
   }, []);
 
-  // Marquer comme lu à l'ouverture
+  // Marquer comme lu à l'ouverture + notifier le partenaire
+  const hasNotifiedReadRef = React.useRef(false);
   useEffect(() => {
     markAsRead();
+    // Notifier le partenaire qu'on a lu ses messages (une seule fois par session)
+    if (messages.length > 0 && !hasNotifiedReadRef.current) {
+      const unreadFromPartner = messages.filter(m => m.senderId !== user?.id && !m.read);
+      if (unreadFromPartner.length > 0) {
+        hasNotifiedReadRef.current = true;
+        notifyNoteRead();
+      }
+    }
   }, [messages]);
 
   // Scroll en bas quand nouveaux messages

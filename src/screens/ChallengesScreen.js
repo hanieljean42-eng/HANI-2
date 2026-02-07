@@ -177,7 +177,7 @@ export default function ChallengesScreen() {
   const { theme } = useTheme();
   const { loveMeter, updateLoveMeter, challenges, addChallenge } = useData();
   const { partner, user } = useAuth();
-  const { notifyChallenge, notifyGame } = useNotifyPartner();
+  const { notifyChallenge, notifyGame, notifyNewChallenge, notifyGameWin } = useNotifyPartner();
   const { 
     coupleId,
     gameSession, 
@@ -289,8 +289,9 @@ export default function ChallengesScreen() {
       completedById: user?.id,
     });
     
-    // Envoyer notification au partenaire
+    // Envoyer notification au partenaire (défi complété + nouveau défi assigné)
     await notifyChallenge(challenge.title);
+    await notifyNewChallenge(challenge.title);
     
     setShowChallengeModal(false);
   };

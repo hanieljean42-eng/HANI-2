@@ -22,7 +22,8 @@ export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, couple, partner, isOnline, isSynced } = useAuth();
   const { loveMeter, challenges, memories } = useData();
-  const { notifyMissYou, notifyLoveNote, sendCustomNotification } = useNotifyPartner();
+  const { notifyMissYou, notifyLoveNote, sendCustomNotification, notifyOnline, sendDailyReminder, sendSmartReminder } = useNotifyPartner();
+  const hasNotifiedOnlineRef = React.useRef(false);
   const [daysCount, setDaysCount] = useState(0);
   const [timeTogetherText, setTimeTogetherText] = useState('');
   const [hasValidDate, setHasValidDate] = useState(false);
@@ -112,6 +113,19 @@ export default function HomeScreen({ navigation }) {
     
     return () => clearInterval(interval);
   }, [couple?.anniversary, currentDate, calculateDaysTogether]);
+
+  // ✅ Notifier le partenaire qu'on est en ligne + programmer les rappels
+  useEffect(() => {
+    if (user?.id && couple?.id && !hasNotifiedOnlineRef.current) {
+      hasNotifiedOnlineRef.current = true;
+      // Notifier le partenaire qu'on est connecté
+      notifyOnline();
+      // Programmer le rappel quotidien à 9h
+      sendDailyReminder();
+      // Programmer un rappel intelligent à 14h
+      sendSmartReminder(false);
+    }
+  }, [user?.id, couple?.id]);
 
   // Écouter quand l'app revient au premier plan pour recalculer
   useEffect(() => {

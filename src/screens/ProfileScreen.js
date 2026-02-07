@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import { useNotifications } from '../context/NotificationContext';
 import AnimatedModal from '../components/AnimatedModal';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
@@ -61,8 +62,11 @@ export default function ProfileScreen({ navigation }) {
     notifyProfileUpdate, 
     notifyCoupleNameChanged, 
     notifyAnniversarySet,
-    notifyPhotoChanged 
+    notifyPhotoChanged,
+    notifyLoveMeterMilestone,
   } = useNotifyPartner();
+  const { scheduleAnniversaryReminder } = useNotifications();
+  const lastMilestoneRef = React.useRef(0);
   const [activeSection, setActiveSection] = useState('profile');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showBucketModal, setShowBucketModal] = useState(false);
@@ -93,6 +97,18 @@ export default function ProfileScreen({ navigation }) {
   const [pinStep, setPinStep] = useState(1);
 
   // Handlers pour thème et PIN
+  // ✅ Fonction pour vérifier les paliers du Love Meter
+  const checkLoveMeterMilestone = (newValue) => {
+    const milestones = [25, 50, 75, 100];
+    for (const milestone of milestones) {
+      if (newValue >= milestone && lastMilestoneRef.current < milestone) {
+        lastMilestoneRef.current = milestone;
+        notifyLoveMeterMilestone(milestone);
+        break;
+      }
+    }
+  };
+
   const handleThemeChange = (themeId) => {
     changeTheme(themeId);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -330,7 +346,10 @@ export default function ProfileScreen({ navigation }) {
     await notifyLoveNote(newNote);
     
     // Augmenter le love meter
-    await updateLoveMeter(loveMeter + 2);
+    const newLoveMeter = loveMeter + 2;
+    await updateLoveMeter(newLoveMeter);
+    // ✅ Vérifier si on atteint un palier du Love Meter (25, 50, 75, 100)
+    checkLoveMeterMilestone(newLoveMeter);
     
     setNewNote('');
     setShowNoteModal(false);
@@ -366,7 +385,10 @@ export default function ProfileScreen({ navigation }) {
     // Envoyer notification au partenaire
     await notifyLoveNote(message);
     
-    await updateLoveMeter(loveMeter + 1);
+    const newLoveMeter = loveMeter + 1;
+    await updateLoveMeter(newLoveMeter);
+    // ✅ Vérifier palier Love Meter
+    checkLoveMeterMilestone(newLoveMeter);
     Alert.alert('💕', 'Message envoyé !');
   };
 
@@ -380,7 +402,10 @@ export default function ProfileScreen({ navigation }) {
     
     // Augmenter le love meter quand on complète un élément
     if (item && !item.completed) {
-      await updateLoveMeter(loveMeter + 5);
+      const newLoveMeter = loveMeter + 5;
+      await updateLoveMeter(newLoveMeter);
+      // ✅ Vérifier palier Love Meter
+      checkLoveMeterMilestone(newLoveMeter);
       // Envoyer notification au partenaire
       await notifyBucket(item.text);
       Alert.alert('🎉', 'Félicitations ! Un rêve réalisé !');
@@ -428,7 +453,15 @@ export default function ProfileScreen({ navigation }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     // Notifier le partenaire
     await notifyAnniversarySet(formattedDate);
-    Alert.alert('✅', 'Date d\'anniversaire mise à jour !\n\nLe compteur de jours est maintenant actif 💕');
+    // ✅ Programmer le rappel la veille de l'anniversaire
+    try {
+      if (scheduleAnniversaryReminder) {
+        await scheduleAnniversaryReminder(formattedDate, couple?.name || 'notre couple');
+      }
+    } catch (e) {
+      console.warn('⚠️ Erreur programmation rappel anniversaire:', e.message);
+    }
+    Alert.alert('✅', 'Date d\'anniversaire mise à jour !\n\nLe compteur de jours est maintenant actif 💕\nRappel programmé la veille 🎂');
   };
 
   const handleSelectAvatar = async (avatar) => {

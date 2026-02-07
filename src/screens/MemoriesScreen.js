@@ -81,7 +81,7 @@ export default function MemoriesScreen() {
     scheduledLetters, addScheduledLetter, markLetterAsRead, deleteScheduledLetter, updateScheduledLetter, getDeliverableLetters,
     sharedDiary, addDiaryEntry, deleteDiaryEntry, updateDiaryEntry
   } = useData();
-  const { notifyMemory, notifyCapsule, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
+  const { notifyMemory, notifyCapsule, notifyCapsuleOpened, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
   const notifications = useNotifications();
   const [activeTab, setActiveTab] = useState('gallery');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -489,7 +489,22 @@ export default function MemoriesScreen() {
       ) : (
         <View style={styles.capsulesList}>
           {(timeCapsules || []).map((capsule, index) => (
-            <View key={`capsule-${capsule?.id || index}-${index}`} style={styles.capsuleCard}>
+            <TouchableOpacity 
+              key={`capsule-${capsule?.id || index}-${index}`} 
+              style={styles.capsuleCard}
+              activeOpacity={capsule.locked ? 1 : 0.7}
+              onPress={() => {
+                if (!capsule.locked) {
+                  // ✅ Notifier le partenaire qu'une capsule a été ouverte
+                  notifyCapsuleOpened(capsule.title);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Alert.alert('💊 ' + capsule.title, capsule.note || 'Cette capsule temporelle est ouverte ! 💕');
+                } else {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  Alert.alert('🔒 Capsule verrouillée', `Cette capsule s'ouvrira le ${formatDateTime(capsule.openDate)}`);
+                }
+              }}
+            >
               <LinearGradient
                 colors={capsule.locked ? ['#94A3B8', '#64748B'] : ['#8B5CF6', '#A855F7']}
                 style={styles.capsuleGradient}
@@ -528,7 +543,7 @@ export default function MemoriesScreen() {
                   <Text style={styles.capsuleNote}>{capsule.note}</Text>
                 )}
               </LinearGradient>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       )}
@@ -660,6 +675,8 @@ export default function MemoriesScreen() {
       // Lettre du partenaire, délivrable
       if (!letter.isRead) {
         markLetterAsRead(letter.id);
+        // ✅ Notifier l'auteur que sa lettre a été lue
+        await notifyLetterDelivered(letter.from || 'Ton amour');
       }
       setSelectedLetter(letter);
       setShowLetterModal(true);
@@ -807,9 +824,31 @@ export default function MemoriesScreen() {
   const MOOD_EMOJIS = ['😊', '🥰', '😍', '🤗', '😌', '🥺', '😢', '😤', '🤔', '✨'];
 
   const handleAddDiaryEntry = async () => {
-    // Journal is currently unavailable
-    Alert.alert('📔 Journal indisponible', "La fonctionnalité du journal intime n'est pas disponible pour le moment.");
-    return;
+    if (!newDiaryEntry.content.trim()) {
+      Alert.alert('Erreur', 'Veuillez écrire quelque chose dans votre journal');
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    try {
+      await addDiaryEntry({
+        mood: newDiaryEntry.mood,
+        content: newDiaryEntry.content,
+        author: user?.name || 'Moi',
+        authorId: user?.id,
+      });
+
+      // ✅ Notifier le partenaire qu'une entrée journal a été ajoutée
+      await notifyDiaryEntry();
+
+      setNewDiaryEntry({ mood: '😊', content: '' });
+      setShowAddModal(false);
+      Alert.alert('📖', 'Entrée ajoutée au journal intime ! 💕');
+    } catch (error) {
+      console.error('Erreur ajout journal:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter l\'entrée. Réessayez.');
+    }
   };
 
   const renderDiary = () => {
