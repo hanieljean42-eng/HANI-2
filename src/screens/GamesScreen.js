@@ -440,6 +440,9 @@ export default function GamesScreen() {
     setOnlineAnswerSent(false);
     setOnlinePartnerAnswer(null);
     setOnlineWaitingPartner(false);
+    setOnlineReadyForNext(false);
+    setOnlinePartnerReady(false);
+    setOnlineWaitingNextPartner(false);
   };
 
   // ═══════════════════════════════════════════════════════
@@ -448,6 +451,10 @@ export default function GamesScreen() {
   const [onlineAnswerSent, setOnlineAnswerSent] = useState(false);
   const [onlinePartnerAnswer, setOnlinePartnerAnswer] = useState(null);
   const [onlineWaitingPartner, setOnlineWaitingPartner] = useState(false);
+  // ✅ SYNC: Attendre que les deux joueurs cliquent "Suivant" avant d'avancer
+  const [onlineReadyForNext, setOnlineReadyForNext] = useState(false);
+  const [onlinePartnerReady, setOnlinePartnerReady] = useState(false);
+  const [onlineWaitingNextPartner, setOnlineWaitingNextPartner] = useState(false);
 
   // ✅ LISTENER: Détecte les réponses du partenaire pour Quiz/WIM/WYR en mode online
   useEffect(() => {
@@ -499,11 +506,108 @@ export default function GamesScreen() {
     }
   };
 
-  // Helper: Passer à la question suivante en mode online (reset online states)
+  // ✅ LISTENER: Détecte quand le partenaire clique "Suivant" pour synchroniser
+  useEffect(() => {
+    if (!activeGame || activeGame === 'truthordare') return;
+    if (gameMode !== 'online' || !isFirebaseReady) return;
+    if (!gameData?.answers) return;
+
+    const readyKey = `ready_next_${activeGame}_${currentQuestion}`;
+    const readyData = gameData.answers[readyKey];
+    if (!readyData) return;
+
+    const partnerReady = Object.entries(readyData).find(
+      ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+    );
+
+    if (partnerReady) {
+      console.log(`✅ Partenaire prêt pour question suivante (${readyKey})`);
+      setOnlinePartnerReady(true);
+      
+      // Si moi aussi je suis prêt, avancer automatiquement
+      if (onlineReadyForNext) {
+        console.log('🚀 Les deux joueurs sont prêts, passage à la question suivante');
+        advanceToNextQuestion();
+      }
+    }
+  }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, onlineReadyForNext, myPlayerId]);
+
+  // Helper: Avancer effectivement à la question suivante (appelé quand les 2 sont prêts)
+  const advanceToNextQuestion = () => {
+    // Reset tous les états online
+    setOnlineAnswerSent(false);
+    setOnlinePartnerAnswer(null);
+    setOnlineWaitingPartner(false);
+    setOnlineReadyForNext(false);
+    setOnlinePartnerReady(false);
+    setOnlineWaitingNextPartner(false);
+
+    if (activeGame === 'quiz') {
+      if (currentQuestion < 9) {
+        setCurrentQuestion(prev => prev + 1);
+        setQuizPhase('player1');
+        setPlayer1Answer(null);
+        setPlayer2Answer(null);
+        setQuizOpenAnswer('');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        setShowResult(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notifyGameWin('Quiz Couple');
+      }
+    } else if (activeGame === 'whoismore') {
+      if (currentQuestion < WHO_IS_MORE.length - 1) {
+        setCurrentQuestion(prev => prev + 1);
+        setWimPhase('player1');
+        setWimPlayer1Answer(null);
+        setWimPlayer2Answer(null);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        setShowResult(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notifyGameWin('Qui est le Plus');
+      }
+    } else if (activeGame === 'wouldyourather') {
+      if (currentQuestion < WOULD_YOU_RATHER.length - 1) {
+        setCurrentQuestion(prev => prev + 1);
+        setWyrPhase('player1');
+        setWyrPlayer1Choice(null);
+        setWyrPlayer2Choice(null);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        setShowResult(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notifyGameWin('Tu Préfères');
+      }
+    }
+  };
+
+  // Helper: Signaler que je suis prêt pour la question suivante (envoie signal Firebase + attend partenaire)
+  const signalReadyForNext = async () => {
+    const readyKey = `ready_next_${activeGame}_${currentQuestion}`;
+    await submitAnswer(readyKey, {
+      ready: true,
+      playerName: user?.name || 'Joueur',
+      timestamp: Date.now(),
+    }, user?.name);
+    setOnlineReadyForNext(true);
+    setOnlineWaitingNextPartner(true);
+
+    // Vérifier si le partenaire a déjà cliqué "Suivant"
+    if (onlinePartnerReady) {
+      console.log('🚀 Partenaire déjà prêt, passage immédiat');
+      advanceToNextQuestion();
+    }
+  };
+
+  // Helper: Passer à la question suivante en mode online (reset online states) — mode local uniquement
   const nextOnlineQuestion = () => {
     setOnlineAnswerSent(false);
     setOnlinePartnerAnswer(null);
     setOnlineWaitingPartner(false);
+    setOnlineReadyForNext(false);
+    setOnlinePartnerReady(false);
+    setOnlineWaitingNextPartner(false);
   };
 
   // ✅ NOUVEAU: Écouter les données du partenaire en Action/Vérité
@@ -1034,12 +1138,18 @@ export default function GamesScreen() {
     };
 
     const handleWyrNext = () => {
+      // ✅ MODE ONLINE: Signaler qu'on est prêt et attendre le partenaire
+      if (isOnline) {
+        setWyrPhase('waitingNext');
+        signalReadyForNext();
+        return;
+      }
+      // MODE LOCAL: Avancer directement
       if (currentQuestion < WOULD_YOU_RATHER.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
         setWyrPhase('player1');
         setWyrPlayer1Choice(null);
         setWyrPlayer2Choice(null);
-        if (isOnline) nextOnlineQuestion();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
         setShowResult(true);
@@ -1174,6 +1284,18 @@ export default function GamesScreen() {
                     {currentQuestion < WOULD_YOU_RATHER.length - 1 ? 'Suivant →' : 'Terminer ✓'}
                   </Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ══════ MODE ONLINE: En attente que le partenaire clique Suivant ══════ */}
+            {isOnline && wyrPhase === 'waitingNext' && (
+              <View style={styles.onlineWaitingContainer}>
+                <Text style={styles.onlineWaitingEmoji}>⏳</Text>
+                <Text style={styles.onlineWaitingTitle}>Prêt !</Text>
+                <ActivityIndicator size="large" color="#fff" style={{ marginVertical: 15 }} />
+                <Text style={styles.onlineWaitingText}>
+                  En attente de {partnerName} pour continuer...
+                </Text>
               </View>
             )}
           </>
@@ -1553,13 +1675,19 @@ export default function GamesScreen() {
     };
 
     const handleQuizNext = () => {
+      // ✅ MODE ONLINE: Signaler qu'on est prêt et attendre le partenaire
+      if (isOnline) {
+        setQuizPhase('waitingNext');
+        signalReadyForNext();
+        return;
+      }
+      // MODE LOCAL: Avancer directement
       if (currentQuestion < 9) {
         setCurrentQuestion(currentQuestion + 1);
         setQuizPhase('player1');
         setPlayer1Answer(null);
         setPlayer2Answer(null);
         setQuizOpenAnswer('');
-        if (isOnline) nextOnlineQuestion();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
         setShowResult(true);
@@ -1770,6 +1898,18 @@ export default function GamesScreen() {
                     {currentQuestion < 9 ? 'Question suivante →' : 'Voir résultats 🏆'}
                   </Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ══════ MODE ONLINE: En attente que le partenaire clique Suivant ══════ */}
+            {isOnline && quizPhase === 'waitingNext' && (
+              <View style={styles.onlineWaitingContainer}>
+                <Text style={styles.onlineWaitingEmoji}>⏳</Text>
+                <Text style={styles.onlineWaitingTitle}>Prêt !</Text>
+                <ActivityIndicator size="large" color="#fff" style={{ marginVertical: 15 }} />
+                <Text style={styles.onlineWaitingText}>
+                  En attente de {partnerName} pour continuer...
+                </Text>
               </View>
             )}
           </>
@@ -2229,12 +2369,18 @@ export default function GamesScreen() {
     };
 
     const handleWimNext = () => {
+      // ✅ MODE ONLINE: Signaler qu'on est prêt et attendre le partenaire
+      if (isOnline) {
+        setWimPhase('waitingNext');
+        signalReadyForNext();
+        return;
+      }
+      // MODE LOCAL: Avancer directement
       if (currentQuestion < WHO_IS_MORE.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
         setWimPhase('player1');
         setWimPlayer1Answer(null);
         setWimPlayer2Answer(null);
-        if (isOnline) nextOnlineQuestion();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
         setShowResult(true);
@@ -2396,6 +2542,18 @@ export default function GamesScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
+              </View>
+            )}
+
+            {/* ══════ MODE ONLINE: En attente que le partenaire clique Suivant ══════ */}
+            {isOnline && wimPhase === 'waitingNext' && (
+              <View style={styles.onlineWaitingContainer}>
+                <Text style={styles.onlineWaitingEmoji}>⏳</Text>
+                <Text style={styles.onlineWaitingTitle}>Prêt !</Text>
+                <ActivityIndicator size="large" color="#fff" style={{ marginVertical: 15 }} />
+                <Text style={styles.onlineWaitingText}>
+                  En attente de {partnerName} pour continuer...
+                </Text>
               </View>
             )}
 
