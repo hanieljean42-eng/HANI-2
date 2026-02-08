@@ -384,11 +384,11 @@ export function NotificationProvider({ children }) {
         return false;
       }
 
-      // Créer le trigger approprié
+      // Créer le trigger approprié (useNextNotificationsApi: true requiert le type)
       let trigger;
       if (typeof triggerOptions === 'number') {
-        // Compatibilité avec l'ancienne API (seconds)
-        trigger = { seconds: triggerOptions };
+        // Compatibilité avec l'ancienne API (seconds) — ajout du type requis
+        trigger = { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: triggerOptions };
       } else if (triggerOptions.date) {
         // Notification à une date précise
         const targetDate = new Date(triggerOptions.date);
