@@ -697,8 +697,9 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // À l'initialisation, reprogrammer les notifications de lettres existantes si besoin
+  // À l'initialisation, reprogrammer les notifications de lettres REÇUES (du partenaire)
   useEffect(() => {
+    if (!authUser?.id) return;
     (async () => {
       try {
         const stored = await AsyncStorage.getItem('@scheduledLetters');
@@ -708,8 +709,9 @@ export function NotificationProvider({ children }) {
         const notifs = letterNotifs ? JSON.parse(letterNotifs) : {};
 
         for (const l of letters) {
-          // Ne programmer que si pas encore programmé et si future
-          if (l && l.id && !notifs[l.id]) {
+          // ✅ Ne programmer que les lettres REÇUES du partenaire (pas les miennes)
+          // Si fromId === mon id, c'est ma lettre → pas de notification pour moi
+          if (l && l.id && !notifs[l.id] && l.fromId && l.fromId !== authUser.id) {
             const date = new Date(l.deliveryDate);
             if (date > new Date()) {
               await scheduleLetterNotification(l.id, l.title, l.content, l.deliveryDate, l.from || '');
@@ -720,7 +722,7 @@ export function NotificationProvider({ children }) {
         console.warn('⚠️ Erreur reprogrammation lettres:', e.message);
       }
     })();
-  }, [coupleId]);
+  }, [coupleId, authUser?.id]);
 
   // Annuler une notification de lettre
   const cancelLetterNotification = async (letterId) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -107,6 +107,29 @@ export default function MemoriesScreen() {
   const [newDiaryEntry, setNewDiaryEntry] = useState({ mood: '😊', content: '' });
   const [selectedLetter, setSelectedLetter] = useState(null);
   const [showLetterModal, setShowLetterModal] = useState(false);
+
+  // ✅ Détecter les lettres du partenaire devenues délivrables → notification locale au DESTINATAIRE
+  const deliverableCheckDone = useRef(false);
+  useEffect(() => {
+    if (!scheduledLetters || !user?.id || deliverableCheckDone.current) return;
+    deliverableCheckDone.current = true;
+    
+    const partnerLetters = scheduledLetters.filter(l => l.fromId && l.fromId !== user.id);
+    const unreadDeliverable = partnerLetters.filter(l => isLetterDeliverable(l) && !l.isRead);
+    
+    if (unreadDeliverable.length > 0 && notifications?.scheduleLocalNotification) {
+      const count = unreadDeliverable.length;
+      const from = unreadDeliverable[0].from || 'Ton amour';
+      notifications.scheduleLocalNotification(
+        '💌 Lettre d\'amour !',
+        count === 1 
+          ? `${from} t'a écrit une lettre d'amour ! Ouvre-la vite ! 💕`
+          : `Tu as ${count} lettres d'amour à lire ! 💕`,
+        { type: 'letter_delivered' },
+        { seconds: 1 }
+      );
+    }
+  }, [scheduledLetters, user?.id]);
 
   // Convertir une image/vidéo en base64 pour la synchronisation
   // Avec compression pour éviter les fichiers trop volumineux
@@ -388,7 +411,7 @@ export default function MemoriesScreen() {
                         </View>
                       </View>
                     ) : (
-                      <Image source={mediaSource} style={styles.galleryImage} />
+                      <Image source={mediaSource} style={styles.galleryImage} resizeMode="cover" />
                     )
                   ) : (
                     <LinearGradient
@@ -638,17 +661,11 @@ export default function MemoriesScreen() {
         deliveryDate: isoDate,
       });
 
-      // Notifier le partenaire qu'une lettre a été programmée
+      // Notifier le partenaire qu'une lettre a été programmée (push notification)
       await notifyScheduledLetter();
 
-      // Planifier localement la notification de livraison (sur cet appareil)
-      try {
-        if (notifications && notifications.scheduleLetterNotification) {
-          await notifications.scheduleLetterNotification(letter.id, letter.title, letter.content, isoDate, user?.name || '');
-        }
-      } catch (e) {
-        console.warn('⚠️ Impossible de planifier notification lettre localement:', e.message);
-      }
+      // Note: la notification de livraison sera déclenchée automatiquement
+      // sur l'appareil du destinataire quand il ouvre l'app et la lettre est délivrable
 
       // Remise à zéro du form
       setNewLetter({ title: '', content: '', deliveryDate: '', deliveryTime: '' });
@@ -1702,6 +1719,7 @@ const styles = StyleSheet.create({
   galleryImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   galleryPlaceholder: {
     width: '100%',
@@ -2018,9 +2036,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewImage: {
-    width: 200,
-    height: 150,
+    width: width - 100,
+    height: 250,
     borderRadius: 15,
+    resizeMode: 'contain',
+    backgroundColor: '#f8f8f8',
   },
   removeImage: {
     position: 'absolute',
