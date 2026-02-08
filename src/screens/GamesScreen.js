@@ -689,8 +689,9 @@ export default function GamesScreen() {
           text: choiceData.type === 'truth' ? '💬 Vérité' : '⚡ Action',
           round: todRound,
         });
-        // Si le partenaire a choisi, je dois écrire la question (je suis le questioner en attente)
-        setTodPhase('writeQuestion');
+        // Le partenaire (questioner) a choisi le type, il va écrire la question
+        // Moi (répondeur) j'attends qu'il l'envoie
+        setTodPhase('waitQuestion');
       }
     }
     
@@ -781,10 +782,11 @@ export default function GamesScreen() {
     // 5. Écouter le signal "prêt pour le tour suivant" du partenaire
     const readyKey = `ready_next_tod_${todRound}`;
     const readyData = findPartnerData(readyKey);
-    if (readyData && !alreadyProcessed(`ready_${todRound}`)) {
-      console.log('✅ Partenaire prêt pour le tour suivant');
-      // Si moi aussi j'attends la sync, avancer
-      if (todWaitingNextSync) {
+    if (readyData) {
+      // ✅ Ne marquer comme traité QUE si on est en attente de sync
+      // Sinon le signal sera re-traité quand todWaitingNextSync deviendra true
+      if (todWaitingNextSync && !alreadyProcessed(`ready_${todRound}`)) {
+        console.log('✅ Partenaire prêt pour le tour suivant → on avance');
         advanceToNextTodRound();
       }
     }
@@ -1121,6 +1123,9 @@ export default function GamesScreen() {
     
     // Synchroniser la réaction en mode online
     if (gameMode === 'online' && isFirebaseReady) {
+      // ✅ Set waiting AVANT d'envoyer à Firebase pour éviter la race condition
+      setTodWaitingNextSync(true);
+      
       await submitAnswer(`tod_reaction_${todRound}`, {
         reaction: emoji,
         reactedBy: myName,
@@ -1134,7 +1139,6 @@ export default function GamesScreen() {
         playerName: myName,
         timestamp: Date.now(),
       }, myName);
-      setTodWaitingNextSync(true);
       
       // Vérifier si le partenaire est déjà prêt
       const readyKey = `ready_next_tod_${todRound}`;
@@ -1159,13 +1163,15 @@ export default function GamesScreen() {
     const myName = user?.name || 'Moi';
     
     if (gameMode === 'online' && isFirebaseReady) {
+      // ✅ Set waiting AVANT d'envoyer à Firebase pour éviter la race condition
+      setTodWaitingNextSync(true);
+      
       // Signaler "prêt pour le tour suivant" et attendre le partenaire
       await submitAnswer(`ready_next_tod_${todRound}`, {
         ready: true,
         playerName: myName,
         timestamp: Date.now(),
       }, myName);
-      setTodWaitingNextSync(true);
       
       // Vérifier si le partenaire est déjà prêt
       const readyKey = `ready_next_tod_${todRound}`;
