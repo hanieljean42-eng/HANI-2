@@ -11,9 +11,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { database, isConfigured } from '../config/firebase';
-import { ref, get } from 'firebase/database';
-import NetInfo from '@react-native-community/netinfo';
 
 export default function JoinCoupleScreen() {
   const { user, joinCouple, createCouple, logout } = useAuth();
@@ -92,56 +89,13 @@ export default function JoinCoupleScreen() {
           '📝 Vérifiez que:\n' +
           '• Votre partenaire a bien créé son espace couple\n' +
           '• Vous avez entré le bon code (6 caractères)\n' +
-          '• Votre partenaire vous a partagé le code exact\n\n' +
-          '💡 Appuyez sur "🔍 Diagnostic" pour voir les codes disponibles.';
+          '• Votre partenaire vous a partagé le code exact';
       }
       Alert.alert('Erreur de jonction', errorMsg);
     }
   };
 
-  // Fonction de diagnostic Firebase
-  const runDiagnostic = async () => {
-    let diagnosticResult = '📊 DIAGNOSTIC FIREBASE\n\n';
-    
-    // 1. Vérifier la connexion internet
-    const netState = await NetInfo.fetch();
-    diagnosticResult += `📶 Internet: ${netState.isConnected ? '✅ Connecté' : '❌ Déconnecté'}\n`;
-    diagnosticResult += `📡 Type: ${netState.type}\n\n`;
-    
-    // 2. Vérifier la config Firebase
-    diagnosticResult += `🔧 Firebase configuré: ${isConfigured ? '✅ Oui' : '❌ Non'}\n`;
-    diagnosticResult += `🗄️ Database: ${database ? '✅ OK' : '❌ Non initialisée'}\n\n`;
-    
-    // 3. Lister les couples sur Firebase
-    if (isConfigured && database) {
-      try {
-        const couplesRef = ref(database, 'couples');
-        const snapshot = await get(couplesRef);
-        
-        if (snapshot.exists()) {
-          const couples = snapshot.val();
-          const coupleList = Object.entries(couples);
-          diagnosticResult += `👥 Couples trouvés: ${coupleList.length}\n\n`;
-          diagnosticResult += '📋 CODES DISPONIBLES:\n';
-          
-          coupleList.forEach(([id, data]) => {
-            diagnosticResult += `• ${data.code || 'SANS CODE'} (${data.name || 'Sans nom'})\n`;
-          });
-        } else {
-          diagnosticResult += '❌ Aucun couple sur Firebase\n';
-          diagnosticResult += '→ Votre partenaire doit d\'abord créer un espace couple.\n';
-        }
-      } catch (error) {
-        diagnosticResult += `❌ Erreur Firebase: ${error.message}\n`;
-        diagnosticResult += '\n⚠️ Les règles Firebase peuvent bloquer la lecture.\n';
-        diagnosticResult += 'Vérifiez la console Firebase.';
-      }
-    } else {
-      diagnosticResult += '❌ Impossible de se connecter à Firebase\n';
-    }
-    
-    Alert.alert('Diagnostic', diagnosticResult);
-  };
+
 
   if (mode === 'choice') {
     return (
@@ -326,13 +280,6 @@ export default function JoinCoupleScreen() {
             onPress={handleJoinCouple}
           >
             <Text style={styles.submitButtonText}>Rejoindre 💕</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.submitButton, { backgroundColor: 'rgba(255,255,255,0.2)', marginTop: 15 }]}
-            onPress={runDiagnostic}
-          >
-            <Text style={styles.submitButtonText}>🔍 Diagnostic Firebase</Text>
           </TouchableOpacity>
         </ScrollView>
       </LinearGradient>
