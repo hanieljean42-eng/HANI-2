@@ -787,27 +787,15 @@ export default function GamesScreen() {
     }
   };
 
-  const startGame = (game) => {
-    // Proposer le choix : online (lobby) ou local (même téléphone)
-    Alert.alert(
-      getGameTitle(game),
-      'Comment voulez-vous jouer ?',
-      [
-        {
-          text: '🌐 À distance',
-          onPress: () => openGameLobby(game),
-        },
-        {
-          text: '📱 Même téléphone',
-          onPress: () => {
-            resetAllGameStates();
-            setGameMode('local');
-            setActiveGame(game);
-          },
-        },
-        { text: 'Annuler', style: 'cancel' },
-      ]
-    );
+  const startGameLocal = (game) => {
+    resetAllGameStates();
+    setGameMode('local');
+    setActiveGame(game);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const startGameOnline = (game) => {
+    openGameLobby(game);
   };
 
   const nextQuestion = () => {
@@ -1361,9 +1349,18 @@ export default function GamesScreen() {
       <View style={styles.lobbyOverlay}>
         <View style={styles.lobbyContent}>
           <Text style={styles.lobbyTitle}>{getGameTitle(selectedGameForLobby)}</Text>
-          <Text style={styles.lobbySubtitle}>Jouez à distance, chacun sur votre téléphone</Text>
+          <Text style={styles.lobbySubtitle}>Mode à distance — chacun sur son téléphone</Text>
 
-          {/* Mode En ligne - Créer */}
+          {/* Indicateur partenaire */}
+          {partner && (
+            <View style={styles.partnerIndicator}>
+              <Text style={styles.partnerIndicatorText}>
+                {partnerOnline ? '🟢' : '⚪'} {partner.name} {partnerOnline ? 'est connecté(e)' : ''}
+              </Text>
+            </View>
+          )}
+
+          {/* Créer une partie */}
           <TouchableOpacity
             style={[styles.lobbyOption, waitingForPartner && styles.lobbyOptionActive]}
             onPress={handleCreateGame}
@@ -1375,31 +1372,33 @@ export default function GamesScreen() {
             >
               {isCreatingGame ? (
                 <ActivityIndicator color="#fff" size="large" />
+              ) : waitingForPartner ? (
+                <>
+                  <ActivityIndicator color="#fff" size="small" style={{ marginRight: 15 }} />
+                  <View style={styles.lobbyOptionTextContainer}>
+                    <Text style={styles.lobbyOptionTitle}>En attente de {partner?.name || 'partenaire'}...</Text>
+                    <Text style={styles.lobbyOptionDesc}>La partie commencera automatiquement</Text>
+                  </View>
+                </>
               ) : (
                 <>
-                  <Text style={styles.lobbyOptionIcon}>{waitingForPartner ? '⏳' : '🎮'}</Text>
+                  <Text style={styles.lobbyOptionIcon}>🎮</Text>
                   <View style={styles.lobbyOptionTextContainer}>
-                    <Text style={styles.lobbyOptionTitle}>
-                      {waitingForPartner ? 'En attente...' : 'Créer une partie'}
-                    </Text>
-                    <Text style={styles.lobbyOptionDesc}>
-                      {waitingForPartner 
-                        ? `${partner?.name || 'Partenaire'} doit rejoindre` 
-                        : 'Votre partenaire rejoint ensuite'}
-                    </Text>
+                    <Text style={styles.lobbyOptionTitle}>Créer une partie</Text>
+                    <Text style={styles.lobbyOptionDesc}>{partner?.name || 'Partenaire'} recevra une notification</Text>
                   </View>
                 </>
               )}
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Mode En ligne - Rejoindre */}
+          {/* Rejoindre une partie */}
           <TouchableOpacity
             style={styles.lobbyOption}
             onPress={handleJoinGame}
             disabled={isJoiningGame || waitingForPartner}
           >
-            <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.lobbyOptionGradient}>
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.lobbyOptionGradient}>
               {isJoiningGame ? (
                 <ActivityIndicator color="#fff" size="large" />
               ) : (
@@ -1407,21 +1406,12 @@ export default function GamesScreen() {
                   <Text style={styles.lobbyOptionIcon}>🤝</Text>
                   <View style={styles.lobbyOptionTextContainer}>
                     <Text style={styles.lobbyOptionTitle}>Rejoindre la partie</Text>
-                    <Text style={styles.lobbyOptionDesc}>Si votre partenaire a créé une partie</Text>
+                    <Text style={styles.lobbyOptionDesc}>Si {partner?.name || 'partenaire'} a déjà créé une partie</Text>
                   </View>
                 </>
               )}
             </LinearGradient>
           </TouchableOpacity>
-
-          {/* Indicateur partenaire */}
-          {partner && (
-            <View style={styles.partnerIndicator}>
-              <Text style={styles.partnerIndicatorText}>
-                {partnerOnline ? '🟢' : '🔴'} {partner.name} {partnerOnline ? 'est disponible' : 'est hors ligne'}
-              </Text>
-            </View>
-          )}
 
           {/* Bouton Annuler */}
           <TouchableOpacity
@@ -1500,7 +1490,7 @@ export default function GamesScreen() {
 
   const renderGameSelector = () => (
     <ScrollView contentContainerStyle={styles.gamesGrid}>
-      {/* Bannière si une invitation est en attente */}
+      {/* ═══ Bannière invitation en attente ═══ */}
       {pendingGameInvite && !showInviteModal && (
         <TouchableOpacity 
           style={styles.inviteBanner}
@@ -1521,42 +1511,62 @@ export default function GamesScreen() {
         </TouchableOpacity>
       )}
 
-      {/* SECTION JOUER À DISTANCE */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* ═══ SECTION 1 : JOUER À DISTANCE ═══ */}
+      {/* ═══════════════════════════════════════════════════ */}
       <View style={styles.distanceSection}>
         <Text style={styles.distanceSectionTitle}>🌐 JOUER À DISTANCE</Text>
         <Text style={styles.distanceSectionDesc}>
-          Jouez avec votre partenaire même à distance !
+          Chacun sur son téléphone, jouez où que vous soyez !
         </Text>
-        
-        <View style={styles.distanceButtonsRow}>
-          {/* Bouton Créer une partie */}
+
+        {/* 4 cartes de jeux à distance */}
+        <View style={styles.onlineGamesGrid}>
           <TouchableOpacity 
-            style={styles.distanceButton}
-            onPress={() => {
-              // ✅ Proposer le choix du jeu au lieu de forcer quiz
-              Alert.alert(
-                '🎮 Choisir un jeu',
-                'Quel jeu voulez-vous jouer \u00e0 distance ?',
-                [
-                  { text: '🧠 Quiz Couple', onPress: () => openGameLobby('quiz') },
-                  { text: '🏆 Qui est le Plus', onPress: () => openGameLobby('whoismore') },
-                  { text: '🤔 Tu Pr\u00e9f\u00e8res', onPress: () => openGameLobby('wouldyourather') },
-                  { text: '🎲 Action/V\u00e9rit\u00e9', onPress: () => openGameLobby('truthordare') },
-                  { text: 'Annuler', style: 'cancel' },
-                ]
-              );
-            }}
+            style={styles.onlineGameCard}
+            onPress={() => startGameOnline('quiz')}
           >
-            <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.distanceButtonGradient}>
-              <Text style={styles.distanceButtonIcon}>🎮</Text>
-              <Text style={styles.distanceButtonText}>CRÉER</Text>
-              <Text style={styles.distanceButtonSubtext}>une partie</Text>
+            <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.onlineGameGradient}>
+              <Text style={styles.onlineGameIcon}>🧠</Text>
+              <Text style={styles.onlineGameTitle}>Quiz</Text>
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Bouton Rejoindre une partie */}
           <TouchableOpacity 
-            style={styles.distanceButton}
+            style={styles.onlineGameCard}
+            onPress={() => startGameOnline('truthordare')}
+          >
+            <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.onlineGameGradient}>
+              <Text style={styles.onlineGameIcon}>🎲</Text>
+              <Text style={styles.onlineGameTitle}>Action/Vérité</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.onlineGameCard}
+            onPress={() => startGameOnline('whoismore')}
+          >
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.onlineGameGradient}>
+              <Text style={styles.onlineGameIcon}>🏆</Text>
+              <Text style={styles.onlineGameTitle}>Qui est le +</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.onlineGameCard}
+            onPress={() => startGameOnline('wouldyourather')}
+          >
+            <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.onlineGameGradient}>
+              <Text style={styles.onlineGameIcon}>🤔</Text>
+              <Text style={styles.onlineGameTitle}>Tu Préfères</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bouton Rejoindre si une partie existe */}
+        {hasActiveSession && gameSession && gameSession.createdBy !== myPlayerId && (
+          <TouchableOpacity
+            style={styles.joinActiveButton}
             onPress={async () => {
               setIsJoiningGame(true);
               const result = await joinGameSession(user?.name || 'Joueur 2');
@@ -1564,58 +1574,57 @@ export default function GamesScreen() {
               
               if (result && !result.error) {
                 setGameMode('online');
-                const gameType = result.gameType || gameSession?.gameType;
-                Alert.alert('🎉 Connecté !', `Vous rejoignez ${getGameTitle(gameType)}`);
-                // ✅ Toujours démarrer le jeu après join réussi
-                // (joinGameSession retourne maintenant les données fraîches avec status='ready')
                 resetAllGameStates();
-                setActiveGame(gameType);
+                setActiveGame(result.gameType || gameSession?.gameType);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               } else {
-                Alert.alert(
-                  '😕 Aucune partie',
-                  result?.error || 'Votre partenaire n\'a pas encore créé de partie.\n\nDemandez-lui de cliquer sur "CRÉER une partie" d\'abord !',
-                  [{ text: 'OK' }]
-                );
+                Alert.alert('Erreur', result?.error || 'Impossible de rejoindre');
               }
             }}
             disabled={isJoiningGame}
           >
-            <LinearGradient colors={['#10B981', '#059669']} style={styles.distanceButtonGradient}>
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.joinActiveGradient}>
               {isJoiningGame ? (
-                <ActivityIndicator color="#fff" size="large" />
+                <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <>
-                  <Text style={styles.distanceButtonIcon}>🤝</Text>
-                  <Text style={styles.distanceButtonText}>REJOINDRE</Text>
-                  <Text style={styles.distanceButtonSubtext}>la partie</Text>
-                </>
+                <Text style={styles.joinActiveText}>
+                  🤝 Rejoindre {getGameTitle(gameSession.gameType)} de {partner?.name || 'Partenaire'}
+                </Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
-        </View>
+        )}
 
-        {/* Indicateur de session active */}
-        {hasActiveSession && gameSession && (
+        {/* Session active indicator */}
+        {hasActiveSession && gameSession && gameSession.createdBy === myPlayerId && waitingForPartner && (
           <View style={styles.activeSessionBanner}>
+            <ActivityIndicator size="small" color="#fff" style={{ marginBottom: 5 }} />
             <Text style={styles.activeSessionText}>
-              ⚡ Session active: {getGameTitle(gameSession.gameType)} 
-              {waitingForPartner ? ' (en attente...)' : ' (prêt!)'}
+              ⏳ En attente de {partner?.name || 'Partenaire'} pour {getGameTitle(gameSession.gameType)}
             </Text>
+            <TouchableOpacity
+              style={styles.cancelSessionButton}
+              onPress={() => endGameSession()}
+            >
+              <Text style={styles.cancelSessionText}>✕ Annuler</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
 
-      {/* Séparateur */}
+      {/* ═══ Séparateur ═══ */}
       <View style={styles.sectionSeparator}>
         <View style={styles.separatorLine} />
-        <Text style={styles.separatorText}>OU JOUER ENSEMBLE</Text>
+        <Text style={styles.separatorText}>📱 MÊME TÉLÉPHONE</Text>
         <View style={styles.separatorLine} />
       </View>
 
-      {/* SECTION JEUX */}
-      <Text style={styles.gamesSectionTitle}>📱 Jeux sur le même téléphone</Text>
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* ═══ SECTION 2 : JEUX EN LOCAL ═══ */}
+      {/* ═══════════════════════════════════════════════════ */}
+      <Text style={styles.gamesSectionTitle}>Passez-vous le téléphone pour jouer ensemble</Text>
 
-      <TouchableOpacity style={styles.gameCard} onPress={() => startGame('quiz')}>
+      <TouchableOpacity style={styles.gameCard} onPress={() => startGameLocal('quiz')}>
         <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.gameGradient}>
           <Text style={styles.gameIcon}>🧠</Text>
           <Text style={styles.gameTitle}>Quiz Couple</Text>
@@ -1623,7 +1632,7 @@ export default function GamesScreen() {
         </LinearGradient>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.gameCard} onPress={() => startGame('truthordare')}>
+      <TouchableOpacity style={styles.gameCard} onPress={() => startGameLocal('truthordare')}>
         <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.gameGradient}>
           <Text style={styles.gameIcon}>🎲</Text>
           <Text style={styles.gameTitle}>Action ou Vérité</Text>
@@ -1631,7 +1640,7 @@ export default function GamesScreen() {
         </LinearGradient>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.gameCard} onPress={() => startGame('whoismore')}>
+      <TouchableOpacity style={styles.gameCard} onPress={() => startGameLocal('whoismore')}>
         <LinearGradient colors={['#10B981', '#059669']} style={styles.gameGradient}>
           <Text style={styles.gameIcon}>🏆</Text>
           <Text style={styles.gameTitle}>Qui est le Plus...</Text>
@@ -1639,7 +1648,7 @@ export default function GamesScreen() {
         </LinearGradient>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.gameCard} onPress={() => startGame('wouldyourather')}>
+      <TouchableOpacity style={styles.gameCard} onPress={() => startGameLocal('wouldyourather')}>
         <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.gameGradient}>
           <Text style={styles.gameIcon}>🤔</Text>
           <Text style={styles.gameTitle}>Tu Préfères...</Text>
@@ -3822,6 +3831,70 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 15,
   },
+  // Grille 2x2 des jeux en ligne
+  onlineGamesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  onlineGameCard: {
+    width: '47%',
+    borderRadius: 18,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  onlineGameGradient: {
+    paddingVertical: 20,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onlineGameIcon: {
+    fontSize: 36,
+    marginBottom: 6,
+  },
+  onlineGameTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  // Bouton rejoindre partie active
+  joinActiveButton: {
+    marginTop: 15,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  joinActiveGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinActiveText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  // Bouton annuler session
+  cancelSessionButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 15,
+    marginTop: 8,
+  },
+  cancelSessionText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
   distanceButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -3857,12 +3930,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
   },
   activeSessionBanner: {
-    backgroundColor: 'rgba(16, 185, 129, 0.3)',
-    borderRadius: 10,
-    padding: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 15,
+    padding: 15,
     marginTop: 15,
     borderWidth: 1,
-    borderColor: '#10B981',
+    borderColor: '#F59E0B',
+    alignItems: 'center',
   },
   activeSessionText: {
     color: '#fff',
