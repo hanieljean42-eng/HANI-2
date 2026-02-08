@@ -12,6 +12,7 @@ import {
   Image,
   Alert,
   Animated,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -122,6 +123,19 @@ export default function ChatScreen({ navigation }) {
       }, 100);
     }
   }, [messages.length]);
+
+  // Scroll en bas quand le clavier s'ouvre (pour ne pas cacher les messages)
+  useEffect(() => {
+    const keyboardShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 150);
+      }
+    );
+    return () => keyboardShow.remove();
+  }, []);
 
   const handleSend = async () => {
     if (!chatAvailable) {
@@ -498,6 +512,12 @@ export default function ChatScreen({ navigation }) {
         </View>
       )}
 
+      {/* Messages + Input wrapped in KeyboardAvoidingView */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        style={{ flex: 1 }}
+      >
       {/* Messages */}
       <View style={styles.messagesContainer}>
         <FlatList
@@ -507,6 +527,8 @@ export default function ChatScreen({ navigation }) {
           keyExtractor={(item, index) => item?.id || `msg-${index}`}
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
           ListEmptyComponent={
             <View style={styles.emptyChat}>
               <Text style={styles.emptyChatEmoji}>💬</Text>
@@ -520,10 +542,6 @@ export default function ChatScreen({ navigation }) {
       </View>
 
       {/* Input */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
         {isRecording ? (
           // Interface d'enregistrement vocal
           <View style={styles.recordingContainer}>

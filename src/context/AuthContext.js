@@ -60,6 +60,8 @@ export function AuthProvider({ children }) {
             name: data.name || prev?.name,
             anniversary: data.anniversary || prev?.anniversary,
             loveMeter: data.loveMeter || 0,
+            couplePhoto: data.couplePhoto || prev?.couplePhoto || null,
+            couplePhotoPublicId: data.couplePhotoPublicId || prev?.couplePhotoPublicId || null,
           };
           AsyncStorage.setItem('@couple', JSON.stringify(updated));
           return updated;
