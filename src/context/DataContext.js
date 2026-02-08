@@ -24,6 +24,9 @@ export function DataProvider({ children }) {
   const [scheduledLetters, setScheduledLetters] = useState([]);
   const [sharedDiary, setSharedDiary] = useState([]);
   const [isDataSynced, setIsDataSynced] = useState(false);
+  
+  // 🔥 Système de flammes/streaks
+  const [streak, setStreak] = useState({ count: 0, lastDate: null, bestStreak: 0 });
 
   // Référence pour éviter les boucles
   const coupleIdRef = useRef(null);
@@ -112,6 +115,12 @@ export function DataProvider({ children }) {
           AsyncStorage.setItem('@quizScores', JSON.stringify(data.quizScores));
         }
         
+        // 🔥 Streak
+        if (data.streak) {
+          setStreak(data.streak);
+          AsyncStorage.setItem('@streak', JSON.stringify(data.streak));
+        }
+        
         setIsDataSynced(true);
       } else {
         console.log('📭 Aucune donnée couple trouvée sur Firebase');
@@ -156,7 +165,7 @@ export function DataProvider({ children }) {
     try {
       const keys = [
         '@memories', '@challenges', '@quizScores', '@loveMeter',
-        '@bucketList', '@loveNotes', '@timeCapsules', '@scheduledLetters', '@sharedDiary'
+        '@bucketList', '@loveNotes', '@timeCapsules', '@scheduledLetters', '@sharedDiary', '@streak'
       ];
       const results = await AsyncStorage.multiGet(keys);
       
@@ -175,6 +184,7 @@ export function DataProvider({ children }) {
               case '@timeCapsules': if (Array.isArray(data)) setTimeCapsules(data); break;
               case '@scheduledLetters': if (Array.isArray(data)) setScheduledLetters(data); break;
               case '@sharedDiary': if (Array.isArray(data)) setSharedDiary(data); break;
+              case '@streak': if (data && typeof data === 'object') setStreak(data); break;
             }
           } catch (parseError) {
             console.error(`Erreur parsing ${key}:`, parseError);
@@ -839,6 +849,103 @@ export function DataProvider({ children }) {
     }
   };
 
+  // 🔥 FLAMMES/STREAKS: Enregistrer une interaction du joueur actuel
+  // Appelé quand l'utilisateur interagit (chat, jeux, souvenirs, défis)
+  // Le streak augmente quand LES DEUX ont interagi dans la même journée
+  const recordInteraction = async () => {
+    const today = new Date().toISOString().split('T')[0]; // "2026-02-08"
+    const myId = user?.id || user?.name || 'unknown';
+    
+    if (!couple?.id) return;
+
+    try {
+      // Lire le streak actuel depuis Firebase ou local
+      let currentStreak = { ...streak };
+      
+      // Marquer mon interaction pour aujourd'hui
+      if (!currentStreak.interactions) currentStreak.interactions = {};
+      
+      // Déjà interagi aujourd'hui ? Ne rien faire
+      if (currentStreak.interactions[myId] === today) return;
+      
+      currentStreak.interactions[myId] = today;
+      
+      // Vérifier si les DEUX ont interagi aujourd'hui
+      const interactionDates = Object.values(currentStreak.interactions);
+      const bothInteractedToday = interactionDates.filter(d => d === today).length >= 2;
+      
+      if (bothInteractedToday) {
+        // Les deux ont interagi aujourd'hui !
+        const lastDate = currentStreak.lastDate;
+        
+        // Vérifier si c'est consécutif (hier)
+        if (lastDate) {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toISOString().split('T')[0];
+          
+          if (lastDate === yesterdayStr) {
+            // Jour consécutif → augmenter le streak
+            currentStreak.count = (currentStreak.count || 0) + 1;
+          } else if (lastDate === today) {
+            // Déjà compté aujourd'hui, ne pas re-incrémenter
+          } else {
+            // Série cassée → reset à 1
+            currentStreak.count = 1;
+          }
+        } else {
+          // Premier jour → streak = 1
+          currentStreak.count = 1;
+        }
+        
+        currentStreak.lastDate = today;
+        
+        // Mettre à jour le meilleur streak
+        if (currentStreak.count > (currentStreak.bestStreak || 0)) {
+          currentStreak.bestStreak = currentStreak.count;
+        }
+      }
+      
+      // Sauvegarder
+      setStreak(currentStreak);
+      await AsyncStorage.setItem('@streak', JSON.stringify(currentStreak));
+      
+      // Sync Firebase
+      if (isConfigured && database) {
+        const streakRef = ref(database, `couples/${couple.id}/data/streak`);
+        await set(streakRef, currentStreak);
+        if (bothInteractedToday) {
+          console.log(`🔥 Streak mis à jour: ${currentStreak.count} jours consécutifs !`);
+        }
+      }
+    } catch (e) {
+      console.log('⚠️ Erreur streak:', e.message);
+    }
+  };
+
+  // 🔥 Vérifier si le streak est cassé au démarrage (nouveau jour sans interaction hier)
+  useEffect(() => {
+    if (!streak.lastDate || streak.count === 0) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    
+    // Si la dernière interaction n'était ni aujourd'hui ni hier → streak cassé
+    if (streak.lastDate !== today && streak.lastDate !== yesterdayStr) {
+      console.log('💔 Streak cassé ! Dernier jour:', streak.lastDate);
+      const resetStreak = { ...streak, count: 0, interactions: {} };
+      setStreak(resetStreak);
+      AsyncStorage.setItem('@streak', JSON.stringify(resetStreak));
+      
+      if (couple?.id && isConfigured && database) {
+        const streakRef = ref(database, `couples/${couple.id}/data/streak`);
+        set(streakRef, resetStreak);
+      }
+    }
+  }, [streak.lastDate, couple?.id]);
+
   // Forcer la synchronisation de toutes les données
   const forceSyncAll = async () => {
     if (!couple?.id || !isConfigured || !database) {
@@ -946,6 +1053,9 @@ export function DataProvider({ children }) {
     setQuizScores: updateQuizScores,
     // Sync
     forceSyncAll,
+    // 🔥 Streaks
+    streak,
+    recordInteraction,
   };
 
   return (

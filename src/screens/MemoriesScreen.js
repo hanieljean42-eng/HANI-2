@@ -86,7 +86,8 @@ export default function MemoriesScreen() {
   const { 
     memories, addMemory, timeCapsules, addTimeCapsule, deleteMemory, deleteTimeCapsule, updateMemory,
     scheduledLetters, addScheduledLetter, markLetterAsRead, deleteScheduledLetter, updateScheduledLetter, getDeliverableLetters,
-    sharedDiary, addDiaryEntry, deleteDiaryEntry, updateDiaryEntry
+    sharedDiary, addDiaryEntry, deleteDiaryEntry, updateDiaryEntry,
+    recordInteraction
   } = useData();
   const { notifyMemory, notifyCapsule, notifyCapsuleOpened, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
   const notifications = useNotifications();
@@ -203,6 +204,8 @@ export default function MemoriesScreen() {
     setIsUploading(true);
     setUploadProgress(0);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // 🔥 Compter comme interaction pour les flammes
+    recordInteraction();
     
     let imageUrl = null;
     let publicId = null;

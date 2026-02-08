@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useGame } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useNavigation } from '@react-navigation/native';
 
@@ -299,6 +300,7 @@ export default function GamesScreen() {
   const navigation = useNavigation();
   const { user, couple, partner } = useAuth();
   const { notifyGame, notifyGameAnswer, notifyGameWin } = useNotifyPartner();
+  const { recordInteraction } = useData();
   const { 
     createGameSession, 
     joinGameSession, 
@@ -869,10 +871,14 @@ export default function GamesScreen() {
     setGameMode('local');
     setActiveGame(game);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // 🔥 Compter comme interaction pour les flammes
+    recordInteraction();
   };
 
   const startGameOnline = (game) => {
     openGameLobby(game);
+    // 🔥 Compter comme interaction pour les flammes
+    recordInteraction();
   };
 
   const nextQuestion = () => {

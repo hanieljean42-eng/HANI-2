@@ -21,13 +21,30 @@ const { width } = Dimensions.get('window');
 export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, couple, partner, isOnline, isSynced } = useAuth();
-  const { loveMeter, challenges, memories } = useData();
+  const { loveMeter, challenges, memories, streak, recordInteraction } = useData();
   const { notifyMissYou, notifyLoveNote, sendCustomNotification, notifyOnline, sendDailyReminder, sendSmartReminder } = useNotifyPartner();
   const hasNotifiedOnlineRef = React.useRef(false);
   const [daysCount, setDaysCount] = useState(0);
   const [timeTogetherText, setTimeTogetherText] = useState('');
   const [hasValidDate, setHasValidDate] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date().toDateString());
+
+  // 🔥 Enregistrer une interaction quand l'utilisateur ouvre l'app
+  useEffect(() => {
+    if (couple?.id && user?.id) {
+      recordInteraction();
+    }
+  }, [couple?.id, user?.id]);
+
+  // 🔥 Helper: niveau de flamme selon le streak
+  const getStreakLevel = (count) => {
+    if (count >= 365) return { emoji: '🌟', label: 'Éternel', color: '#FFD700' };
+    if (count >= 100) return { emoji: '💖', label: 'Indestructible', color: '#FF1493' };
+    if (count >= 30) return { emoji: '🔥🔥🔥', label: 'En feu !', color: '#FF4500' };
+    if (count >= 7) return { emoji: '🔥🔥', label: 'Flamme vive', color: '#FF6347' };
+    if (count >= 1) return { emoji: '🔥', label: 'Flamme allumée', color: '#FFA500' };
+    return { emoji: '❄️', label: 'Pas de série', color: '#87CEEB' };
+  };
 
   // Fonction pour calculer les jours ensemble
   const calculateDaysTogether = useCallback(() => {
@@ -250,6 +267,34 @@ export default function HomeScreen({ navigation }) {
             </>
           )}
         </View>
+
+        {/* 🔥 Flammes / Streaks */}
+        {(() => {
+          const level = getStreakLevel(streak?.count || 0);
+          const streakCount = streak?.count || 0;
+          const bestStreak = streak?.bestStreak || 0;
+          return (
+            <View style={styles.streakCard}>
+              <View style={styles.streakMain}>
+                <Text style={styles.streakEmoji}>{level.emoji}</Text>
+                <View style={styles.streakInfo}>
+                  <Text style={styles.streakCount}>{streakCount}</Text>
+                  <Text style={styles.streakLabel}>jour{streakCount > 1 ? 's' : ''} de flamme</Text>
+                </View>
+              </View>
+              <Text style={[styles.streakLevel, { color: level.color }]}>{level.label}</Text>
+              {bestStreak > 0 && streakCount < bestStreak && (
+                <Text style={styles.streakBest}>🏆 Record : {bestStreak} jours</Text>
+              )}
+              {streakCount === 0 && (
+                <Text style={styles.streakHint}>💡 Interagissez tous les deux chaque jour pour garder la flamme !</Text>
+              )}
+              {streakCount > 0 && streakCount === bestStreak && (
+                <Text style={styles.streakBest}>⭐ Nouveau record !</Text>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Love Meter */}
         <View style={styles.loveMeterCard}>
@@ -498,6 +543,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.7)',
     marginTop: 5,
+  },
+  // 🔥 Streak/Flammes styles
+  streakCard: {
+    backgroundColor: 'rgba(255, 100, 0, 0.25)',
+    borderRadius: 25,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 150, 50, 0.5)',
+  },
+  streakMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  streakEmoji: {
+    fontSize: 50,
+    marginRight: 15,
+  },
+  streakInfo: {
+    alignItems: 'center',
+  },
+  streakCount: {
+    fontSize: 52,
+    fontWeight: 'bold',
+    color: '#fff',
+    textShadowColor: 'rgba(255, 100, 0, 0.5)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 10,
+  },
+  streakLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: -2,
+  },
+  streakLevel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 5,
+  },
+  streakBest: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 5,
+  },
+  streakHint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 8,
+    textAlign: 'center',
   },
   loveMeterCard: {
     backgroundColor: 'rgba(255,255,255,0.95)',

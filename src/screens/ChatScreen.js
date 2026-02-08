@@ -99,7 +99,7 @@ export default function ChatScreen({ navigation }) {
   // Chat is now available
   const chatAvailable = true;
   const { notifyLoveNote, notifyNoteRead } = useNotifyPartner();
-  const { addDiaryEntry } = useData();
+  const { addDiaryEntry, recordInteraction } = useData();
 
   const [inputText, setInputText] = useState('');
   const [selectedMessage, setSelectedMessage] = useState(null);
@@ -210,6 +210,8 @@ export default function ChatScreen({ navigation }) {
     if (result?.success) {
       // Notifier le partenaire
       await notifyLoveNote(text.substring(0, 50));
+      // 🔥 Compter comme interaction pour les flammes
+      recordInteraction();
     }
   };
 
