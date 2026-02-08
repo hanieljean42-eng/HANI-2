@@ -1223,49 +1223,6 @@ export default function MemoriesScreen() {
                   </View>
                 )}
 
-                {addType === 'diary' && (
-                  <View style={styles.diaryFormContainer}>
-                    {/* Sélecteur d'humeur */}
-                    <Text style={styles.diaryFormLabel}>Comment te sens-tu ? 💭</Text>
-                    <View style={styles.diaryMoodGrid}>
-                      {MOOD_EMOJIS.map((emoji) => (
-                        <TouchableOpacity
-                          key={emoji}
-                          style={[
-                            styles.diaryMoodBtn,
-                            newDiaryEntry.mood === emoji && styles.diaryMoodBtnActive,
-                          ]}
-                          onPress={() => {
-                            setNewDiaryEntry({ ...newDiaryEntry, mood: emoji });
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          }}
-                        >
-                          <Text style={[
-                            styles.diaryMoodEmoji,
-                            newDiaryEntry.mood === emoji && styles.diaryMoodEmojiActive,
-                          ]}>{emoji}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    {/* Zone de texte */}
-                    <Text style={styles.diaryFormLabel}>Écris ta page... ✍️</Text>
-                    <TextInput
-                      style={styles.diaryFormTextArea}
-                      placeholder="Qu'as-tu sur le cœur aujourd'hui ? Raconte ta journée, un moment spécial, ou ce que tu ressens..."
-                      placeholderTextColor="#aaa"
-                      multiline
-                      numberOfLines={8}
-                      textAlignVertical="top"
-                      value={newDiaryEntry.content}
-                      onChangeText={(text) => setNewDiaryEntry({ ...newDiaryEntry, content: text })}
-                    />
-                    <Text style={styles.diaryFormCharCount}>
-                      {newDiaryEntry.content.length} caractères
-                    </Text>
-                  </View>
-                )}
-
                 {newMemory.imageUri && (
                   <View style={styles.imagePreview}>
                     {newMemory.mediaType === 'video' ? (
@@ -1291,6 +1248,50 @@ export default function MemoriesScreen() {
                   </View>
                 )}
               </>
+            )}
+
+            {/* Formulaire pour Journal Intime */}
+            {addType === 'diary' && (
+              <View style={styles.diaryFormContainer}>
+                {/* Sélecteur d'humeur */}
+                <Text style={styles.diaryFormLabel}>Comment te sens-tu ? 💭</Text>
+                <View style={styles.diaryMoodGrid}>
+                  {MOOD_EMOJIS.map((emoji) => (
+                    <TouchableOpacity
+                      key={emoji}
+                      style={[
+                        styles.diaryMoodBtn,
+                        newDiaryEntry.mood === emoji && styles.diaryMoodBtnActive,
+                      ]}
+                      onPress={() => {
+                        setNewDiaryEntry({ ...newDiaryEntry, mood: emoji });
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                    >
+                      <Text style={[
+                        styles.diaryMoodEmoji,
+                        newDiaryEntry.mood === emoji && styles.diaryMoodEmojiActive,
+                      ]}>{emoji}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Zone de texte */}
+                <Text style={styles.diaryFormLabel}>Écris ta page... ✍️</Text>
+                <TextInput
+                  style={styles.diaryFormTextArea}
+                  placeholder="Qu'as-tu sur le cœur aujourd'hui ? Raconte ta journée, un moment spécial, ou ce que tu ressens..."
+                  placeholderTextColor="#aaa"
+                  multiline
+                  numberOfLines={8}
+                  textAlignVertical="top"
+                  value={newDiaryEntry.content}
+                  onChangeText={(text) => setNewDiaryEntry({ ...newDiaryEntry, content: text })}
+                />
+                <Text style={styles.diaryFormCharCount}>
+                  {newDiaryEntry.content.length} caractères
+                </Text>
+              </View>
             )}
 
             <View style={styles.modalButtons}>
