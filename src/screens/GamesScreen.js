@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useGame } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -295,6 +296,7 @@ const WOULD_YOU_RATHER = [
 ];
 
 export default function GamesScreen() {
+  const navigation = useNavigation();
   const { user, couple, partner } = useAuth();
   const { notifyGame, notifyGameAnswer, notifyGameWin } = useNotifyPartner();
   const { 
@@ -2629,7 +2631,12 @@ export default function GamesScreen() {
             <Text style={styles.backButton}>← Retour</Text>
           </TouchableOpacity>
         ) : (
-          <Text style={styles.title}>🎮 Jeux Couple</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 15 }}>
+              <Text style={styles.backButton}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>🎮 Jeux Couple</Text>
+          </View>
         )}
       </View>
 

@@ -67,6 +67,7 @@ import ChatScreen from './src/screens/ChatScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import RetrospectiveScreen from './src/screens/RetrospectiveScreen';
 import WidgetsScreen from './src/screens/WidgetsScreen';
+import GamesScreen from './src/screens/GamesScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -118,6 +119,14 @@ function AppNavigator() {
             component={WidgetsScreen} 
             options={{ 
               animation: 'slide_from_right',
+              presentation: 'card'
+            }} 
+          />
+          <Stack.Screen 
+            name="Games" 
+            component={GamesScreen} 
+            options={{ 
+              animation: 'slide_from_bottom',
               presentation: 'card'
             }} 
           />
