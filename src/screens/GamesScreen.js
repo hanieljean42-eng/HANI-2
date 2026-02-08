@@ -511,6 +511,7 @@ export default function GamesScreen() {
   const submitOnlineAnswer = async (answer) => {
     const answerKey = `${activeGame}_${currentQuestion}`;
     // ✅ Marquer comme envoyé AVANT l'appel Firebase pour éviter la race condition
+    // Le useEffect listener se re-déclenchera automatiquement quand onlineAnswerSent change
     setOnlineAnswerSent(true);
     setOnlineWaitingPartner(true);
     
@@ -520,23 +521,8 @@ export default function GamesScreen() {
       playerName: user?.name || 'Joueur',
     }, user?.name);
     
-    // Vérifier si le partenaire a déjà répondu (lecture directe de gameData)
-    const existingAnswers = gameData?.answers?.[answerKey];
-    if (existingAnswers) {
-      const partnerEntry = Object.entries(existingAnswers).find(
-        ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
-      );
-      if (partnerEntry) {
-        const [, partnerData] = partnerEntry;
-        const dedupKey = `answer_${answerKey}`;
-        processedOnlineKeys.current.add(dedupKey); // ✅ Marquer car on va en reveal
-        setOnlinePartnerAnswer(partnerData.answer);
-        setOnlineWaitingPartner(false);
-        if (activeGame === 'quiz') setQuizPhase('reveal');
-        if (activeGame === 'whoismore') setWimPhase('reveal');
-        if (activeGame === 'wouldyourather') setWyrPhase('reveal');
-      }
-    }
+    // ✅ PAS de vérification ici - le listener useEffect gère la détection
+    // quand Firebase notifie que la réponse du partenaire existe
   };
 
   // ✅ LISTENER ROBUSTE: Détecte quand le partenaire clique "Suivant" pour synchroniser
@@ -639,6 +625,7 @@ export default function GamesScreen() {
   const signalReadyForNext = async () => {
     const readyKey = `ready_next_${activeGame}_${currentQuestion}`;
     // ✅ Marquer comme prêt AVANT l'appel Firebase pour éviter la race condition
+    // Le useEffect listener ready se re-déclenchera automatiquement quand onlineReadyForNext change
     setOnlineReadyForNext(true);
     setOnlineWaitingNextPartner(true);
     
@@ -647,20 +634,9 @@ export default function GamesScreen() {
       playerName: user?.name || 'Joueur',
       timestamp: Date.now(),
     }, user?.name);
-
-    // Vérifier si le partenaire a déjà cliqué "Suivant" (lecture directe de gameData)
-    const existingReady = gameData?.answers?.[readyKey];
-    if (existingReady) {
-      const partnerReady = Object.entries(existingReady).find(
-        ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
-      );
-      if (partnerReady) {
-        const dedupKey = `ready_${readyKey}`;
-        processedOnlineKeys.current.add(dedupKey); // ✅ Marquer car on avance
-        console.log('🚀 Partenaire déjà prêt, passage immédiat');
-        advanceToNextQuestion();
-      }
-    }
+    
+    // ✅ PAS de vérification ici - le listener useEffect gère la détection
+    // quand Firebase notifie que le partenaire est prêt
   };
 
   // Helper: Reset les états online (pour "Rejouer")
