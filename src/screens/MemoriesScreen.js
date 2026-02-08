@@ -1115,6 +1115,7 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <TouchableOpacity 
           style={styles.modalOverlay} 
           activeOpacity={1} 
@@ -1342,6 +1343,7 @@ export default function MemoriesScreen() {
           </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* View Memory Modal */}
@@ -1491,6 +1493,7 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowEditModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <TouchableOpacity 
           style={styles.modalOverlay} 
           activeOpacity={1} 
@@ -1629,6 +1632,7 @@ export default function MemoriesScreen() {
           </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </LinearGradient>
   );

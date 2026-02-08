@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
@@ -148,7 +150,8 @@ export default function JoinCoupleScreen() {
         colors={['#FF6B9D', '#C44569', '#8B5CF6']}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => setMode('choice')}
@@ -213,6 +216,7 @@ export default function JoinCoupleScreen() {
             <Text style={styles.submitButtonText}>Créer notre espace 💖</Text>
           </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     );
   }
@@ -223,7 +227,8 @@ export default function JoinCoupleScreen() {
         colors={['#8B5CF6', '#C44569', '#FF6B9D']}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => setMode('choice')}
@@ -282,6 +287,7 @@ export default function JoinCoupleScreen() {
             <Text style={styles.submitButtonText}>Rejoindre 💕</Text>
           </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     );
   }

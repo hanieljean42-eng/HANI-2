@@ -28,6 +28,7 @@
         "backgroundColor": "#FF6B9D"
       },
       "package": "com.loveapp.couple2026",
+      "softwareKeyboardLayoutMode": "pan",
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
