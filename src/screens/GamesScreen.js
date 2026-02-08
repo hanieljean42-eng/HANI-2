@@ -479,7 +479,7 @@ export default function GamesScreen() {
     const answerKey = `${activeGame}_${currentQuestion}`;
     const dedupKey = `answer_${answerKey}`;
     
-    // Ne traiter que si pas déjà fait pour cette question
+    // Déjà traité ET révélé ? On ne re-traite plus
     if (processedOnlineKeys.current.has(dedupKey)) return;
     
     const answers = gameData.answers[answerKey];
@@ -492,37 +492,50 @@ export default function GamesScreen() {
 
     if (partnerEntry) {
       const [, partnerData] = partnerEntry;
-      processedOnlineKeys.current.add(dedupKey); // Marquer comme traité
       console.log(`📥 Réponse partenaire reçue pour ${answerKey}:`, partnerData.answer);
       setOnlinePartnerAnswer(partnerData.answer);
       setOnlineWaitingPartner(false);
       
-      // Si j'ai déjà répondu, passer en phase reveal
+      // Si j'ai déjà répondu, passer en phase reveal ET marquer comme traité
       if (onlineAnswerSent) {
+        processedOnlineKeys.current.add(dedupKey); // ✅ Marquer SEULEMENT quand on passe en reveal
         if (activeGame === 'quiz') setQuizPhase('reveal');
         if (activeGame === 'whoismore') setWimPhase('reveal');
         if (activeGame === 'wouldyourather') setWyrPhase('reveal');
       }
+      // Sinon: on NE marque PAS comme traité → le useEffect re-vérifiera quand onlineAnswerSent deviendra true
     }
   }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, onlineAnswerSent, myPlayerId]);
 
   // Helper: Soumettre ma réponse online pour Quiz/WIM/WYR
   const submitOnlineAnswer = async (answer) => {
     const answerKey = `${activeGame}_${currentQuestion}`;
+    // ✅ Marquer comme envoyé AVANT l'appel Firebase pour éviter la race condition
+    setOnlineAnswerSent(true);
+    setOnlineWaitingPartner(true);
+    
     await submitAnswer(answerKey, {
       answer,
       questionIndex: currentQuestion,
       playerName: user?.name || 'Joueur',
     }, user?.name);
-    setOnlineAnswerSent(true);
-    setOnlineWaitingPartner(true);
     
-    // Vérifier si le partenaire a déjà répondu
-    if (onlinePartnerAnswer !== null) {
-      setOnlineWaitingPartner(false);
-      if (activeGame === 'quiz') setQuizPhase('reveal');
-      if (activeGame === 'whoismore') setWimPhase('reveal');
-      if (activeGame === 'wouldyourather') setWyrPhase('reveal');
+    // Vérifier si le partenaire a déjà répondu (lecture directe de gameData)
+    const existingAnswers = gameData?.answers?.[answerKey];
+    if (existingAnswers) {
+      const partnerEntry = Object.entries(existingAnswers).find(
+        ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+      );
+      if (partnerEntry) {
+        const [, partnerData] = partnerEntry;
+        const dedupKey = `answer_${answerKey}`;
+        processedOnlineKeys.current.add(dedupKey); // ✅ Marquer car on va en reveal
+        setOnlinePartnerAnswer(partnerData.answer);
+        setOnlineWaitingPartner(false);
+        if (activeGame === 'quiz') setQuizPhase('reveal');
+        if (activeGame === 'whoismore') setWimPhase('reveal');
+        if (activeGame === 'wouldyourather') setWyrPhase('reveal');
+      }
     }
   };
 
@@ -535,7 +548,7 @@ export default function GamesScreen() {
     const readyKey = `ready_next_${activeGame}_${currentQuestion}`;
     const dedupKey = `ready_${readyKey}`;
     
-    // Ne traiter que si pas déjà fait
+    // Déjà avancé ? On ne re-traite plus
     if (processedOnlineKeys.current.has(dedupKey)) return;
     
     const readyData = gameData.answers[readyKey];
@@ -546,15 +559,17 @@ export default function GamesScreen() {
     );
 
     if (partnerReady) {
-      processedOnlineKeys.current.add(dedupKey); // Marquer comme traité
       console.log(`✅ Partenaire prêt pour question suivante (${readyKey})`);
       setOnlinePartnerReady(true);
+      setOnlineWaitingNextPartner(false);
       
-      // Si moi aussi je suis prêt, avancer automatiquement
+      // Si moi aussi je suis prêt, avancer automatiquement ET marquer comme traité
       if (onlineReadyForNext) {
+        processedOnlineKeys.current.add(dedupKey); // ✅ Marquer SEULEMENT quand on avance
         console.log('🚀 Les deux joueurs sont prêts, passage à la question suivante');
         advanceToNextQuestion();
       }
+      // Sinon: on NE marque PAS → le useEffect re-vérifiera quand onlineReadyForNext deviendra true
     }
   }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, onlineReadyForNext, myPlayerId]);
 
@@ -623,18 +638,28 @@ export default function GamesScreen() {
   // Helper: Signaler que je suis prêt pour la question suivante (envoie signal Firebase + attend partenaire)
   const signalReadyForNext = async () => {
     const readyKey = `ready_next_${activeGame}_${currentQuestion}`;
+    // ✅ Marquer comme prêt AVANT l'appel Firebase pour éviter la race condition
+    setOnlineReadyForNext(true);
+    setOnlineWaitingNextPartner(true);
+    
     await submitAnswer(readyKey, {
       ready: true,
       playerName: user?.name || 'Joueur',
       timestamp: Date.now(),
     }, user?.name);
-    setOnlineReadyForNext(true);
-    setOnlineWaitingNextPartner(true);
 
-    // Vérifier si le partenaire a déjà cliqué "Suivant"
-    if (onlinePartnerReady) {
-      console.log('🚀 Partenaire déjà prêt, passage immédiat');
-      advanceToNextQuestion();
+    // Vérifier si le partenaire a déjà cliqué "Suivant" (lecture directe de gameData)
+    const existingReady = gameData?.answers?.[readyKey];
+    if (existingReady) {
+      const partnerReady = Object.entries(existingReady).find(
+        ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+      );
+      if (partnerReady) {
+        const dedupKey = `ready_${readyKey}`;
+        processedOnlineKeys.current.add(dedupKey); // ✅ Marquer car on avance
+        console.log('🚀 Partenaire déjà prêt, passage immédiat');
+        advanceToNextQuestion();
+      }
     }
   };
 

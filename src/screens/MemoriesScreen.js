@@ -1687,7 +1687,7 @@ const styles = StyleSheet.create({
   },
   galleryItem: {
     width: (width - 50) / 2,
-    height: 180,
+    height: 260,
     marginBottom: 15,
     borderRadius: 15,
     overflow: 'hidden',
@@ -2013,8 +2013,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewImage: {
-    width: width - 100,
-    height: 250,
+    width: width - 40,
+    height: 400,
     borderRadius: 15,
     resizeMode: 'contain',
     backgroundColor: '#f8f8f8',
@@ -2022,7 +2022,7 @@ const styles = StyleSheet.create({
   removeImage: {
     position: 'absolute',
     top: -10,
-    right: 60,
+    right: 10,
     backgroundColor: '#EF4444',
     width: 30,
     height: 30,
@@ -2093,7 +2093,7 @@ const styles = StyleSheet.create({
   },
   viewImageLarge: {
     width: '100%',
-    height: height * 0.6,
+    height: height * 0.75,
     backgroundColor: '#000',
   },
   viewImagePlaceholder: {
