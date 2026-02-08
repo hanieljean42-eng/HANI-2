@@ -764,6 +764,12 @@ export default function GamesScreen() {
         // Je suis le répondeur, j'attendais la réaction → on peut avancer maintenant
         if (todWaitingReaction) {
           setTodWaitingReaction(false);
+          // ✅ Signaler au questioner que je suis prêt pour le tour suivant
+          submitAnswer(`ready_next_tod_${todRound}`, {
+            ready: true,
+            playerName: myName,
+            timestamp: Date.now(),
+          }, myName);
           // Auto-avancer au tour suivant après un court délai
           setTimeout(() => {
             advanceToNextTodRound();
@@ -2485,7 +2491,10 @@ export default function GamesScreen() {
           <View style={styles.todEndButtons}>
             <TouchableOpacity
               style={styles.todReplayButton}
-              onPress={() => {
+              onPress={async () => {
+                if (gameMode === 'online') {
+                  await clearGameAnswers();
+                }
                 resetAllGameStates();
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               }}

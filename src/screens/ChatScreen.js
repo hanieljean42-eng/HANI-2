@@ -13,6 +13,9 @@ import {
   Alert,
   Animated,
   Keyboard,
+  Modal,
+  StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +30,56 @@ import { useData } from '../context/DataContext';
 import { uploadToCloudinary, uploadAudioToCloudinary } from '../utils/uploadToCloudinary';
 
 const { width, height } = Dimensions.get('window');
+
+const MAX_IMAGE_WIDTH = width * 0.65;
+const MIN_IMAGE_WIDTH = 120;
+
+// Composant image adaptative qui préserve les proportions
+const ChatImage = React.memo(({ uri }) => {
+  const [dims, setDims] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (uri) {
+      Image.getSize(
+        uri,
+        (w, h) => {
+          const ratio = h / w;
+          let displayWidth = Math.min(MAX_IMAGE_WIDTH, Math.max(MIN_IMAGE_WIDTH, w));
+          let displayHeight = displayWidth * ratio;
+          // Limiter la hauteur max à 400
+          if (displayHeight > 400) {
+            displayHeight = 400;
+            displayWidth = displayHeight / ratio;
+          }
+          setDims({ width: displayWidth, height: displayHeight });
+          setLoading(false);
+        },
+        () => {
+          // Fallback si on ne peut pas obtenir les dimensions
+          setDims({ width: MAX_IMAGE_WIDTH, height: 200 });
+          setLoading(false);
+        }
+      );
+    }
+  }, [uri]);
+
+  if (loading || !dims) {
+    return (
+      <View style={styles.messageImageLoading}>
+        <ActivityIndicator size="small" color="#E91E63" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={[styles.messageImage, { width: dims.width, height: dims.height }]}
+      resizeMode="contain"
+    />
+  );
+});
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👍'];
 
@@ -57,6 +110,8 @@ export default function ChatScreen({ navigation }) {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [playingAudio, setPlayingAudio] = useState(null);
   const [audioProgress, setAudioProgress] = useState({});
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imageDimensions, setImageDimensions] = useState({});
   
   const flatListRef = useRef(null);
   const recordingRef = useRef(null);
@@ -457,7 +512,12 @@ export default function ChatScreen({ navigation }) {
         >
           <View style={[styles.messageBubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
             {item.type === 'image' ? (
-              <Image source={{ uri: item.content }} style={styles.messageImage} />
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setSelectedImage(item.content)}
+              >
+                <ChatImage uri={item.content} />
+              </TouchableOpacity>
             ) : item.type === 'voice' ? (
               <TouchableOpacity 
                 style={styles.voiceMessage}
@@ -639,6 +699,31 @@ export default function ChatScreen({ navigation }) {
         )}
       </KeyboardAvoidingView>
 
+      {/* Modal Image Plein Écran */}
+      <Modal
+        visible={!!selectedImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <StatusBar backgroundColor="rgba(0,0,0,0.95)" barStyle="light-content" />
+        <View style={styles.fullscreenOverlay}>
+          <TouchableOpacity
+            style={styles.fullscreenClose}
+            onPress={() => setSelectedImage(null)}
+          >
+            <Text style={styles.fullscreenCloseText}>✕</Text>
+          </TouchableOpacity>
+          {selectedImage && (
+            <Image
+              source={{ uri: selectedImage }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+
       {/* Reactions Modal */}
       {showReactions && (
         <TouchableOpacity
@@ -784,9 +869,43 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   messageImage: {
-    width: 200,
-    height: 200,
     borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  messageImageLoading: {
+    width: width * 0.6,
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: width,
+    height: height,
+  },
+  fullscreenClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenCloseText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   messageTime: {
     fontSize: 10,
