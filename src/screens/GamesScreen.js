@@ -369,6 +369,7 @@ export default function GamesScreen() {
   const [todWaitingNextSync, setTodWaitingNextSync] = useState(false); // Attend que le partenaire soit prêt pour le tour suivant
   const todScrollRef = useRef(null); // Ref pour auto-scroll du fil
   const processedTodKeys = useRef(new Set()); // Clés Firebase déjà traitées (éviter doublons)
+  const gameStartedRef = useRef(false); // Guard: empêcher le double-démarrage de jeu
   
   // États pour le mode multijoueur à distance
   const [showLobby, setShowLobby] = useState(false);
@@ -399,16 +400,26 @@ export default function GamesScreen() {
   // Surveiller les changements de session pour le mode en ligne
   useEffect(() => {
     if (gameSession && gameMode === 'online') {
-      if (gameSession.status === 'ready' && !waitingForPartner) {
+      if (gameSession.status === 'ready' && !waitingForPartner && !activeGame) {
+        // Guard: ne démarrer qu'une seule fois
+        if (gameStartedRef.current) return;
+        gameStartedRef.current = true;
+        
         // Les deux joueurs sont là, démarrer le jeu
         setShowLobby(false);
         setShowInviteModal(false);
-        // ✅ Reset des états avant de démarrer un nouveau jeu
+        // Reset propre avant de démarrer
         resetAllGameStates();
+        // Re-setter gameMode après reset (resetAllGameStates ne le touche pas)
         setActiveGame(gameSession.gameType);
+        console.log('🎮 Jeu démarré via session watcher:', gameSession.gameType);
       }
     }
-  }, [gameSession, waitingForPartner, gameMode]);
+    // Reset le guard quand on quitte un jeu
+    if (!activeGame && !gameSession) {
+      gameStartedRef.current = false;
+    }
+  }, [gameSession, waitingForPartner, gameMode, activeGame]);
 
   // ✅ Fonction centralisée de reset de TOUS les états de jeu
   const resetAllGameStates = () => {
@@ -562,7 +573,7 @@ export default function GamesScreen() {
   }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, onlineReadyForNext, myPlayerId]);
 
   // ✅ Helper PROTÉGÉ: Avancer effectivement à la question suivante (appelé quand les 2 sont prêts)
-  const advanceToNextQuestion = () => {
+  const advanceToNextQuestion = useCallback(() => {
     // Guard contre double-appel
     if (advancingRef.current) {
       console.log('⚠️ advanceToNextQuestion déjà en cours, ignoré');
@@ -577,51 +588,59 @@ export default function GamesScreen() {
     setOnlineReadyForNext(false);
     setOnlinePartnerReady(false);
     setOnlineWaitingNextPartner(false);
-    // Nettoyer les clés de déduplication pour la prochaine question
-    processedOnlineKeys.current = new Set();
+    // NE PAS reset processedOnlineKeys à new Set() — les anciennes clés doivent rester pour éviter re-traitement
+    // Les nouvelles clés (avec le nouvel index) seront naturellement différentes
 
-    if (activeGame === 'quiz') {
-      if (currentQuestion < 9) {
-        setCurrentQuestion(prev => prev + 1);
-        setQuizPhase('player1');
-        setPlayer1Answer(null);
-        setPlayer2Answer(null);
-        setQuizOpenAnswer('');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else {
-        setShowResult(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        notifyGameWin('Quiz Couple');
+    // ✅ Utiliser les valeurs actuelles via les setters fonctionnels
+    setCurrentQuestion(prevQ => {
+      // Lire activeGame depuis la closure mais c'est OK car ce useCallback a activeGame en dep
+      if (activeGame === 'quiz') {
+        if (prevQ < 9) {
+          setQuizPhase('player1');
+          setPlayer1Answer(null);
+          setPlayer2Answer(null);
+          setQuizOpenAnswer('');
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          return prevQ + 1;
+        } else {
+          setShowResult(true);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notifyGameWin('Quiz Couple');
+          return prevQ;
+        }
+      } else if (activeGame === 'whoismore') {
+        if (prevQ < WHO_IS_MORE.length - 1) {
+          setWimPhase('player1');
+          setWimPlayer1Answer(null);
+          setWimPlayer2Answer(null);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          return prevQ + 1;
+        } else {
+          setShowResult(true);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notifyGameWin('Qui est le Plus');
+          return prevQ;
+        }
+      } else if (activeGame === 'wouldyourather') {
+        if (prevQ < WOULD_YOU_RATHER.length - 1) {
+          setWyrPhase('player1');
+          setWyrPlayer1Choice(null);
+          setWyrPlayer2Choice(null);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          return prevQ + 1;
+        } else {
+          setShowResult(true);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notifyGameWin('Tu Préfères');
+          return prevQ;
+        }
       }
-    } else if (activeGame === 'whoismore') {
-      if (currentQuestion < WHO_IS_MORE.length - 1) {
-        setCurrentQuestion(prev => prev + 1);
-        setWimPhase('player1');
-        setWimPlayer1Answer(null);
-        setWimPlayer2Answer(null);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else {
-        setShowResult(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        notifyGameWin('Qui est le Plus');
-      }
-    } else if (activeGame === 'wouldyourather') {
-      if (currentQuestion < WOULD_YOU_RATHER.length - 1) {
-        setCurrentQuestion(prev => prev + 1);
-        setWyrPhase('player1');
-        setWyrPlayer1Choice(null);
-        setWyrPlayer2Choice(null);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else {
-        setShowResult(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        notifyGameWin('Tu Préfères');
-      }
-    }
+      return prevQ;
+    });
     
     // Relâcher le guard après un tick pour laisser les states se propager
     setTimeout(() => { advancingRef.current = false; }, 500);
-  };
+  }, [activeGame, notifyGameWin]);
 
   // Helper: Signaler que je suis prêt pour la question suivante (envoie signal Firebase + attend partenaire)
   const signalReadyForNext = async () => {
@@ -852,11 +871,10 @@ export default function GamesScreen() {
     
     if (result && !result.error) {
       setGameMode('online');
-      // ✅ Toujours démarrer le jeu après join réussi
+      // Le session watcher (useEffect) détectera status='ready' et démarrera le jeu automatiquement
       setShowLobby(false);
-      resetAllGameStates();
-      setActiveGame(result.gameType);
-      Alert.alert('🎉 Connecté !', 'Vous avez rejoint la partie !');
+      gameStartedRef.current = false; // Reset pour permettre au watcher de démarrer
+      Alert.alert('🎉 Connecté !', 'La partie va commencer !');
     } else {
       Alert.alert(
         'Aucune partie trouvée',
@@ -1147,18 +1165,8 @@ export default function GamesScreen() {
         timestamp: Date.now(),
       }, myName);
       
-      // Vérifier si le partenaire est déjà prêt
-      const readyKey = `ready_next_tod_${todRound}`;
-      const readyEntries = gameData?.answers?.[readyKey];
-      if (readyEntries) {
-        const partnerReady = Object.entries(readyEntries).find(
-          ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
-        );
-        if (partnerReady) {
-          setTimeout(() => advanceToNextTodRound(), 800);
-          return;
-        }
-      }
+      // ✅ NE PAS vérifier gameData ici — c'est une closure stale après await
+      // Le listener useEffect (section 5) détectera le signal du partenaire
     } else {
       // Mode local: avancer directement après un délai
       setTimeout(() => advanceToNextTodRound(), 800);
@@ -1180,18 +1188,8 @@ export default function GamesScreen() {
         timestamp: Date.now(),
       }, myName);
       
-      // Vérifier si le partenaire est déjà prêt
-      const readyKey = `ready_next_tod_${todRound}`;
-      const readyEntries = gameData?.answers?.[readyKey];
-      if (readyEntries) {
-        const partnerReady = Object.entries(readyEntries).find(
-          ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
-        );
-        if (partnerReady) {
-          advanceToNextTodRound();
-          return;
-        }
-      }
+      // ✅ NE PAS vérifier gameData ici — c'est une closure stale après await
+      // Le listener useEffect (section 5) détectera le signal du partenaire
     } else {
       // Mode local: avancer directement
       advanceToNextTodRound();
@@ -1603,9 +1601,8 @@ export default function GamesScreen() {
                 
                 if (session && !session.error) {
                   setGameMode('online');
-                  resetAllGameStates();
-                  // ✅ Toujours démarrer le jeu après join réussi
-                  setActiveGame(pendingGameInvite.gameType);
+                  gameStartedRef.current = false; // Permettre au watcher de démarrer le jeu
+                  // Le session watcher détectera status='ready' et démarrera automatiquement
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
               }}
@@ -1717,8 +1714,8 @@ export default function GamesScreen() {
               
               if (result && !result.error) {
                 setGameMode('online');
-                resetAllGameStates();
-                setActiveGame(result.gameType || gameSession?.gameType);
+                gameStartedRef.current = false; // Permettre au watcher de démarrer le jeu
+                // Le session watcher détectera status='ready' et démarrera automatiquement
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               } else {
                 Alert.alert('Erreur', result?.error || 'Impossible de rejoindre');

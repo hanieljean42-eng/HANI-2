@@ -142,11 +142,11 @@ export function GameProvider({ children }) {
           setPendingGameInvite(null);
         }
         
-        // Si les deux joueurs sont là, mettre à jour le statut
-        if (hasPartner && data.status === 'waiting') {
+        // Si les deux joueurs sont là, mettre à jour le statut (seul le créateur le fait pour éviter le double-write)
+        if (hasPartner && data.status === 'waiting' && isMySession) {
           update(sessionRef, { status: 'ready' }).then(() => {
             console.log('✅ Session prête!');
-          });
+          }).catch(e => console.log('⚠️ Erreur update status:', e.message));
         }
       } else {
         console.log('📭 Pas de session active');
