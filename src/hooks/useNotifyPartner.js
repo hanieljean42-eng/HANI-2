@@ -210,22 +210,23 @@ export const useNotifyPartner = () => {
   };
 
   // === LETTRES D'AMOUR PROGRAMMÉES ===
-  const notifyScheduledLetter = async () => {
+  const notifyScheduledLetter = async (deliveryDateStr) => {
     if (notifications?.sendPushNotification && user?.name) {
+      const dateInfo = deliveryDateStr ? ` Elle s'ouvrira le ${deliveryDateStr} ❤️` : '';
       await notifications.sendPushNotification(
         '💌 Lettre programmée',
-        `${user.name} t'a écrit une lettre d'amour pour plus tard... 💕`,
+        `${user.name} t'a écrit une lettre d'amour pour plus tard...${dateInfo} 💕`,
         { type: 'scheduled_letter' }
       );
     }
   };
 
-  const notifyLetterDelivered = async (from) => {
-    if (notifications?.sendPushNotification) {
+  const notifyLetterDelivered = async () => {
+    if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
-        '💌 Lettre d\'amour !',
-        `${from} t'a envoyé une lettre d'amour ! Ouvre-la vite ! 💕`,
-        { type: 'letter_delivered' }
+        '💌 Ta lettre a été lue !',
+        `${user.name} a ouvert et lu ta lettre d'amour ! 💕`,
+        { type: 'letter_read' }
       );
     }
   };
