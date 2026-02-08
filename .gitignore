@@ -35,3 +35,6 @@ yarn-error.*
 # APK builds (too large for GitHub)
 *.apk
 build.apk
+# Firebase Admin SDK key (SECRET - never commit!)
+h-couple-firebase-adminsdk*.json
+*-adminsdk*.json
