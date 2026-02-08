@@ -677,6 +677,19 @@ export function GameProvider({ children }) {
     }
   };
 
+  // ✅ NOUVEAU: Nettoyer les réponses Firebase sans détruire la session (pour "Rejouer")
+  const clearGameAnswers = async () => {
+    if (!isFirebaseReady || !database || !coupleId) return;
+    
+    try {
+      const answersRef = ref(database, `games/${coupleId}/session/answers`);
+      await remove(answersRef);
+      console.log('🗑️ Réponses Firebase nettoyées pour rejouer');
+    } catch (error) {
+      console.error('❌ Erreur nettoyage réponses:', error);
+    }
+  };
+
   // Vérifier s'il y a une session active
   const checkActiveSession = async () => {
     // Mode local - retourner la session actuelle
@@ -800,6 +813,7 @@ export function GameProvider({ children }) {
     waitForPartnerAnswer,
     nextQuestion,
     endGameSession,
+    clearGameAnswers,
     checkActiveSession,
     setPlayerReady,
     getPartnerInfo,

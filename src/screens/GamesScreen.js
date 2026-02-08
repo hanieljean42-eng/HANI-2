@@ -306,6 +306,7 @@ export default function GamesScreen() {
     waitingForPartner, 
     partnerOnline,
     endGameSession,
+    clearGameAnswers,
     submitAnswer,
     checkBothAnswered,
     getBothAnswers,
@@ -451,6 +452,8 @@ export default function GamesScreen() {
     setOnlineReadyForNext(false);
     setOnlinePartnerReady(false);
     setOnlineWaitingNextPartner(false);
+    processedOnlineKeys.current = new Set();
+    advancingRef.current = false;
   };
 
   // ═══════════════════════════════════════════════════════
@@ -463,14 +466,22 @@ export default function GamesScreen() {
   const [onlineReadyForNext, setOnlineReadyForNext] = useState(false);
   const [onlinePartnerReady, setOnlinePartnerReady] = useState(false);
   const [onlineWaitingNextPartner, setOnlineWaitingNextPartner] = useState(false);
+  // ✅ DÉDUPLICATION: Éviter de re-traiter les mêmes données
+  const processedOnlineKeys = useRef(new Set());
+  const advancingRef = useRef(false); // Guard contre double-avance
 
-  // ✅ LISTENER: Détecte les réponses du partenaire pour Quiz/WIM/WYR en mode online
+  // ✅ LISTENER ROBUSTE: Détecte les réponses du partenaire pour Quiz/WIM/WYR en mode online
   useEffect(() => {
     if (!activeGame || activeGame === 'truthordare') return;
     if (gameMode !== 'online' || !isFirebaseReady) return;
     if (!gameData?.answers) return;
 
     const answerKey = `${activeGame}_${currentQuestion}`;
+    const dedupKey = `answer_${answerKey}`;
+    
+    // Ne traiter que si pas déjà fait pour cette question
+    if (processedOnlineKeys.current.has(dedupKey)) return;
+    
     const answers = gameData.answers[answerKey];
     if (!answers) return;
 
@@ -481,6 +492,7 @@ export default function GamesScreen() {
 
     if (partnerEntry) {
       const [, partnerData] = partnerEntry;
+      processedOnlineKeys.current.add(dedupKey); // Marquer comme traité
       console.log(`📥 Réponse partenaire reçue pour ${answerKey}:`, partnerData.answer);
       setOnlinePartnerAnswer(partnerData.answer);
       setOnlineWaitingPartner(false);
@@ -514,13 +526,18 @@ export default function GamesScreen() {
     }
   };
 
-  // ✅ LISTENER: Détecte quand le partenaire clique "Suivant" pour synchroniser
+  // ✅ LISTENER ROBUSTE: Détecte quand le partenaire clique "Suivant" pour synchroniser
   useEffect(() => {
     if (!activeGame || activeGame === 'truthordare') return;
     if (gameMode !== 'online' || !isFirebaseReady) return;
     if (!gameData?.answers) return;
 
     const readyKey = `ready_next_${activeGame}_${currentQuestion}`;
+    const dedupKey = `ready_${readyKey}`;
+    
+    // Ne traiter que si pas déjà fait
+    if (processedOnlineKeys.current.has(dedupKey)) return;
+    
     const readyData = gameData.answers[readyKey];
     if (!readyData) return;
 
@@ -529,6 +546,7 @@ export default function GamesScreen() {
     );
 
     if (partnerReady) {
+      processedOnlineKeys.current.add(dedupKey); // Marquer comme traité
       console.log(`✅ Partenaire prêt pour question suivante (${readyKey})`);
       setOnlinePartnerReady(true);
       
@@ -540,8 +558,15 @@ export default function GamesScreen() {
     }
   }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, onlineReadyForNext, myPlayerId]);
 
-  // Helper: Avancer effectivement à la question suivante (appelé quand les 2 sont prêts)
+  // ✅ Helper PROTÉGÉ: Avancer effectivement à la question suivante (appelé quand les 2 sont prêts)
   const advanceToNextQuestion = () => {
+    // Guard contre double-appel
+    if (advancingRef.current) {
+      console.log('⚠️ advanceToNextQuestion déjà en cours, ignoré');
+      return;
+    }
+    advancingRef.current = true;
+    
     // Reset tous les états online
     setOnlineAnswerSent(false);
     setOnlinePartnerAnswer(null);
@@ -549,6 +574,8 @@ export default function GamesScreen() {
     setOnlineReadyForNext(false);
     setOnlinePartnerReady(false);
     setOnlineWaitingNextPartner(false);
+    // Nettoyer les clés de déduplication pour la prochaine question
+    processedOnlineKeys.current = new Set();
 
     if (activeGame === 'quiz') {
       if (currentQuestion < 9) {
@@ -588,6 +615,9 @@ export default function GamesScreen() {
         notifyGameWin('Tu Préfères');
       }
     }
+    
+    // Relâcher le guard après un tick pour laisser les states se propager
+    setTimeout(() => { advancingRef.current = false; }, 500);
   };
 
   // Helper: Signaler que je suis prêt pour la question suivante (envoie signal Firebase + attend partenaire)
@@ -608,7 +638,7 @@ export default function GamesScreen() {
     }
   };
 
-  // Helper: Passer à la question suivante en mode online (reset online states) — mode local uniquement
+  // Helper: Reset les états online (pour "Rejouer")
   const nextOnlineQuestion = () => {
     setOnlineAnswerSent(false);
     setOnlinePartnerAnswer(null);
@@ -616,6 +646,8 @@ export default function GamesScreen() {
     setOnlineReadyForNext(false);
     setOnlinePartnerReady(false);
     setOnlineWaitingNextPartner(false);
+    processedOnlineKeys.current = new Set();
+    advancingRef.current = false;
   };
 
   // ✅ LISTENER ROBUSTE: Écouter les données du partenaire en Action/Vérité
@@ -1386,14 +1418,17 @@ export default function GamesScreen() {
             <Text style={styles.wyrResultHint}>Discutez de vos choix différents 💕</Text>
             <TouchableOpacity
               style={styles.playAgainButton}
-              onPress={() => {
+              onPress={async () => {
+                if (isOnline) {
+                  await clearGameAnswers(); // Nettoyer Firebase avant de rejouer
+                  nextOnlineQuestion();
+                }
                 setCurrentQuestion(0);
                 setWyrChoice(null);
                 setWyrPhase('player1');
                 setWyrPlayer1Choice(null);
                 setWyrPlayer2Choice(null);
                 setShowResult(false);
-                if (isOnline) nextOnlineQuestion();
               }}
             >
               <Text style={styles.playAgainText}>🔄 Rejouer</Text>
@@ -2028,7 +2063,11 @@ export default function GamesScreen() {
             <Text style={styles.quizResultHint}>Vous vous connaissez {Math.round((scores.player1 + scores.player2) / 20 * 100)}% 💕</Text>
             <TouchableOpacity
               style={styles.playAgainButton}
-              onPress={() => {
+              onPress={async () => {
+                if (isOnline) {
+                  await clearGameAnswers(); // Nettoyer Firebase avant de rejouer
+                  nextOnlineQuestion();
+                }
                 setCurrentQuestion(0);
                 setScores({ player1: 0, player2: 0 });
                 setShowResult(false);
@@ -2036,7 +2075,6 @@ export default function GamesScreen() {
                 setPlayer1Answer(null);
                 setPlayer2Answer(null);
                 setQuizOpenAnswer('');
-                if (isOnline) nextOnlineQuestion();
               }}
             >
               <Text style={styles.playAgainText}>🔄 Rejouer</Text>
@@ -2551,7 +2589,10 @@ export default function GamesScreen() {
     );
 
     // Déterminer la réponse du partenaire
-    const partnerAnswer = isOnline ? onlinePartnerAnswer : wimPlayer2Answer;
+    // ✅ En mode online, inverser la réponse du partenaire:
+    // Quand partenaire dit "player1" (= lui-même), pour moi c'est "player2" (= le partenaire)
+    const invertAnswer = (a) => a === 'player1' ? 'player2' : a === 'player2' ? 'player1' : a;
+    const partnerAnswer = isOnline ? invertAnswer(onlinePartnerAnswer) : wimPlayer2Answer;
 
     return (
       <View style={styles.gameContainer}>
@@ -2713,14 +2754,17 @@ export default function GamesScreen() {
             </Text>
             <TouchableOpacity
               style={styles.playAgainButton}
-              onPress={() => {
+              onPress={async () => {
+                if (isOnline) {
+                  await clearGameAnswers(); // Nettoyer Firebase avant de rejouer
+                  nextOnlineQuestion();
+                }
                 setCurrentQuestion(0);
                 setScores({ player1: 0, player2: 0 });
                 setShowResult(false);
                 setWimPhase('player1');
                 setWimPlayer1Answer(null);
                 setWimPlayer2Answer(null);
-                if (isOnline) nextOnlineQuestion();
               }}
             >
               <Text style={styles.playAgainText}>🔄 Rejouer</Text>
