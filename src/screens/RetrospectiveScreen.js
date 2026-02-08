@@ -29,7 +29,7 @@ export default function RetrospectiveScreen({ navigation }) {
 
   useEffect(() => {
     generateRetrospective();
-  }, []);
+  }, [memories, challenges, bucketList, loveNotes, sharedDiary, messages]);
 
   const generateRetrospective = () => {
     const now = new Date();

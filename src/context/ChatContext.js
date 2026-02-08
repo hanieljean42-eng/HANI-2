@@ -202,7 +202,7 @@ export function ChatProvider({ children }) {
 
       // Arrêter après 2 secondes d'inactivité
       typingTimeoutRef.current = setTimeout(() => {
-        setTyping(false);
+        setIsTyping(false);
       }, 2000);
     }
   };

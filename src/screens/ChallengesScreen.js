@@ -179,7 +179,7 @@ export default function ChallengesScreen() {
   const { theme } = useTheme();
   const { loveMeter, updateLoveMeter, challenges, addChallenge } = useData();
   const { partner, user } = useAuth();
-  const { notifyChallenge, notifyGame, notifyNewChallenge, notifyGameWin } = useNotifyPartner();
+  const { notifyChallenge, notifyGame, notifyNewChallenge, notifyGameWin, notifyGameAnswer } = useNotifyPartner();
   const { 
     coupleId,
     gameSession, 
@@ -196,7 +196,6 @@ export default function ChallengesScreen() {
     checkActiveSession,
     getPartnerInfo,
     getMyInfo,
-    listenToGameSession,
     pendingGameInvite,
     hasActiveSession,
   } = useGame();

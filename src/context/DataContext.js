@@ -290,9 +290,9 @@ export function DataProvider({ children }) {
     const newChallenge = {
       id: Date.now().toString(),
       ...challenge,
-      completed: true,
+      completed: challenge.completed || false,
       createdAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
+      completedAt: challenge.completed ? new Date().toISOString() : null,
       addedBy: user?.name
     };
     

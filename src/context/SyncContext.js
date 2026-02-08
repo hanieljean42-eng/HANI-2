@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, update, get, serverTimestamp } from 'firebase/database';
+import { ref, set, onValue, update, get, serverTimestamp, query, orderByChild, equalTo } from 'firebase/database';
 
 const SyncContext = createContext({});
 
@@ -107,31 +107,24 @@ export function SyncProvider({ children }) {
     try {
       setIsSyncing(true);
       
-      // Chercher le couple par code
+      // Chercher le couple par code avec une query ciblée
       const couplesRef = ref(database, 'couples');
-      const snapshot = await get(couplesRef);
+      const codeQuery = query(couplesRef, orderByChild('code'), equalTo(code?.toUpperCase()));
+      let snapshot = await get(codeQuery);
       
+      // Fallback: essayer en minuscule si pas trouvé
       if (!snapshot.exists()) {
-        setIsSyncing(false);
-        return { success: false, error: 'Code invalide' };
+        const codeQueryLower = query(couplesRef, orderByChild('code'), equalTo(code));
+        snapshot = await get(codeQueryLower);
       }
 
-      const couples = snapshot.val();
-      let foundCoupleId = null;
-      let foundCoupleData = null;
-
-      for (const [id, data] of Object.entries(couples)) {
-        if (data.code === code || data.code?.toUpperCase() === code?.toUpperCase()) {
-          foundCoupleId = id;
-          foundCoupleData = data;
-          break;
-        }
-      }
-
-      if (!foundCoupleId) {
+      if (!snapshot.exists()) {
         setIsSyncing(false);
         return { success: false, error: 'Code couple introuvable' };
       }
+
+      const couples = snapshot.val();
+      const [foundCoupleId, foundCoupleData] = Object.entries(couples)[0];
 
       // Ajouter le nouveau membre
       const memberRef = ref(database, `couples/${foundCoupleId}/members/${userData.id}`);
