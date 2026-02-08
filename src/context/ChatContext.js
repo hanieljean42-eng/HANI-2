@@ -107,6 +107,7 @@ export function ChatProvider({ children }) {
         timestamp: new Date().toISOString(),
         read: false,
         reactions: {},
+        ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
       };
 
       if (isConfigured && database) {

@@ -24,7 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useData } from '../context/DataContext';
-import { uploadToCloudinary } from '../utils/uploadToCloudinary';
+import { uploadToCloudinary, uploadAudioToCloudinary } from '../utils/uploadToCloudinary';
 
 const { width, height } = Dimensions.get('window');
 
@@ -250,17 +250,37 @@ export default function ChatScreen({ navigation }) {
     try {
       clearInterval(recordingTimerRef.current);
       
+      const status = await recordingRef.current.getStatusAsync();
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
+      
+      // Utiliser la durée réelle du recording (en ms → sec), sinon le compteur
+      const actualDuration = status?.durationMillis 
+        ? Math.round(status.durationMillis / 1000) 
+        : recordingDuration;
       
       setIsRecording(false);
       recordingRef.current = null;
       
-      if (uri && recordingDuration >= 1) {
-        // Envoyer le message vocal
-        await sendMessage(uri, 'voice', { duration: recordingDuration });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        await notifyLoveNote('🎤 Message vocal');
+      if (uri && actualDuration >= 1) {
+        try {
+          // Upload l'audio vers Cloudinary pour que le partenaire puisse l'écouter
+          const file = {
+            uri: uri,
+            type: 'audio/m4a',
+            name: `voice_${Date.now()}.m4a`
+          };
+          const cloudResult = await uploadAudioToCloudinary(file);
+          const audioUrl = cloudResult.url;
+          
+          // Envoyer le message avec l'URL Cloudinary (pas l'URI locale)
+          await sendMessage(audioUrl, 'voice', { duration: actualDuration });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await notifyLoveNote('🎤 Message vocal');
+        } catch (uploadError) {
+          console.log('Erreur upload vocal:', uploadError);
+          Alert.alert('Erreur', 'Impossible d\'envoyer le message vocal. Vérifie ta connexion.');
+        }
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
@@ -300,6 +320,14 @@ export default function ChatScreen({ navigation }) {
 
   const playAudio = async (messageId, uri) => {
     try {
+      // Configurer le mode audio pour la lecture
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+      
       // Arrêter l'audio en cours si différent
       if (soundRef.current && playingAudio !== messageId) {
         await soundRef.current.unloadAsync();
@@ -322,12 +350,13 @@ export default function ChatScreen({ navigation }) {
       // Charger et jouer le nouveau son
       const { sound } = await Audio.Sound.createAsync(
         { uri },
-        { shouldPlay: true },
+        { shouldPlay: true, progressUpdateIntervalMillis: 100 },
         (status) => {
           if (status.isLoaded) {
+            const duration = status.durationMillis || 1;
             setAudioProgress(prev => ({
               ...prev,
-              [messageId]: status.positionMillis / status.durationMillis
+              [messageId]: status.positionMillis / duration
             }));
             
             if (status.didJustFinish) {
@@ -344,7 +373,7 @@ export default function ChatScreen({ navigation }) {
       
     } catch (error) {
       console.log('Erreur lecture audio:', error);
-      Alert.alert('Erreur', 'Impossible de lire le message vocal');
+      Alert.alert('Erreur', 'Impossible de lire le message vocal. Vérifie ta connexion.');
     }
   };
 
@@ -450,7 +479,7 @@ export default function ChatScreen({ navigation }) {
                         style={[
                           styles.voiceBar,
                           { 
-                            height: 6 + Math.sin(i * 0.8) * 8 + Math.random() * 4,
+                            height: 6 + Math.sin(i * 0.8 + (item.id?.charCodeAt(0) || 0) * 0.3) * 8 + Math.sin(i * 1.5) * 4,
                             backgroundColor: isMe ? 'rgba(255,255,255,0.7)' : theme.accent + '80',
                             opacity: audioProgress[item.id] > (i / 15) ? 1 : 0.4
                           }

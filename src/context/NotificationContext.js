@@ -349,6 +349,9 @@ export function NotificationProvider({ children }) {
       };
 
       console.log('🔗 Appel Expo Push Service...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+      
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers: {
@@ -357,7 +360,10 @@ export function NotificationProvider({ children }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(message),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const result = await response.json();
       

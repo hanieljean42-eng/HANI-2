@@ -7,8 +7,6 @@ export const uploadToCloudinary = async (file) => {
     
     const formData = new FormData();
     
-    // ✅ React Native FormData : l'objet {uri, type, name} est automatiquement 
-    // traité comme un fichier par React Native (pas besoin de Blob/File)
     formData.append('file', {
       uri: file.uri,
       type: file.type || 'image/jpeg',
@@ -16,7 +14,6 @@ export const uploadToCloudinary = async (file) => {
     });
     formData.append('upload_preset', 'HANI2_couple');
 
-    // ✅ Timeout de 30 secondes pour éviter les blocages
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -26,8 +23,6 @@ export const uploadToCloudinary = async (file) => {
         method: 'POST',
         body: formData,
         signal: controller.signal,
-        // ✅ PAS de Content-Type header ! React Native le génère automatiquement
-        // avec le bon boundary pour multipart/form-data
       }
     );
 
@@ -51,6 +46,58 @@ export const uploadToCloudinary = async (file) => {
       throw new Error('Upload trop long. Vérifiez votre connexion internet.');
     }
     console.error('❌ Upload error:', error.message);
+    throw error;
+  }
+};
+
+// Upload audio/vidéo vers Cloudinary (utilise l'endpoint video qui gère aussi l'audio)
+export const uploadAudioToCloudinary = async (file) => {
+  try {
+    console.log('🎤 Upload audio Cloudinary démarré:', file.name);
+    
+    const formData = new FormData();
+    
+    formData.append('file', {
+      uri: file.uri,
+      type: file.type || 'audio/m4a',
+      name: file.name || `audio_${Date.now()}.m4a`,
+    });
+    formData.append('upload_preset', 'HANI2_couple');
+    formData.append('resource_type', 'video');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s pour l'audio
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/video/upload`,
+      {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error('❌ Cloudinary audio erreur:', data.error.message);
+      throw new Error(data.error.message);
+    }
+
+    console.log('✅ Upload audio Cloudinary réussi:', data.secure_url?.substring(0, 60) + '...');
+    return {
+      url: data.secure_url,
+      publicId: data.public_id,
+      duration: data.duration // Cloudinary retourne la durée réelle
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error('❌ Upload audio Cloudinary timeout (60s)');
+      throw new Error('Upload audio trop long. Vérifiez votre connexion.');
+    }
+    console.error('❌ Upload audio error:', error.message);
     throw error;
   }
 };

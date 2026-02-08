@@ -48,19 +48,23 @@ const getFileInfo = async (uri) => {
   try {
     const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
     const sizeMB = (fileInfo.size || 0) / (1024 * 1024);
-    const extension = uri.split('.').pop()?.toLowerCase();
+    const extension = uri.split('.').pop()?.toLowerCase()?.split('?')[0]; // Enlever les query params
     const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'].includes(extension);
-    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(extension);
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'bmp'].includes(extension);
+    
+    // Si l'URI vient de ImagePicker, c'est forcément une image valide
+    const isFromPicker = uri.includes('ImagePicker') || uri.includes('ImageManipulator') || uri.includes('cache');
     
     return {
       exists: fileInfo.exists,
       sizeMB,
       isVideo,
-      isImage,
-      canUpload: isImage && sizeMB <= 5, // Max 5MB pour les images
+      isImage: isImage || isFromPicker,
+      canUpload: (isImage || isFromPicker) && sizeMB <= 10, // Max 10MB pour les images
     };
   } catch (error) {
-    return { exists: false, sizeMB: 0, canUpload: false };
+    // En cas d'erreur de FileSystem, autoriser quand même (on laisse Cloudinary vérifier)
+    return { exists: true, sizeMB: 0, isImage: true, canUpload: true };
   }
 };
 
@@ -214,7 +218,7 @@ export default function MemoriesScreen() {
           setIsUploading(false);
           Alert.alert(
             '📸 Image trop grande',
-            `L'image fait ${fileInfo.sizeMB?.toFixed(1) || '?'} MB.\n\nMaximum: 5 MB.`,
+            `L'image fait ${fileInfo.sizeMB?.toFixed(1) || '?'} MB.\n\nMaximum: 10 MB.\n\nEssayez de réduire la qualité ou de choisir une autre image.`,
             [{ text: 'Compris' }]
           );
           return;
