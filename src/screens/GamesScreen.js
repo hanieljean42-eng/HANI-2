@@ -350,12 +350,16 @@ export default function GamesScreen() {
   const [todResponse, setTodResponse] = useState('');
   const [todSubmitted, setTodSubmitted] = useState(false);
   const [todRound, setTodRound] = useState(0);
-  const [todPhase, setTodPhase] = useState('choose'); // 'choose', 'waiting', 'answer', 'view'
+  // Phases: 'modeSelect' → 'choose' → 'writeQuestion' → 'waitQuestion' → 'answer' → 'waitAnswer' → 'reveal'
+  const [todPhase, setTodPhase] = useState('modeSelect');
   const [todAsker, setTodAsker] = useState(null);
   const [todAnswerer, setTodAnswerer] = useState(null);
   const [todHistory, setTodHistory] = useState([]);
   const [isMyTurnToAsk, setIsMyTurnToAsk] = useState(true);
   const [todPartnerResponse, setTodPartnerResponse] = useState(null);
+  const [todGameMode, setTodGameMode] = useState(null); // 'classic' or 'custom'
+  const [todCustomQuestion, setTodCustomQuestion] = useState(''); // question écrite par le partenaire
+  const [todChosenType, setTodChosenType] = useState(null); // 'truth' or 'dare' choisi par answerer
   
   // États pour le mode multijoueur à distance
   const [showLobby, setShowLobby] = useState(false);
@@ -422,12 +426,15 @@ export default function GamesScreen() {
     setTodResponse('');
     setTodSubmitted(false);
     setTodRound(0);
-    setTodPhase('choose');
+    setTodPhase('modeSelect');
     setTodAsker(null);
     setTodAnswerer(null);
     setTodHistory([]);
     setIsMyTurnToAsk(true);
     setTodPartnerResponse(null);
+    setTodGameMode(null);
+    setTodCustomQuestion('');
+    setTodChosenType(null);
     // Online states
     setOnlineAnswerSent(false);
     setOnlinePartnerAnswer(null);
@@ -498,11 +505,33 @@ export default function GamesScreen() {
     setOnlineWaitingPartner(false);
   };
 
-  // ✅ NOUVEAU: Écouter les réponses du partenaire en Vérité/Action (bug #5)
+  // ✅ NOUVEAU: Écouter les données du partenaire en Action/Vérité
   useEffect(() => {
     if (activeGame !== 'truthordare' || !isFirebaseReady) return;
+    if (gameMode !== 'online') return;
     
-    // Écouter les questions posées par le partenaire (pour synchroniser la même question)
+    const myName = user?.name || 'Moi';
+    
+    // 1. Écouter le choix Action/Vérité du partenaire (mode personnalisé)
+    const choiceKey = `tod_choice_${todRound}`;
+    if (gameData?.answers?.[choiceKey] && todPhase === 'choose' && todGameMode === 'custom') {
+      const choices = gameData.answers[choiceKey];
+      const partnerChoice = Object.entries(choices).find(
+        ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+      );
+      
+      if (partnerChoice) {
+        const [, choiceData] = partnerChoice;
+        if (choiceData.chosenBy !== myName) {
+          // Mon partenaire a choisi Action ou Vérité → je dois écrire la question
+          console.log('📨 Partenaire a choisi:', choiceData.type);
+          setTodChosenType(choiceData.type);
+          setTodPhase('writeQuestion');
+        }
+      }
+    }
+    
+    // 2. Écouter la question posée par le partenaire
     const questionKey = `tod_question_${todRound}`;
     if (gameData?.answers?.[questionKey] && !truthOrDare) {
       const questions = gameData.answers[questionKey];
@@ -510,27 +539,26 @@ export default function GamesScreen() {
         ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
       );
       
-      if (partnerQuestion && gameMode === 'online') {
+      if (partnerQuestion) {
         const [, questionData] = partnerQuestion;
-        // Le partenaire a posé une question — l'afficher chez moi
-        if (questionData.mustAnswerBy === (user?.name || 'Moi')) {
+        if (questionData.mustAnswerBy === myName) {
+          // La question est pour moi → je dois y répondre
           console.log('📨 Question du partenaire reçue:', questionData);
           setTruthOrDare({ type: questionData.type, text: questionData.text, round: questionData.round });
           setTodAsker(questionData.askedBy);
           setTodAnswerer(questionData.mustAnswerBy);
+          setTodChosenType(questionData.type);
           setTodPhase('answer');
+        } else if (questionData.askedBy !== myName && todPhase === 'waitQuestion') {
+          // Le partenaire a écrit la question pour quelqu'un d'autre? Non, c'est la question que le partenaire a posée
+          // Si j'attends la question et que c'est le partenaire qui l'a posée pour moi
         }
       }
     }
 
-    // Si on est en phase d'attente (questioner attend la réponse)
-    if (todPhase === 'waiting' || (todSubmitted && !todResponse?.trim())) {
-      console.log(`👂 Écoute réponse partenaire pour tour ${todRound}...`);
-      
-      // Écouter la réponse du partenaire
+    // 3. Écouter la réponse du partenaire
+    if (todPhase === 'waitAnswer' || todSubmitted) {
       const responseKey = `tod_response_${todRound}`;
-      
-      // Vérifier les réponses existantes
       if (gameData?.answers?.[responseKey]) {
         const responses = gameData.answers[responseKey];
         const partnerResponse = Object.entries(responses).find(
@@ -538,14 +566,16 @@ export default function GamesScreen() {
         );
         
         if (partnerResponse) {
-          const [playerId, responseData] = partnerResponse;
+          const [, responseData] = partnerResponse;
           console.log('✅ Réponse du partenaire reçue:', responseData);
           setTodPartnerResponse(responseData);
-          setTodPhase('reveal'); // Passer à révélation
+          if (todPhase === 'waitAnswer') {
+            setTodPhase('reveal');
+          }
         }
       }
     }
-  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todResponse, todSubmitted, myPlayerId, user?.name, truthOrDare]);
+  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todSubmitted, myPlayerId, user?.name, truthOrDare, todGameMode]);
 
   // ✅ Synchroniser le tour de question en mode online via gameSession
   useEffect(() => {
@@ -654,39 +684,88 @@ export default function GamesScreen() {
   };
 
   const selectTruthOrDare = async (type) => {
-    const items = type === 'truth' ? TRUTH_OR_DARE.truths : TRUTH_OR_DARE.dares;
-    const random = items[Math.floor(Math.random() * items.length)];
-    const selection = { type, text: random, round: todRound };
+    const myName = user?.name || 'Moi';
+    const partnerName = partner?.name || 'Partenaire';
     
-    setTruthOrDare(selection);
+    setTodChosenType(type);
     setTodResponse('');
     setTodSubmitted(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    // Définir qui pose et qui répond
-    const myName = user?.name || 'Moi';
-    const partnerName = partner?.name || 'Partenaire';
-    
-    if (isMyTurnToAsk) {
-      // C'est moi qui pose → mon partenaire doit répondre
-      setTodAsker(myName);
-      setTodAnswerer(partnerName);
-      setTodPhase('waiting'); // J'attends que mon partenaire réponde
+    if (todGameMode === 'custom') {
+      // MODE PERSONNALISÉ: Le joueur qui pose choisit Action/Vérité, puis écrit la question
+      setTodAsker(isMyTurnToAsk ? myName : partnerName);
+      setTodAnswerer(isMyTurnToAsk ? partnerName : myName);
+      
+      if (gameMode === 'online' && isFirebaseReady) {
+        await submitAnswer(`tod_choice_${todRound}`, {
+          type,
+          chosenBy: myName,
+          round: todRound,
+          timestamp: Date.now()
+        }, myName);
+      }
+      
+      if (isMyTurnToAsk) {
+        // C'est moi qui pose → je choisis Action/Vérité → maintenant j'écris la question
+        setTodPhase('writeQuestion');
+      } else {
+        // C'est le partenaire qui pose → j'attends qu'il écrive la question
+        setTodPhase('waitQuestion');
+      }
     } else {
-      // C'est mon partenaire qui pose → je dois répondre
-      setTodAsker(partnerName);
-      setTodAnswerer(myName);
-      setTodPhase('answer'); // Je dois répondre
+      // MODE CLASSIQUE: Question aléatoire du pool
+      const items = type === 'truth' ? TRUTH_OR_DARE.truths : TRUTH_OR_DARE.dares;
+      const random = items[Math.floor(Math.random() * items.length)];
+      const selection = { type, text: random, round: todRound };
+      setTruthOrDare(selection);
+      
+      setTodAsker(isMyTurnToAsk ? myName : partnerName);
+      setTodAnswerer(isMyTurnToAsk ? partnerName : myName);
+      
+      if (isMyTurnToAsk) {
+        setTodPhase('waitAnswer'); // J'attends que le partenaire réponde
+      } else {
+        setTodPhase('answer'); // Je dois répondre
+      }
+      
+      if (gameMode === 'online' && isFirebaseReady) {
+        await submitAnswer(`tod_question_${todRound}`, { 
+          type, 
+          text: random, 
+          askedBy: isMyTurnToAsk ? myName : partnerName,
+          mustAnswerBy: isMyTurnToAsk ? partnerName : myName,
+          round: todRound,
+          mode: 'classic',
+          timestamp: Date.now()
+        }, myName);
+      }
+    }
+  };
+
+  // Envoyer une question personnalisée au partenaire
+  const submitCustomQuestion = async () => {
+    if (!todCustomQuestion.trim()) {
+      Alert.alert('Oops', 'Écris une question ou un défi pour ton partenaire !');
+      return;
     }
     
-    // En mode online, synchroniser le choix avec le partenaire
+    const myName = user?.name || 'Moi';
+    const partnerName = partner?.name || 'Partenaire';
+    const selection = { type: todChosenType, text: todCustomQuestion.trim(), round: todRound };
+    setTruthOrDare(selection);
+    setTodPhase('waitAnswer');
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
     if (gameMode === 'online' && isFirebaseReady) {
-      await submitAnswer(`tod_question_${todRound}`, { 
-        type, 
-        text: random, 
-        askedBy: isMyTurnToAsk ? myName : partnerName,
-        mustAnswerBy: isMyTurnToAsk ? partnerName : myName,
+      await submitAnswer(`tod_question_${todRound}`, {
+        type: todChosenType,
+        text: todCustomQuestion.trim(),
+        askedBy: myName,
+        mustAnswerBy: partnerName,
         round: todRound,
+        mode: 'custom',
         timestamp: Date.now()
       }, myName);
     }
@@ -700,6 +779,7 @@ export default function GamesScreen() {
     }
     
     setTodSubmitted(true);
+    setTodPhase('reveal');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     // En mode online, synchroniser la réponse avec le partenaire
@@ -720,6 +800,7 @@ export default function GamesScreen() {
   const confirmActionDone = async () => {
     setTodSubmitted(true);
     setTodResponse('✅ Action réalisée !');
+    setTodPhase('reveal');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     if (gameMode === 'online' && isFirebaseReady) {
@@ -754,6 +835,9 @@ export default function GamesScreen() {
     setTodSubmitted(false);
     setTodRound(prev => prev + 1);
     setTodPhase('choose');
+    setTodCustomQuestion('');
+    setTodChosenType(null);
+    setTodPartnerResponse(null);
     
     // ALTERNER : si c'était mon tour de poser, maintenant c'est au partenaire
     setIsMyTurnToAsk(prev => !prev);
@@ -1624,75 +1708,196 @@ export default function GamesScreen() {
         {/* Indicateur de tour */}
         <View style={styles.todTurnIndicator}>
           <Text style={styles.todTurnText}>
-            {isMyTurnToAsk 
-              ? `🎯 C'est ton tour de poser une question à ${partnerName}` 
-              : `⏳ C'est au tour de ${partnerName} de te poser une question`}
+            {todGameMode 
+              ? (todGameMode === 'custom' ? '✍️ Mode Personnalisé' : '🎲 Mode Classique')
+              : '🎭 Action ou Vérité'}
           </Text>
           <Text style={styles.todRoundText}>Tour {todRound + 1}</Text>
         </View>
 
-        {/* Phase 1: Choix Action/Vérité */}
-        {!truthOrDare && isMyTurnToAsk && (
+        {/* ===================== PHASE: MODE SELECT ===================== */}
+        {todPhase === 'modeSelect' && (
           <View style={styles.todChoice}>
-            <Text style={styles.todTitle}>
-              Choisis pour {partnerName} :
-            </Text>
+            <Text style={styles.todTitle}>Choisis un mode :</Text>
+            
             <TouchableOpacity
               style={styles.todButton}
-              onPress={() => selectTruthOrDare('truth')}
+              onPress={() => {
+                setTodGameMode('classic');
+                setTodPhase('choose');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }}
             >
-              <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.todButtonGradient}>
-                <Text style={styles.todButtonIcon}>💬</Text>
-                <Text style={styles.todButtonText}>VÉRITÉ</Text>
-                <Text style={styles.todButtonHint}>{partnerName} devra répondre honnêtement</Text>
+              <LinearGradient colors={['#8B5CF6', '#7C3AED']} style={styles.todButtonGradient}>
+                <Text style={styles.todButtonIcon}>🎲</Text>
+                <Text style={styles.todButtonText}>CLASSIQUE</Text>
+                <Text style={styles.todButtonHint}>Questions aléatoires du jeu</Text>
               </LinearGradient>
             </TouchableOpacity>
+            
             <Text style={styles.todOr}>ou</Text>
+            
             <TouchableOpacity
               style={styles.todButton}
-              onPress={() => selectTruthOrDare('dare')}
+              onPress={() => {
+                setTodGameMode('custom');
+                setTodPhase('choose');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }}
             >
-              <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.todButtonGradient}>
-                <Text style={styles.todButtonIcon}>⚡</Text>
-                <Text style={styles.todButtonText}>ACTION</Text>
-                <Text style={styles.todButtonHint}>{partnerName} devra faire un défi</Text>
+              <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.todButtonGradient}>
+                <Text style={styles.todButtonIcon}>✍️</Text>
+                <Text style={styles.todButtonText}>PERSONNALISÉ</Text>
+                <Text style={styles.todButtonHint}>Écrivez vos propres questions !</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Phase: Attente du partenaire qui doit poser */}
-        {!truthOrDare && !isMyTurnToAsk && (
-          <View style={styles.todWaitingTurn}>
-            <Text style={styles.todWaitingIcon}>🔄</Text>
-            <Text style={styles.todWaitingTitle}>
-              C'est au tour de {partnerName} !
+        {/* ===================== PHASE: CHOOSE ===================== */}
+        {todPhase === 'choose' && (
+          <View style={styles.todChoice}>
+            <Text style={styles.todTitle}>
+              {isMyTurnToAsk 
+                ? (todGameMode === 'custom' 
+                    ? `Choisis ce que ${partnerName} doit faire :`
+                    : `Choisis pour ${partnerName} :`)
+                : `C'est au tour de ${partnerName}...`}
             </Text>
-            <Text style={styles.todWaitingHint}>
-              {gameMode === 'online' 
-                ? `${partnerName} est en train de choisir une question pour toi...`
-                : 'Passe le téléphone à ton partenaire pour qu\'il/elle choisisse Action ou Vérité pour toi.'}
-            </Text>
-            {gameMode === 'online' ? (
-              <View style={styles.todWaitingResponse}>
-                <ActivityIndicator size="small" color="#FF6B9D" />
-                <Text style={styles.todWaitingResponseText}>En attente...</Text>
-              </View>
+            
+            {isMyTurnToAsk ? (
+              <>
+                <TouchableOpacity
+                  style={styles.todButton}
+                  onPress={() => selectTruthOrDare('truth')}
+                >
+                  <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.todButtonGradient}>
+                    <Text style={styles.todButtonIcon}>💬</Text>
+                    <Text style={styles.todButtonText}>VÉRITÉ</Text>
+                    <Text style={styles.todButtonHint}>
+                      {todGameMode === 'custom' 
+                        ? 'Tu écriras une question pour ' + partnerName
+                        : partnerName + ' devra répondre honnêtement'}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <Text style={styles.todOr}>ou</Text>
+                <TouchableOpacity
+                  style={styles.todButton}
+                  onPress={() => selectTruthOrDare('dare')}
+                >
+                  <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.todButtonGradient}>
+                    <Text style={styles.todButtonIcon}>⚡</Text>
+                    <Text style={styles.todButtonText}>ACTION</Text>
+                    <Text style={styles.todButtonHint}>
+                      {todGameMode === 'custom' 
+                        ? 'Tu écriras un défi pour ' + partnerName
+                        : partnerName + ' devra faire un défi'}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
             ) : (
-              <TouchableOpacity
-                style={styles.todReadyButton}
-                onPress={() => setIsMyTurnToAsk(true)}
-              >
-                <Text style={styles.todReadyButtonText}>
-                  👋 {partnerName} est prêt(e) à choisir
+              <View style={styles.todWaitingTurn}>
+                <Text style={styles.todWaitingIcon}>⏳</Text>
+                <Text style={styles.todWaitingTitle}>
+                  {partnerName} choisit...
                 </Text>
-              </TouchableOpacity>
+                <Text style={styles.todWaitingHint}>
+                  {gameMode === 'online'
+                    ? `${partnerName} est en train de choisir Action ou Vérité pour toi...`
+                    : 'Passe le téléphone à ton partenaire pour qu\'il/elle choisisse.'}
+                </Text>
+                {gameMode === 'online' ? (
+                  <View style={styles.todWaitingResponse}>
+                    <ActivityIndicator size="small" color="#FF6B9D" />
+                    <Text style={styles.todWaitingResponseText}>En attente...</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.todReadyButton}
+                    onPress={() => setIsMyTurnToAsk(true)}
+                  >
+                    <Text style={styles.todReadyButtonText}>
+                      👋 C'est mon tour de choisir
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
           </View>
         )}
 
-        {/* Phase 2: Question posée - Affichage */}
-        {truthOrDare && (
+        {/* ===================== PHASE: WRITE QUESTION (custom mode) ===================== */}
+        {todPhase === 'writeQuestion' && (
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.todResult}
+          >
+            <View style={styles.todQuestionHeader}>
+              <Text style={styles.todAskerText}>
+                {todChosenType === 'truth' ? '💬 VÉRITÉ' : '⚡ ACTION'} — pour {todAnswerer || partnerName}
+              </Text>
+            </View>
+            
+            <Text style={styles.todTitle}>
+              {todChosenType === 'truth'
+                ? `✍️ Écris une question pour ${todAnswerer || partnerName} :`
+                : `✍️ Écris un défi pour ${todAnswerer || partnerName} :`}
+            </Text>
+            
+            <View style={styles.todResponseContainer}>
+              <TextInput
+                style={[styles.todResponseInput, { minHeight: 120 }]}
+                value={todCustomQuestion}
+                onChangeText={setTodCustomQuestion}
+                placeholder={todChosenType === 'truth' 
+                  ? "Ex: Quel est ton souvenir préféré de nous ?" 
+                  : "Ex: Envoie un message mignon à ta maman !"}
+                placeholderTextColor="#999"
+                multiline
+                maxLength={300}
+                autoFocus
+              />
+              <TouchableOpacity
+                style={[
+                  styles.todSubmitButton,
+                  !todCustomQuestion.trim() && styles.todSubmitButtonDisabled
+                ]}
+                onPress={submitCustomQuestion}
+                disabled={!todCustomQuestion.trim()}
+              >
+                <Text style={styles.todSubmitButtonText}>
+                  Envoyer à {todAnswerer || partnerName} ✉️
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+
+        {/* ===================== PHASE: WAIT QUESTION ===================== */}
+        {todPhase === 'waitQuestion' && (
+          <View style={styles.todWaitingTurn}>
+            <Text style={styles.todWaitingIcon}>✍️</Text>
+            <Text style={styles.todWaitingTitle}>
+              {todChosenType === 'truth' ? '💬 Vérité choisie !' : '⚡ Action choisie !'}
+            </Text>
+            <Text style={styles.todWaitingHint}>
+              {isMyTurnToAsk
+                ? `Tu as choisi ${todChosenType === 'truth' ? 'Vérité' : 'Action'}.\n${partnerName} est en train d'écrire une question pour toi...`
+                : `${partnerName} est en train d'écrire ${todChosenType === 'truth' ? 'une question' : 'un défi'} pour toi...`}
+            </Text>
+            <View style={styles.todWaitingResponse}>
+              <ActivityIndicator size="small" color="#FF6B9D" />
+              <Text style={styles.todWaitingResponseText}>
+                En attente de la question...
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* ===================== PHASE: ANSWER ===================== */}
+        {todPhase === 'answer' && truthOrDare && (
           <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.todResult}
@@ -1704,7 +1909,7 @@ export default function GamesScreen() {
               </Text>
             </View>
 
-            {/* Type: Vérité ou Action */}
+            {/* Type */}
             <Text style={styles.todResultType}>
               {truthOrDare.type === 'truth' ? '💬 VÉRITÉ' : '⚡ ACTION'}
             </Text>
@@ -1714,106 +1919,133 @@ export default function GamesScreen() {
               <Text style={styles.todResultText}>{truthOrDare.text}</Text>
             </View>
 
-            {/* Zone de réponse - uniquement si c'est mon tour de répondre (ou en mode local après passage du tel) */}
-            {((todAnswerer === myName) || (gameMode !== 'online' && todPhase === 'answer')) && !todSubmitted && (
-              <View style={styles.todResponseContainer}>
-                <Text style={styles.todResponseLabel}>
-                  {truthOrDare.type === 'truth' 
-                    ? '📝 Écris ta réponse pour ' + todAsker + ' :' 
-                    : '⚡ Confirme quand tu as fait l\'action :'}
-                </Text>
-                
-                {truthOrDare.type === 'truth' ? (
-                  <>
-                    <TextInput
-                      style={styles.todResponseInput}
-                      value={todResponse}
-                      onChangeText={setTodResponse}
-                      placeholder="Tape ta réponse ici..."
-                      placeholderTextColor="#999"
-                      multiline
-                      maxLength={500}
-                    />
-                    <TouchableOpacity
-                      style={[
-                        styles.todSubmitButton,
-                        !todResponse.trim() && styles.todSubmitButtonDisabled
-                      ]}
-                      onPress={submitTodResponse}
-                      disabled={!todResponse.trim()}
-                    >
-                      <Text style={styles.todSubmitButtonText}>
-                        Envoyer ma réponse à {todAsker} ✓
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <View style={styles.todActionButtons}>
-                    <TouchableOpacity
-                      style={styles.todActionDoneButton}
-                      onPress={confirmActionDone}
-                    >
-                      <Text style={styles.todActionDoneText}>✅ J'ai fait l'action !</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.todActionSkipButton}
-                      onPress={() => {
-                        setTodSubmitted(true);
-                        setTodResponse('❌ Action passée...');
-                        if (gameMode === 'online' && isFirebaseReady) {
-                          submitAnswer(`tod_response_${todRound}`, {
-                            response: '❌ Action passée...',
-                            respondedBy: myName,
-                            question: truthOrDare,
-                            round: todRound,
-                            timestamp: Date.now()
-                          }, myName);
-                        }
-                      }}
-                    >
-                      <Text style={styles.todActionSkipText}>😅 Je passe...</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* Attente de réponse - si c'est moi qui ai posé (pas en phase answer locale) */}
-            {todAsker === myName && !todSubmitted && todPhase !== 'answer' && (
-              <View style={styles.todWaitingResponse}>
-                <ActivityIndicator size="small" color="#FF6B9D" />
-                <Text style={styles.todWaitingResponseText}>
-                  En attente de la réponse de {todAnswerer}...
-                </Text>
-                {gameMode !== 'online' && (
-                  <>
-                    <Text style={styles.todWaitingResponseHint}>
-                      Passe le téléphone à {todAnswerer} pour qu'il/elle réponde.
+            {/* Zone de réponse */}
+            <View style={styles.todResponseContainer}>
+              <Text style={styles.todResponseLabel}>
+                {truthOrDare.type === 'truth' 
+                  ? '📝 Écris ta réponse :' 
+                  : '⚡ Confirme quand tu as fait l\'action :'}
+              </Text>
+              
+              {truthOrDare.type === 'truth' ? (
+                <>
+                  <TextInput
+                    style={styles.todResponseInput}
+                    value={todResponse}
+                    onChangeText={setTodResponse}
+                    placeholder="Tape ta réponse ici..."
+                    placeholderTextColor="#999"
+                    multiline
+                    maxLength={500}
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.todSubmitButton,
+                      !todResponse.trim() && styles.todSubmitButtonDisabled
+                    ]}
+                    onPress={submitTodResponse}
+                    disabled={!todResponse.trim()}
+                  >
+                    <Text style={styles.todSubmitButtonText}>
+                      Envoyer ma réponse à {todAsker} ✓
                     </Text>
-                    <TouchableOpacity
-                      style={styles.todPassPhoneButton}
-                      onPress={() => {
-                        // En mode local: simuler que c'est maintenant le répondeur qui a le téléphone
-                        // Inverser les rôles temporairement pour que la zone de réponse s'affiche
-                        const tempAsker = todAsker;
-                        const tempAnswerer = todAnswerer;
-                        setTodAsker(tempAsker);
-                        setTodAnswerer(tempAnswerer);
-                        // Forcer l'affichage de la zone de réponse en mode local
-                        setTodPhase('answer');
-                      }}
-                    >
-                      <Text style={styles.todPassPhoneText}>
-                        📱 Téléphone passé à {todAnswerer}
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.todActionButtons}>
+                  <TouchableOpacity
+                    style={styles.todActionDoneButton}
+                    onPress={confirmActionDone}
+                  >
+                    <Text style={styles.todActionDoneText}>✅ J'ai fait l'action !</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.todActionSkipButton}
+                    onPress={() => {
+                      setTodSubmitted(true);
+                      setTodResponse('❌ Action passée...');
+                      setTodPhase('reveal');
+                      if (gameMode === 'online' && isFirebaseReady) {
+                        submitAnswer(`tod_response_${todRound}`, {
+                          response: '❌ Action passée...',
+                          respondedBy: myName,
+                          question: truthOrDare,
+                          round: todRound,
+                          timestamp: Date.now()
+                        }, myName);
+                      }
+                    }}
+                  >
+                    <Text style={styles.todActionSkipText}>😅 Je passe...</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        )}
+
+        {/* ===================== PHASE: WAIT ANSWER ===================== */}
+        {todPhase === 'waitAnswer' && truthOrDare && (
+          <View style={styles.todResult}>
+            {/* Header: Qui pose à qui */}
+            <View style={styles.todQuestionHeader}>
+              <Text style={styles.todAskerText}>
+                Tu as demandé à {todAnswerer} :
+              </Text>
+            </View>
+
+            <Text style={styles.todResultType}>
+              {truthOrDare.type === 'truth' ? '💬 VÉRITÉ' : '⚡ ACTION'}
+            </Text>
+            
+            <View style={styles.todResultCard}>
+              <Text style={styles.todResultText}>{truthOrDare.text}</Text>
+            </View>
+
+            <View style={styles.todWaitingResponse}>
+              <ActivityIndicator size="small" color="#FF6B9D" />
+              <Text style={styles.todWaitingResponseText}>
+                En attente de la réponse de {todAnswerer}...
+              </Text>
+            </View>
+
+            {gameMode !== 'online' && (
+              <TouchableOpacity
+                style={styles.todPassPhoneButton}
+                onPress={() => {
+                  setTodPhase('answer');
+                }}
+              >
+                <Text style={styles.todPassPhoneText}>
+                  📱 Téléphone passé à {todAnswerer}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* ===================== PHASE: REVEAL ===================== */}
+        {todPhase === 'reveal' && (
+          <View style={styles.todResult}>
+            <View style={styles.todQuestionHeader}>
+              <Text style={styles.todAskerText}>
+                {todAsker} a demandé à {todAnswerer} :
+              </Text>
+            </View>
+
+            <Text style={styles.todResultType}>
+              {truthOrDare?.type === 'truth' ? '💬 VÉRITÉ' : '⚡ ACTION'}
+            </Text>
+            
+            {truthOrDare && (
+              <View style={styles.todResultCard}>
+                <Text style={styles.todResultText}>{truthOrDare.text}</Text>
               </View>
             )}
 
-            {/* Réponse soumise - Affichage pour les deux */}
-            {todSubmitted && (
+            {/* Réponse locale (ma propre réponse si j'étais le répondant) */}
+            {todSubmitted && todResponse ? (
               <View style={styles.todAnswerContainer}>
                 <Text style={styles.todAnswerLabel}>
                   ✅ Réponse de {todAnswerer} :
@@ -1821,55 +2053,32 @@ export default function GamesScreen() {
                 <View style={styles.todAnswerBox}>
                   <Text style={styles.todAnswerText}>{todResponse}</Text>
                 </View>
-                
-                {/* En mode online, afficher aussi la réponse du partenaire */}
-                {gameMode === 'online' && (
-                  <View style={styles.todPartnerSection}>
-                    {(() => {
-                      const partnerResponse = getPartnerTodResponse();
-                      if (partnerResponse) {
-                        return (
-                          <>
-                            <Text style={styles.todPartnerLabel}>
-                              💕 Réponse de {partnerResponse.respondedBy || partnerName} :
-                            </Text>
-                            <View style={styles.todPartnerAnswerBox}>
-                              <Text style={styles.todPartnerAnswerText}>
-                                {partnerResponse.response}
-                              </Text>
-                            </View>
-                          </>
-                        );
-                      } else {
-                        return (
-                          <View style={styles.todWaitingPartner}>
-                            <ActivityIndicator size="small" color="#FF6B9D" />
-                            <Text style={styles.todWaitingText}>
-                              En attente de la réponse de {partnerName}...
-                            </Text>
-                          </View>
-                        );
-                      }
-                    })()}
-                  </View>
-                )}
+              </View>
+            ) : null}
+
+            {/* Réponse du partenaire (si mode online et j'étais l'asker) */}
+            {todPartnerResponse && (
+              <View style={styles.todPartnerSection}>
+                <Text style={styles.todPartnerLabel}>
+                  💕 Réponse de {todPartnerResponse.respondedBy || partnerName} :
+                </Text>
+                <View style={styles.todPartnerAnswerBox}>
+                  <Text style={styles.todPartnerAnswerText}>
+                    {todPartnerResponse.response}
+                  </Text>
+                </View>
               </View>
             )}
 
-            {/* Bouton tour suivant - visible après réponse */}
-            {todSubmitted && (
-              <TouchableOpacity
-                style={styles.todNextButton}
-                onPress={nextTodRound}
-              >
-                <Text style={styles.todNextButtonText}>
-                  {isMyTurnToAsk 
-                    ? `Prochain tour → (${partnerName} pose)` 
-                    : `Prochain tour → (Je pose)`}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </KeyboardAvoidingView>
+            <TouchableOpacity
+              style={styles.todNextButton}
+              onPress={nextTodRound}
+            >
+              <Text style={styles.todNextButtonText}>
+                ➡️ Tour suivant ({isMyTurnToAsk ? partnerName + ' pose' : 'Je pose'})
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Historique des tours */}
@@ -1881,7 +2090,7 @@ export default function GamesScreen() {
                 <View key={idx} style={styles.todHistoryItem}>
                   <Text style={styles.todHistoryRound}>Tour {item.round + 1}</Text>
                   <Text style={styles.todHistoryType}>
-                    {item.question.type === 'truth' ? '💬' : '⚡'}
+                    {item.question?.type === 'truth' ? '💬' : '⚡'}
                   </Text>
                   <Text style={styles.todHistoryAnswer} numberOfLines={2}>
                     {item.response}

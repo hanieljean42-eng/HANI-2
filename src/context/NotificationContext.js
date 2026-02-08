@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -396,11 +397,11 @@ export function NotificationProvider({ children }) {
           console.log('⚠️ Date de notification passée');
           return false;
         }
-        trigger = { date: targetDate };
+        trigger = { type: SchedulableTriggerInputTypes.DATE, date: targetDate };
       } else if (triggerOptions.seconds) {
-        trigger = { seconds: triggerOptions.seconds };
+        trigger = { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: triggerOptions.seconds };
       } else {
-        trigger = { seconds: 1 };
+        trigger = { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 1 };
       }
 
       const notificationId = await Notifications.scheduleNotificationAsync({
@@ -549,6 +550,7 @@ export function NotificationProvider({ children }) {
         priority: Notifications.AndroidNotificationPriority.HIGH,
       },
       trigger: {
+        type: SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: seconds,
         repeats: false,
       },
@@ -581,6 +583,7 @@ export function NotificationProvider({ children }) {
         priority: Notifications.AndroidNotificationPriority.DEFAULT,
       },
       trigger: {
+        type: SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: seconds,
         repeats: false,
       },
@@ -613,6 +616,7 @@ export function NotificationProvider({ children }) {
           sound: 'default',
         },
         trigger: {
+          type: SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: seconds,
           repeats: false,
         },
@@ -669,7 +673,7 @@ export function NotificationProvider({ children }) {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: { date: targetDate },
+        trigger: { type: SchedulableTriggerInputTypes.DATE, date: targetDate },
       });
 
       console.log('📅 Notification lettre programmée pour:', targetDate.toISOString(), 'ID:', notificationId);
@@ -742,7 +746,7 @@ export function NotificationProvider({ children }) {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: { seconds: 2 },
+        trigger: { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2 },
       });
       console.log('✅ Notification de bienvenue envoyée');
       return true;
@@ -803,7 +807,7 @@ export function NotificationProvider({ children }) {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: { seconds: seconds },
+        trigger: { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: seconds },
       });
       console.log(`✅ Notification différée programmée (${seconds}s), ID:`, notifId);
       return { success: true, id: notifId };
@@ -823,7 +827,7 @@ export function NotificationProvider({ children }) {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: { seconds: 1 }, // Immédiat (après 1 seconde pour s'assurer que tout est chargé)
+        trigger: { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 1 }, // Immédiat (après 1 seconde)
       });
       return true;
     } catch (error) {
