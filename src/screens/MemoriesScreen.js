@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
@@ -1110,17 +1111,17 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => Keyboard.dismiss()}
         >
-        <View style={styles.modalOverlay}>
+          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
           <ScrollView 
-            contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-          >
-          <View style={styles.modalContent}> 
+            bounces={false}
+          > 
             <Text style={styles.modalTitle}>{
                addType === 'letter' ? '💌 Nouvelle Lettre' :
                addType === 'diary' ? '📖 Nouvelle Entrée' :
@@ -1334,10 +1335,9 @@ export default function MemoriesScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
           </ScrollView>
-        </View>
-        </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* View Memory Modal */}
@@ -1487,17 +1487,17 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowEditModal(false)}
       >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => Keyboard.dismiss()}
         >
-        <View style={styles.modalOverlay}>
+          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
           <ScrollView 
-            contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            bounces={false}
           >
-          <View style={styles.modalContent}> 
             <Text style={styles.modalTitle}>{
                editType === 'letter' ? '✏️ Modifier la lettre' : 
                '✏️ Modifier l\'entrée'}
@@ -1622,10 +1622,9 @@ export default function MemoriesScreen() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
           </ScrollView>
-        </View>
-        </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </LinearGradient>
   );
@@ -1968,7 +1967,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 30,
-    maxHeight: '85%',
+    maxHeight: Dimensions.get('window').height * 0.85,
   },
   modalTitle: {
     fontSize: 22,
