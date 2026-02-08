@@ -362,7 +362,10 @@ export default function GamesScreen() {
   const [todGameMode, setTodGameMode] = useState(null); // 'classic' or 'custom'
   const [todCustomQuestion, setTodCustomQuestion] = useState('');
   const [todChosenType, setTodChosenType] = useState(null);
+  const [todWaitingReaction, setTodWaitingReaction] = useState(false); // Le répondeur attend la réaction du questioner
+  const [todWaitingNextSync, setTodWaitingNextSync] = useState(false); // Attend que le partenaire soit prêt pour le tour suivant
   const todScrollRef = useRef(null); // Ref pour auto-scroll du fil
+  const processedTodKeys = useRef(new Set()); // Clés Firebase déjà traitées (éviter doublons)
   
   // États pour le mode multijoueur à distance
   const [showLobby, setShowLobby] = useState(false);
@@ -438,6 +441,9 @@ export default function GamesScreen() {
     setTodGameMode(null);
     setTodCustomQuestion('');
     setTodChosenType(null);
+    setTodWaitingReaction(false);
+    setTodWaitingNextSync(false);
+    processedTodKeys.current = new Set();
     // Online states
     setOnlineAnswerSent(false);
     setOnlinePartnerAnswer(null);
@@ -612,7 +618,7 @@ export default function GamesScreen() {
     setOnlineWaitingNextPartner(false);
   };
 
-  // ✅ NOUVEAU: Écouter les données du partenaire en Action/Vérité
+  // ✅ LISTENER ROBUSTE: Écouter les données du partenaire en Action/Vérité
   useEffect(() => {
     if (activeGame !== 'truthordare' || !isFirebaseReady) return;
     if (gameMode !== 'online') return;
@@ -620,101 +626,131 @@ export default function GamesScreen() {
     const myName = user?.name || 'Moi';
     const partnerName = partner?.name || 'Partenaire';
     
-    // 1. Écouter le choix Action/Vérité du partenaire (mode personnalisé)
-    const choiceKey = `tod_choice_${todRound}`;
-    if (gameData?.answers?.[choiceKey] && todPhase === 'choose' && todGameMode === 'custom') {
-      const choices = gameData.answers[choiceKey];
-      const partnerChoice = Object.entries(choices).find(
-        ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+    // Helper: vérifier si une clé a déjà été traitée (éviter doublons)
+    const alreadyProcessed = (key) => {
+      if (processedTodKeys.current.has(key)) return true;
+      processedTodKeys.current.add(key);
+      return false;
+    };
+    
+    // Helper: trouver les données du partenaire dans une clé Firebase
+    const findPartnerData = (key) => {
+      const entries = gameData?.answers?.[key];
+      if (!entries) return null;
+      const found = Object.entries(entries).find(
+        ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
       );
-      
-      if (partnerChoice) {
-        const [, choiceData] = partnerChoice;
-        if (choiceData.chosenBy !== myName) {
-          console.log('📨 Partenaire a choisi:', choiceData.type);
-          setTodChosenType(choiceData.type);
-          // Ajouter le choix du partenaire dans le fil
-          addToThread({
-            type: 'choice',
-            player: choiceData.chosenBy,
-            choice: choiceData.type,
-            text: choiceData.type === 'truth' ? '💬 Vérité' : '⚡ Action',
-            round: todRound,
-          });
-          setTodPhase('writeQuestion');
-        }
+      return found ? found[1] : null;
+    };
+    
+    // 1. Écouter le choix Action/Vérité du partenaire (mode personnalisé uniquement)
+    const choiceKey = `tod_choice_${todRound}`;
+    const choiceData = findPartnerData(choiceKey);
+    if (choiceData && todGameMode === 'custom' && !alreadyProcessed(`choice_${todRound}`)) {
+      if (choiceData.chosenBy !== myName) {
+        console.log('📨 Partenaire a choisi:', choiceData.type);
+        setTodChosenType(choiceData.type);
+        addToThread({
+          type: 'choice',
+          player: choiceData.chosenBy,
+          choice: choiceData.type,
+          text: choiceData.type === 'truth' ? '💬 Vérité' : '⚡ Action',
+          round: todRound,
+        });
+        // Si le partenaire a choisi, je dois écrire la question (je suis le questioner en attente)
+        setTodPhase('writeQuestion');
       }
     }
     
     // 2. Écouter la question posée par le partenaire
     const questionKey = `tod_question_${todRound}`;
-    if (gameData?.answers?.[questionKey] && !truthOrDare) {
-      const questions = gameData.answers[questionKey];
-      const partnerQuestion = Object.entries(questions).find(
-        ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
-      );
-      
-      if (partnerQuestion) {
-        const [, questionData] = partnerQuestion;
-        if (questionData.mustAnswerBy === myName) {
-          console.log('📨 Question du partenaire reçue:', questionData);
-          setTruthOrDare({ type: questionData.type, text: questionData.text, round: questionData.round });
-          setTodAsker(questionData.askedBy);
-          setTodAnswerer(questionData.mustAnswerBy);
-          setTodChosenType(questionData.type);
-          // Ajouter la question du partenaire dans le fil
-          addToThread({
-            type: 'question',
-            player: questionData.askedBy,
-            questionType: questionData.type,
-            text: questionData.text,
-            round: todRound,
-          });
-          setTodPhase('answer');
+    const questionData = findPartnerData(questionKey);
+    if (questionData && !alreadyProcessed(`question_${todRound}`)) {
+      if (questionData.mustAnswerBy === myName) {
+        console.log('📨 Question du partenaire reçue:', questionData);
+        setTruthOrDare({ type: questionData.type, text: questionData.text, round: questionData.round });
+        setTodAsker(questionData.askedBy);
+        setTodAnswerer(questionData.mustAnswerBy);
+        setTodChosenType(questionData.type);
+        addToThread({
+          type: 'question',
+          player: questionData.askedBy,
+          questionType: questionData.type,
+          text: questionData.text,
+          round: todRound,
+        });
+        // En mode classique, le choix est inclus dans la question — ajouter aussi la bulle choix
+        if (questionData.mode === 'classic') {
+          // Insérer la bulle choix AVANT la question (si pas déjà fait)
+          if (!processedTodKeys.current.has(`choice_classic_${todRound}`)) {
+            processedTodKeys.current.add(`choice_classic_${todRound}`);
+            // On l'ajoute en tant que system message
+            addToThread({
+              type: 'choice',
+              player: questionData.askedBy,
+              choice: questionData.type,
+              text: questionData.type === 'truth' ? '💬 Vérité' : '⚡ Action',
+              round: todRound,
+            });
+          }
         }
+        setTodPhase('answer');
       }
     }
 
-    // 3. Écouter la réponse du partenaire
-    if (todPhase === 'waitAnswer' || todPhase === 'react') {
-      const responseKey = `tod_response_${todRound}`;
-      if (gameData?.answers?.[responseKey]) {
-        const responses = gameData.answers[responseKey];
-        const partnerResponse = Object.entries(responses).find(
-          ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
-        );
-        
-        if (partnerResponse) {
-          const [, responseData] = partnerResponse;
-          console.log('✅ Réponse du partenaire reçue:', responseData);
-          setTodPartnerResponse(responseData);
-          if (todPhase === 'waitAnswer') {
-            // Ajouter la réponse du partenaire dans le fil
-            addToThread({
-              type: 'response',
-              player: responseData.respondedBy || partnerName,
-              text: responseData.response,
-              round: todRound,
-            });
-            setTodPhase('react');
-          }
-        }
+    // 3. Écouter la réponse du partenaire (SANS restriction de phase — on la capture dès qu'elle arrive)
+    const responseKey = `tod_response_${todRound}`;
+    const responseData = findPartnerData(responseKey);
+    if (responseData && !alreadyProcessed(`response_${todRound}`)) {
+      if (responseData.respondedBy !== myName) {
+        console.log('✅ Réponse du partenaire reçue:', responseData);
+        setTodPartnerResponse(responseData);
+        addToThread({
+          type: 'response',
+          player: responseData.respondedBy || partnerName,
+          text: responseData.response,
+          round: todRound,
+        });
+        // Je suis le questioner → je passe en phase react pour réagir
+        setTodPhase('react');
       }
     }
     
     // 4. Écouter la réaction du partenaire
     const reactionKey = `tod_reaction_${todRound}`;
-    if (gameData?.answers?.[reactionKey]) {
-      const reactions = gameData.answers[reactionKey];
-      const partnerReaction = Object.entries(reactions).find(
-        ([playerId, data]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
-      );
-      if (partnerReaction) {
-        const [, reactionData] = partnerReaction;
+    const reactionData = findPartnerData(reactionKey);
+    if (reactionData && !alreadyProcessed(`reaction_${todRound}`)) {
+      if (reactionData.reactedBy !== myName) {
+        console.log('✅ Réaction du partenaire reçue:', reactionData.reaction);
         addReactionToThread(reactionData.reaction);
+        addToThread({
+          type: 'reaction',
+          player: reactionData.reactedBy || partnerName,
+          text: reactionData.reaction,
+          round: todRound,
+        });
+        // Je suis le répondeur, j'attendais la réaction → on peut avancer maintenant
+        if (todWaitingReaction) {
+          setTodWaitingReaction(false);
+          // Auto-avancer au tour suivant après un court délai
+          setTimeout(() => {
+            advanceToNextTodRound();
+          }, 1200);
+        }
       }
     }
-  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, todSubmitted, myPlayerId, user?.name, truthOrDare, todGameMode]);
+    
+    // 5. Écouter le signal "prêt pour le tour suivant" du partenaire
+    const readyKey = `ready_next_tod_${todRound}`;
+    const readyData = findPartnerData(readyKey);
+    if (readyData && !alreadyProcessed(`ready_${todRound}`)) {
+      console.log('✅ Partenaire prêt pour le tour suivant');
+      // Si moi aussi j'attends la sync, avancer
+      if (todWaitingNextSync) {
+        advanceToNextTodRound();
+      }
+    }
+  }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, myPlayerId, user?.name, truthOrDare, todGameMode, todWaitingReaction, todWaitingNextSync]);
 
   // ✅ Synchroniser le tour de question en mode online via gameSession
   useEffect(() => {
@@ -840,8 +876,8 @@ export default function GamesScreen() {
     setTodSubmitted(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    // Ajouter le choix dans le fil
-    const chooserName = isMyTurnToAsk ? partnerName : myName;
+    // Ajouter le choix dans le fil — C'est MOI qui choisis quand isMyTurnToAsk est true
+    const chooserName = isMyTurnToAsk ? myName : partnerName;
     addToThread({
       type: 'choice',
       player: chooserName,
@@ -961,10 +997,12 @@ export default function GamesScreen() {
     });
     
     setTodSubmitted(true);
-    setTodPhase('react');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     if (gameMode === 'online' && isFirebaseReady) {
+      // En mode online, le répondeur attend la réaction du questioner
+      setTodWaitingReaction(true);
+      setTodPhase('waitReaction');
       await submitAnswer(`tod_response_${todRound}`, {
         response: responseText,
         respondedBy: myName,
@@ -973,6 +1011,9 @@ export default function GamesScreen() {
         timestamp: Date.now()
       }, myName);
       await notifyGameAnswer();
+    } else {
+      // En mode local, le répondeur peut réagir lui-même (pas de séparation)
+      setTodPhase('react');
     }
   };
 
@@ -990,10 +1031,12 @@ export default function GamesScreen() {
     
     setTodSubmitted(true);
     setTodResponse(responseText);
-    setTodPhase('react');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     if (gameMode === 'online' && isFirebaseReady) {
+      // En mode online, le répondeur attend la réaction du questioner
+      setTodWaitingReaction(true);
+      setTodPhase('waitReaction');
       await submitAnswer(`tod_response_${todRound}`, {
         response: responseText,
         respondedBy: myName,
@@ -1002,11 +1045,29 @@ export default function GamesScreen() {
         timestamp: Date.now()
       }, myName);
       await notifyGameAnswer();
+    } else {
+      setTodPhase('react');
     }
   };
 
+  // ✅ Fonction centralisée: Avancer au tour suivant d'Action/Vérité
+  const advanceToNextTodRound = () => {
+    setTruthOrDare(null);
+    setTodResponse('');
+    setTodSubmitted(false);
+    setTodRound(prev => prev + 1);
+    setTodPhase('choose');
+    setTodCustomQuestion('');
+    setTodChosenType(null);
+    setTodPartnerResponse(null);
+    setTodWaitingReaction(false);
+    setTodWaitingNextSync(false);
+    // isMyTurnToAsk sera recalculé automatiquement par le useEffect basé sur todRound
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
   // Réagir avec un emoji et passer au tour suivant
-  const reactAndNextRound = (emoji) => {
+  const reactAndNextRound = async (emoji) => {
     const myName = user?.name || 'Moi';
     
     // Ajouter la réaction dans le fil
@@ -1022,40 +1083,68 @@ export default function GamesScreen() {
     
     // Synchroniser la réaction en mode online
     if (gameMode === 'online' && isFirebaseReady) {
-      submitAnswer(`tod_reaction_${todRound}`, {
+      await submitAnswer(`tod_reaction_${todRound}`, {
         reaction: emoji,
         reactedBy: myName,
         round: todRound,
         timestamp: Date.now()
       }, myName);
+      
+      // Signaler "prêt pour le tour suivant" et attendre le partenaire
+      await submitAnswer(`ready_next_tod_${todRound}`, {
+        ready: true,
+        playerName: myName,
+        timestamp: Date.now(),
+      }, myName);
+      setTodWaitingNextSync(true);
+      
+      // Vérifier si le partenaire est déjà prêt
+      const readyKey = `ready_next_tod_${todRound}`;
+      const readyEntries = gameData?.answers?.[readyKey];
+      if (readyEntries) {
+        const partnerReady = Object.entries(readyEntries).find(
+          ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+        );
+        if (partnerReady) {
+          setTimeout(() => advanceToNextTodRound(), 800);
+          return;
+        }
+      }
+    } else {
+      // Mode local: avancer directement après un délai
+      setTimeout(() => advanceToNextTodRound(), 800);
     }
-    
-    // Passer au tour suivant après un court délai
-    setTimeout(() => {
-      setTruthOrDare(null);
-      setTodResponse('');
-      setTodSubmitted(false);
-      setTodRound(prev => prev + 1);
-      setTodPhase('choose');
-      setTodCustomQuestion('');
-      setTodChosenType(null);
-      setTodPartnerResponse(null);
-      setIsMyTurnToAsk(prev => !prev);
-    }, 800);
   };
 
-  // Passer au tour suivant d'Action/Vérité (alterner les rôles)
-  const nextTodRound = () => {
-    setTruthOrDare(null);
-    setTodResponse('');
-    setTodSubmitted(false);
-    setTodRound(prev => prev + 1);
-    setTodPhase('choose');
-    setTodCustomQuestion('');
-    setTodChosenType(null);
-    setTodPartnerResponse(null);
-    setIsMyTurnToAsk(prev => !prev);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  // Passer au tour suivant d'Action/Vérité sans réagir
+  const nextTodRound = async () => {
+    const myName = user?.name || 'Moi';
+    
+    if (gameMode === 'online' && isFirebaseReady) {
+      // Signaler "prêt pour le tour suivant" et attendre le partenaire
+      await submitAnswer(`ready_next_tod_${todRound}`, {
+        ready: true,
+        playerName: myName,
+        timestamp: Date.now(),
+      }, myName);
+      setTodWaitingNextSync(true);
+      
+      // Vérifier si le partenaire est déjà prêt
+      const readyKey = `ready_next_tod_${todRound}`;
+      const readyEntries = gameData?.answers?.[readyKey];
+      if (readyEntries) {
+        const partnerReady = Object.entries(readyEntries).find(
+          ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+        );
+        if (partnerReady) {
+          advanceToNextTodRound();
+          return;
+        }
+      }
+    } else {
+      // Mode local: avancer directement
+      advanceToNextTodRound();
+    }
   };
 
   // Obtenir la réponse du partenaire pour le tour actuel
@@ -2118,12 +2207,14 @@ export default function GamesScreen() {
               {todThread.map((item, index) => renderThreadBubble(item, index))}
               
               {/* Indicateur d'attente si nécessaire */}
-              {(todPhase === 'waitAnswer' || todPhase === 'waitQuestion') && (
+              {(todPhase === 'waitAnswer' || todPhase === 'waitQuestion' || todPhase === 'waitReaction') && (
                 <View style={styles.todThreadWaiting}>
                   <ActivityIndicator size="small" color="#FF6B9D" />
                   <Text style={styles.todThreadWaitingText}>
                     {todPhase === 'waitAnswer' 
                       ? `${todAnswerer || partnerName} écrit sa réponse...`
+                      : todPhase === 'waitReaction'
+                      ? `${partnerName} réagit à ta réponse... 🎭`
                       : `${partnerName} écrit la question...`}
                   </Text>
                 </View>
@@ -2256,17 +2347,20 @@ export default function GamesScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.todBottomBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-                        onPress={() => {
+                        onPress={async () => {
                           const responseText = '❌ Action passée...';
                           addToThread({ type: 'response', player: myName, text: responseText, round: todRound });
                           setTodSubmitted(true);
                           setTodResponse(responseText);
-                          setTodPhase('react');
                           if (gameMode === 'online' && isFirebaseReady) {
-                            submitAnswer(`tod_response_${todRound}`, {
+                            setTodWaitingReaction(true);
+                            setTodPhase('waitReaction');
+                            await submitAnswer(`tod_response_${todRound}`, {
                               response: responseText, respondedBy: myName,
                               question: truthOrDare, round: todRound, timestamp: Date.now()
                             }, myName);
+                          } else {
+                            setTodPhase('react');
                           }
                         }}
                       >
@@ -2298,8 +2392,8 @@ export default function GamesScreen() {
               </View>
             )}
 
-            {/* PHASE: REACT — Réactions emoji */}
-            {todPhase === 'react' && (
+            {/* PHASE: REACT — Réactions emoji (questioner seulement en online) */}
+            {todPhase === 'react' && !todWaitingNextSync && (
               <View style={styles.todBottomBar}>
                 <Text style={styles.todBottomLabel}>Réagis ! 👇</Text>
                 <View style={styles.todReactionRow}>
@@ -2319,6 +2413,30 @@ export default function GamesScreen() {
                 >
                   <Text style={styles.todSkipReactText}>➡️ Tour suivant</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* PHASE: WAIT REACTION — Le répondeur attend la réaction du questioner (online) */}
+            {todPhase === 'waitReaction' && (
+              <View style={styles.todBottomBar}>
+                <View style={styles.todBottomWait}>
+                  <ActivityIndicator size="small" color="#FF6B9D" />
+                  <Text style={styles.todBottomWaitText}>
+                    En attente de la réaction de {partnerName}... 🎭
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* PHASE: WAITING NEXT SYNC — En attente du partenaire pour le tour suivant (online) */}
+            {todWaitingNextSync && (
+              <View style={styles.todBottomBar}>
+                <View style={styles.todBottomWait}>
+                  <ActivityIndicator size="small" color="#FF6B9D" />
+                  <Text style={styles.todBottomWaitText}>
+                    En attente de {partnerName} pour le tour suivant... ⏳
+                  </Text>
+                </View>
               </View>
             )}
           </>
