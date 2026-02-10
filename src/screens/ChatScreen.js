@@ -77,7 +77,7 @@ const ChatImage = React.memo(({ uri }) => {
   if (loading || !dims) {
     return (
       <View style={styles.messageImageLoading}>
-        <ActivityIndicator size="small" color="#E91E63" />
+        <ActivityIndicator size="small" color={theme.secondary} />
       </View>
     );
   }
@@ -114,6 +114,7 @@ export default function ChatScreen({ navigation }) {
   const [inputText, setInputText] = useState('');
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [showReactions, setShowReactions] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // Message auquel on répond
   
   // États pour les messages vocaux
   const [isRecording, setIsRecording] = useState(false);
@@ -215,13 +216,15 @@ export default function ChatScreen({ navigation }) {
     const text = inputText.trim();
     setInputText('');
     
-    const result = await sendMessage(text, 'text');
+    const result = await sendMessage(text, 'text', {}, replyingTo);
     
     if (result?.success) {
       // Notifier le partenaire
       await notifyLoveNote(text.substring(0, 50));
       // 🔥 Compter comme interaction pour les flammes
       recordInteraction();
+      // Effacer le reply
+      setReplyingTo(null);
     }
   };
 
@@ -524,7 +527,18 @@ export default function ChatScreen({ navigation }) {
           delayLongPress={500}
           activeOpacity={0.8}
         >
-          <View style={[styles.messageBubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
+          <View style={[styles.messageBubble, isMe ? [styles.bubbleMe, { backgroundColor: theme.secondary }] : styles.bubbleOther]}>
+            {/* Message cité (reply) */}
+            {item.replyTo && (
+              <View style={[styles.replyPreview, isMe ? styles.replyPreviewMe : styles.replyPreviewOther]}>
+                <Text style={[styles.replyPreviewName, isMe && { color: 'rgba(255,255,255,0.9)' }]} numberOfLines={1}>
+                  {item.replyTo.senderName || 'Message'}
+                </Text>
+                <Text style={[styles.replyPreviewText, isMe && { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={2}>
+                  {item.replyTo.type === 'image' ? '📸 Photo' : item.replyTo.type === 'voice' ? '🎤 Vocal' : item.replyTo.content}
+                </Text>
+              </View>
+            )}
             {item.type === 'image' ? (
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -670,14 +684,32 @@ export default function ChatScreen({ navigation }) {
             </View>
             
             <TouchableOpacity style={styles.stopRecordButton} onPress={stopRecording}>
-              <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.stopRecordGradient}>
+              <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.stopRecordGradient}>
                 <Ionicons name="send" size={22} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
           // Interface normale
-          <View style={styles.inputContainer}>
+          <View>
+            {/* Bandeau de réponse */}
+            {replyingTo && (
+              <View style={styles.replyBanner}>
+                <View style={styles.replyBannerLine} />
+                <View style={styles.replyBannerContent}>
+                  <Text style={styles.replyBannerName}>
+                    ↩️ {replyingTo.senderName === user?.name ? 'Toi' : replyingTo.senderName}
+                  </Text>
+                  <Text style={styles.replyBannerText} numberOfLines={1}>
+                    {replyingTo.type === 'image' ? '📸 Photo' : replyingTo.type === 'voice' ? '🎤 Vocal' : replyingTo.content}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyBannerClose}>
+                  <Text style={{ fontSize: 18, color: '#999' }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={styles.inputContainer}>
             <TouchableOpacity style={styles.attachButton} onPress={handleImagePick}>
               <Text style={styles.attachText}>📷</Text>
             </TouchableOpacity>
@@ -701,7 +733,7 @@ export default function ChatScreen({ navigation }) {
                 onPress={handleSend}
               >
                 <LinearGradient
-                  colors={['#FF6B9D', '#C44569']}
+                  colors={[theme.secondary, theme.accent]}
                   style={styles.sendButtonGradient}
                 >
                   <Ionicons name="send" size={18} color="#fff" />
@@ -713,13 +745,14 @@ export default function ChatScreen({ navigation }) {
                 onPress={startRecording}
               >
                 <LinearGradient
-                  colors={['#FF6B9D', '#C44569']}
+                  colors={[theme.secondary, theme.accent]}
                   style={styles.sendButtonGradient}
                 >
                   <Ionicons name="mic" size={20} color="#fff" />
                 </LinearGradient>
               </TouchableOpacity>
             )}
+          </View>
           </View>
         )}
       </KeyboardAvoidingView>
@@ -769,6 +802,18 @@ export default function ChatScreen({ navigation }) {
                 <Text style={styles.reactionButtonText}>{emoji}</Text>
               </TouchableOpacity>
             ))}
+            
+            {/* Bouton Répondre */}
+            <TouchableOpacity
+              style={styles.replyButton}
+              onPress={() => {
+                setReplyingTo(selectedMessage);
+                setShowReactions(false);
+                setSelectedMessage(null);
+              }}
+            >
+              <Text style={styles.replyButtonText}>↩️</Text>
+            </TouchableOpacity>
             
             {selectedMessage?.senderId === user?.id && (
               <TouchableOpacity
@@ -1068,6 +1113,76 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontSize: 20,
+  },
+  // Styles pour le reply-to-message
+  replyButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e0f2fe',
+  },
+  replyButtonText: {
+    fontSize: 22,
+  },
+  replyPreview: {
+    borderLeftWidth: 3,
+    paddingLeft: 8,
+    paddingVertical: 4,
+    marginBottom: 6,
+    borderRadius: 4,
+  },
+  replyPreviewMe: {
+    borderLeftColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  replyPreviewOther: {
+    borderLeftColor: '#FF6B9D',
+    backgroundColor: 'rgba(255,107,157,0.08)',
+  },
+  replyPreviewName: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FF6B9D',
+    marginBottom: 2,
+  },
+  replyPreviewText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  replyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  replyBannerLine: {
+    width: 3,
+    height: '100%',
+    backgroundColor: '#FF6B9D',
+    borderRadius: 2,
+    marginRight: 10,
+    minHeight: 30,
+  },
+  replyBannerContent: {
+    flex: 1,
+  },
+  replyBannerName: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FF6B9D',
+  },
+  replyBannerText: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
+  replyBannerClose: {
+    padding: 8,
   },
   // Styles pour messages vocaux
   voiceMessage: {

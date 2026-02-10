@@ -554,7 +554,7 @@ export default function ProfileScreen({ navigation }) {
         {couple?.couplePhoto ? (
           <Image source={{ uri: couple.couplePhoto }} style={styles.couplePhoto} />
         ) : (
-          <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.couplePhotoPlaceholder}>
+          <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.couplePhotoPlaceholder}>
             <Text style={styles.couplePhotoPlaceholderText}>💑</Text>
             <Text style={styles.couplePhotoAddText}>Ajouter une photo de couple</Text>
           </LinearGradient>
@@ -673,7 +673,7 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.loveMeterTitle}>💕 Love Meter</Text>
         <View style={styles.loveMeterBar}>
           <LinearGradient
-            colors={['#FF6B9D', '#C44569']}
+            colors={[theme.secondary, theme.accent]}
             style={[styles.loveMeterFill, { width: `${loveMeter}%` }]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -1091,7 +1091,7 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <LinearGradient
-      colors={['#8B5CF6', '#C44569', '#FF6B9D']}
+      colors={theme.primary}
       style={styles.container}
     >
       <View style={styles.header}>

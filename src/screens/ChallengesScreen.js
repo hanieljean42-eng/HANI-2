@@ -106,10 +106,19 @@ export default function ChallengesScreen() {
       completedById: user?.id,
     });
     
-    // ✅ Notifier le partenaire que le défi a été complété (une seule notification)
+    // ✅ Notifier le partenaire que le défi a été complété
     await notifyChallenge(challenge.title);
     
+    // ✅ Fermer le modal et afficher une alerte de confirmation
     setShowChallengeModal(false);
+    
+    setTimeout(() => {
+      Alert.alert(
+        '🎉 Défi complété !',
+        `"${challenge.title}" terminé !\n+${challenge.xp} XP gagnés\n\n${partner?.name || 'Ton partenaire'} a été notifié(e) !`,
+        [{ text: 'Super ! 🎊' }]
+      );
+    }, 300);
   };
 
   const openChallenge = (challenge) => {

@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -768,11 +769,21 @@ const WOULD_YOU_RATHER = [
   },
 ];
 
+// Fonction utilitaire: sélectionner N questions aléatoires parmi un tableau
+const shuffleAndPick = (array, count) => {
+  const shuffled = [...array].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+};
+
 export default function GamesScreen() {
   const navigation = useNavigation();
+  const { theme } = useTheme();
   const { user, couple, partner } = useAuth();
   const { notifyGame, notifyGameAnswer, notifyGameWin } = useNotifyPartner();
   const { recordInteraction } = useData();
+
+  // Quiz: 10 questions aléatoires parmi les 50 disponibles
+  const [shuffledQuizQuestions, setShuffledQuizQuestions] = useState(() => shuffleAndPick(QUIZ_QUESTIONS, 10));
   const { 
     createGameSession, 
     joinGameSession, 
@@ -958,6 +969,29 @@ export default function GamesScreen() {
   // ✅ DÉDUPLICATION: Éviter de re-traiter les mêmes données
   const processedOnlineKeys = useRef(new Set());
   const advancingRef = useRef(false); // Guard contre double-avance
+
+  // ✅ Auto-scoring pour questions choice online (sorti du render pour éviter side-effects)
+  useEffect(() => {
+    if (activeGame !== 'quiz' || gameMode !== 'online') return;
+    if (quizPhase !== 'reveal' || quizValidated) return;
+    const question = shuffledQuizQuestions[currentQuestion];
+    if (!question || question.type !== 'choice') return;
+    
+    const iAmResponder = currentQuestion % 2 === 0;
+    const responderAnswer = iAmResponder ? player1Answer : onlinePartnerAnswer;
+    const guesserAnswer = iAmResponder ? onlinePartnerAnswer : player1Answer;
+    const isChoiceCorrect = responderAnswer === guesserAnswer;
+    
+    if (isChoiceCorrect) {
+      const scoringPlayer = iAmResponder ? 'player2' : 'player1';
+      setScores(prev => ({
+        ...prev,
+        [scoringPlayer]: prev[scoringPlayer] + 1,
+      }));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setQuizValidated(true);
+  }, [quizPhase, quizValidated, activeGame, gameMode, currentQuestion, player1Answer, onlinePartnerAnswer]);
 
   // ✅ LISTENER ROBUSTE: Détecte les réponses du partenaire pour Quiz/WIM/WYR en mode online
   useEffect(() => {
@@ -2150,7 +2184,7 @@ export default function GamesScreen() {
           style={styles.inviteBanner}
           onPress={() => setShowInviteModal(true)}
         >
-          <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.inviteBannerGradient}>
+          <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.inviteBannerGradient}>
             <Text style={styles.inviteBannerEmoji}>🎮</Text>
             <View style={styles.inviteBannerTextContainer}>
               <Text style={styles.inviteBannerTitle}>
@@ -2180,7 +2214,7 @@ export default function GamesScreen() {
             style={styles.onlineGameCard}
             onPress={() => startGameOnline('quiz')}
           >
-            <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.onlineGameGradient}>
+            <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.onlineGameGradient}>
               <Text style={styles.onlineGameIcon}>🧠</Text>
               <Text style={styles.onlineGameTitle}>Quiz</Text>
             </LinearGradient>
@@ -2279,7 +2313,7 @@ export default function GamesScreen() {
       <Text style={styles.gamesSectionTitle}>Passez-vous le téléphone pour jouer ensemble</Text>
 
       <TouchableOpacity style={styles.gameCard} onPress={() => startGameLocal('quiz')}>
-        <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.gameGradient}>
+        <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.gameGradient}>
           <Text style={styles.gameIcon}>🧠</Text>
           <Text style={styles.gameTitle}>Quiz Couple</Text>
           <Text style={styles.gameDesc}>Testez vos connaissances sur l'autre</Text>
@@ -2313,7 +2347,7 @@ export default function GamesScreen() {
   );
 
   const renderQuizGame = () => {
-    const question = QUIZ_QUESTIONS[currentQuestion];
+    const question = shuffledQuizQuestions[currentQuestion];
     const myName = user?.name || 'Joueur 1';
     const partnerName = partner?.name || 'Joueur 2';
     const isOnline = gameMode === 'online';
@@ -2585,19 +2619,6 @@ export default function GamesScreen() {
               
               // Pour les questions choice en mode online: auto-validation
               const isChoiceCorrect = question.type === 'choice' && responderAnswer === guesserAnswer;
-              
-              // Auto-attribuer le point pour choice en mode online (une seule fois)
-              if (isOnline && question.type === 'choice' && !quizValidated) {
-                if (isChoiceCorrect) {
-                  const scoringPlayer = iAmResponder ? 'player2' : 'player1';
-                  setScores(prev => ({
-                    ...prev,
-                    [scoringPlayer]: prev[scoringPlayer] + 1,
-                  }));
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                }
-                setQuizValidated(true);
-              }
 
               return (
                 <View style={styles.quizRevealContainer}>
@@ -2709,7 +2730,7 @@ export default function GamesScreen() {
                 : `Égalité ${scores.player1}-${scores.player2} !`
               }
             </Text>
-            <Text style={styles.quizResultHint}>Vous vous connaissez {Math.round((scores.player1 + scores.player2) / 20 * 100)}% 💕</Text>
+            <Text style={styles.quizResultHint}>Vous vous connaissez {Math.round((scores.player1 + scores.player2) / 10 * 100)}% 💕</Text>
             <TouchableOpacity
               style={styles.playAgainButton}
               onPress={async () => {
@@ -2717,6 +2738,7 @@ export default function GamesScreen() {
                   await clearGameAnswers(); // Nettoyer Firebase avant de rejouer
                   nextOnlineQuestion();
                 }
+                setShuffledQuizQuestions(shuffleAndPick(QUIZ_QUESTIONS, 10));
                 setCurrentQuestion(0);
                 setScores({ player1: 0, player2: 0 });
                 setShowResult(false);
@@ -3442,7 +3464,7 @@ export default function GamesScreen() {
 
   return (
     <LinearGradient
-      colors={['#FF6B9D', '#C44569', '#8B5CF6']}
+      colors={theme.primary}
       style={styles.container}
     >
       <View style={styles.header}>

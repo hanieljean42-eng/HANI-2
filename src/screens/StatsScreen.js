@@ -159,7 +159,7 @@ export default function StatsScreen({ navigation }) {
         {/* Communication */}
         <Text style={styles.sectionTitle}>💬 Communication</Text>
         <View style={styles.statsGrid}>
-          <StatCard icon="💬" title="Messages" value={stats.totalMessages} color="#667eea" />
+          <StatCard icon="💬" title="Messages" value={stats.totalMessages} color={theme.accent} />
           <StatCard icon="💌" title="Notes d'amour" value={stats.totalNotes} color="#f093fb" />
         </View>
 

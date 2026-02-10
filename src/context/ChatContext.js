@@ -95,7 +95,7 @@ export function ChatProvider({ children }) {
   };
 
   // Envoyer un message
-  const sendMessage = async (content, type = 'text', metadata = {}) => {
+  const sendMessage = async (content, type = 'text', metadata = {}, replyTo = null) => {
     if (!couple?.id || !user?.id) return null;
 
     try {
@@ -108,6 +108,7 @@ export function ChatProvider({ children }) {
         read: false,
         reactions: {},
         ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+        ...(replyTo ? { replyTo: { id: replyTo.id, content: replyTo.content?.substring(0, 100), senderName: replyTo.senderName, type: replyTo.type } } : {}),
       };
 
       if (isConfigured && database) {
