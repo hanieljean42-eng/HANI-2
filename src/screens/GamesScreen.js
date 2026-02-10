@@ -2212,12 +2212,13 @@ export default function GamesScreen() {
         {/* 4 cartes de jeux à distance */}
         <View style={styles.onlineGamesGrid}>
           <TouchableOpacity 
-            style={styles.onlineGameCard}
-            onPress={() => startGameOnline('quiz')}
+            style={[styles.onlineGameCard, { opacity: 0.5 }]}
+            onPress={() => Alert.alert('🚧 Bientôt disponible', 'Le Quiz Couple est en cours d\'amélioration.\nIl sera disponible très prochainement ! 💕')}
           >
             <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.onlineGameGradient}>
               <Text style={styles.onlineGameIcon}>🧠</Text>
               <Text style={styles.onlineGameTitle}>Quiz</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 2 }}>Bientôt</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -2313,11 +2314,11 @@ export default function GamesScreen() {
       {/* ═══════════════════════════════════════════════════ */}
       <Text style={styles.gamesSectionTitle}>Passez-vous le téléphone pour jouer ensemble</Text>
 
-      <TouchableOpacity style={styles.gameCard} onPress={() => startGameLocal('quiz')}>
+      <TouchableOpacity style={[styles.gameCard, { opacity: 0.5 }]} onPress={() => Alert.alert('🚧 Bientôt disponible', 'Le Quiz Couple est en cours d\'amélioration.\nIl sera disponible très prochainement ! 💕')}>
         <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.gameGradient}>
           <Text style={styles.gameIcon}>🧠</Text>
           <Text style={styles.gameTitle}>Quiz Couple</Text>
-          <Text style={styles.gameDesc}>Testez vos connaissances sur l'autre</Text>
+          <Text style={styles.gameDesc}>Bientôt disponible 🚧</Text>
         </LinearGradient>
       </TouchableOpacity>
 
