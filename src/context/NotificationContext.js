@@ -66,11 +66,12 @@ export function NotificationProvider({ children }) {
       case 'wheel_spin_partner':
         return { tab: 'Wheel' };
       // Profil & Couple
-      case 'online':
       case 'profile_update':
       case 'couple_name':
-      case 'anniversary':
       case 'photo_change':
+        return { tab: 'Profile' };
+      case 'online':
+      case 'anniversary':
       case 'partner_joined':
       case 'partner_joined_creator':
         return { tab: 'Home' };

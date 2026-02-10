@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useNotifyPartner } from '../hooks/useNotifyPartner';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,6 +24,7 @@ export default function WidgetsScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, partner, couple } = useAuth();
   const { memories, loveNotes, challenges } = useData();
+  const { notifyLoveNote } = useNotifyPartner();
   
   const [widgetSettings, setWidgetSettings] = useState({
     showCountdown: true,
@@ -119,6 +121,13 @@ export default function WidgetsScreen({ navigation }) {
       thinking: 'Je pense à toi 💭',
       miss: 'Tu me manques 😢💕',
     };
+    
+    // ✅ Envoyer une notification push au partenaire
+    try {
+      await notifyLoveNote(messages[type]);
+    } catch (e) {
+      console.log('Erreur envoi Quick Love push:', e);
+    }
     
     Alert.alert(
       'Envoyé !',

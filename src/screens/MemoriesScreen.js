@@ -88,7 +88,7 @@ export default function MemoriesScreen() {
     sharedDiary, addDiaryEntry, deleteDiaryEntry, updateDiaryEntry,
     recordInteraction
   } = useData();
-  const { notifyMemory, notifyCapsule, notifyCapsuleOpened, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
+  const { notifyMemory, notifyCapsule, notifyCapsuleOpened, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
   const [activeTab, setActiveTab] = useState('gallery');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -639,9 +639,12 @@ export default function MemoriesScreen() {
         deliveryDate: isoDate,
       });
 
-      // ✅ La surprise est préservée : pas de notification immédiate au partenaire
-      // La notification de livraison sera déclenchée automatiquement
-      // sur l'appareil du destinataire quand la date arrive
+      // ✅ Notifier le partenaire qu'une lettre l'attend (sans spoiler le contenu)
+      try {
+        await notifyScheduledLetter(formatDateTime(isoDate));
+      } catch (e) {
+        console.log('Erreur notification lettre:', e);
+      }
 
       // Remise à zéro du form
       setNewLetter({ title: '', content: '', deliveryDate: '', deliveryTime: '' });

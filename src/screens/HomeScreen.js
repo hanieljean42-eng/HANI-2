@@ -22,7 +22,7 @@ export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, couple, partner, isOnline, isSynced } = useAuth();
   const { loveMeter, challenges, memories, streak, recordInteraction } = useData();
-  const { notifyMissYou, notifyLoveNote, sendCustomNotification, notifyOnline, sendDailyReminder, sendSmartReminder } = useNotifyPartner();
+  const { notifyMissYou, notifyOnline, sendDailyReminder, sendSmartReminder } = useNotifyPartner();
   const hasNotifiedOnlineRef = React.useRef(false);
   const [daysCount, setDaysCount] = useState(0);
   const [timeTogetherText, setTimeTogetherText] = useState('');
