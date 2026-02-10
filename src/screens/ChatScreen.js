@@ -46,6 +46,7 @@ const getStreakLevel = (count) => {
 
 // Composant image adaptative qui préserve les proportions
 const ChatImage = React.memo(({ uri }) => {
+  const { theme } = useTheme();
   const [dims, setDims] = useState(null);
   const [loading, setLoading] = useState(true);
 
