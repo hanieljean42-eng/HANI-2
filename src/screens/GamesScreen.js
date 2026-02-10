@@ -128,6 +128,157 @@ const QUIZ_QUESTIONS = [
     question: "Quel moment avec toi je voudrais revivre ?",
     type: "open",
   },
+  // Nouvelles questions Quiz
+  {
+    id: 21,
+    question: "Quelle est ma boisson favorite ?",
+    type: "open",
+  },
+  {
+    id: 22,
+    question: "Quelle est ma série préférée ?",
+    type: "open",
+  },
+  {
+    id: 23,
+    question: "Quelle est ma destination de voyage idéale ?",
+    type: "open",
+  },
+  {
+    id: 24,
+    question: "Quelle matière j'aimais le plus à l'école ?",
+    type: "open",
+  },
+  {
+    id: 25,
+    question: "Quelle matière je détestais le plus ?",
+    type: "open",
+  },
+  {
+    id: 26,
+    question: "Quel est mon sport préféré ?",
+    type: "open",
+  },
+  {
+    id: 27,
+    question: "Quel est mon plus grand défaut ?",
+    type: "open",
+  },
+  {
+    id: 28,
+    question: "Quelle est ma plus grande fierté ?",
+    type: "open",
+  },
+  {
+    id: 29,
+    question: "Quelle est mon habitude la plus étrange ?",
+    type: "open",
+  },
+  {
+    id: 30,
+    question: "Quelle est ma plus grande faiblesse ?",
+    type: "open",
+  },
+  {
+    id: 31,
+    question: "Quelle est ma plus grande passion ?",
+    type: "open",
+  },
+  {
+    id: 32,
+    question: "Quelle était ma plus grande peur enfant ?",
+    type: "open",
+  },
+  {
+    id: 33,
+    question: "Quelle est mon envie actuelle la plus forte ?",
+    type: "open",
+  },
+  {
+    id: 34,
+    question: "Quelle est la surprise qui m'a le plus marqué ?",
+    type: "open",
+  },
+  {
+    id: 35,
+    question: "Quelle est ma plus grande déception ?",
+    type: "open",
+  },
+  {
+    id: 36,
+    question: "Quelle est ma plus grande réussite ?",
+    type: "open",
+  },
+  {
+    id: 37,
+    question: "Quel est mon plus grand regret ?",
+    type: "open",
+  },
+  {
+    id: 38,
+    question: "Quelle est ma première habitude le matin ?",
+    type: "open",
+  },
+  {
+    id: 39,
+    question: "Quelle est ma dernière habitude le soir ?",
+    type: "open",
+  },
+  {
+    id: 40,
+    question: "Quel est mon plat préféré au restaurant ?",
+    type: "open",
+  },
+  {
+    id: 41,
+    question: "Quelle est ma chanson préférée ?",
+    type: "open",
+  },
+  {
+    id: 42,
+    question: "Quelle est ma tenue préférée ?",
+    type: "open",
+  },
+  {
+    id: 43,
+    question: "Quelle est ma plus grande habitude romantique ?",
+    type: "open",
+  },
+  {
+    id: 44,
+    question: "Quelle est ma plus grande habitude de couple ?",
+    type: "open",
+  },
+  {
+    id: 45,
+    question: "Quelle est ma plus grande habitude intime ?",
+    type: "open",
+  },
+  {
+    id: 46,
+    question: "Quel est mon rêve secret ?",
+    type: "open",
+  },
+  {
+    id: 47,
+    question: "Quelle est ma plus grande honte ?",
+    type: "open",
+  },
+  {
+    id: 48,
+    question: "Quelle est ma manie la plus marquée ?",
+    type: "open",
+  },
+  {
+    id: 49,
+    question: "Quelle est ma plus grande force ?",
+    type: "open",
+  },
+  {
+    id: 50,
+    question: "Quelle est ma plus grosse dépense récente ?",
+    type: "open",
+  },
 ];
 
 const TRUTH_OR_DARE = {
@@ -251,6 +402,98 @@ const WHO_IS_MORE = [
   "Qui est le/la plus passionné(e) ?",
   "Qui est le/la plus attentionné(e) ?",
   "Qui nous aime le plus ?",
+  // Nouvelles questions
+  "Qui est le plus maladroit ?",
+  "Qui est le plus romantique au quotidien ?",
+  "Qui est le plus bavard ?",
+  "Qui est le plus joueur dans l'intimité ?",
+  "Qui est le plus ponctuel ?",
+  "Qui est le plus susceptible de lancer un défi amoureux ?",
+  "Qui est le plus rêveur ?",
+  "Qui est le plus casanier ?",
+  "Qui est le plus audacieux en couple ?",
+  "Qui est le plus rancunier ?",
+  "Qui est le plus susceptible de rougir facilement ?",
+  "Qui est le plus curieux des envies de l'autre ?",
+  "Qui est le plus généreux ?",
+  "Qui est le plus susceptible de pardonner rapidement ?",
+  "Qui est le plus accro aux séries ?",
+  "Qui est le plus susceptible de proposer un week-end romantique ?",
+  "Qui est le plus accro au café ?",
+  "Qui est le plus susceptible de garder un secret amoureux ?",
+  "Qui est le plus accro aux voyages ?",
+  "Qui est le plus susceptible de dire « je t'aime » en premier ?",
+  "Qui est le plus accro aux selfies ?",
+  "Qui est le plus susceptible de surprendre l'autre avec un geste tendre ?",
+  "Qui est le plus accro aux soirées entre amis ?",
+  "Qui est le plus susceptible de rêver d'un mariage ?",
+  "Qui est le plus accro aux fast-foods ?",
+  "Qui est le plus susceptible de se vexer dans une dispute ?",
+  "Qui est le plus accro aux câlins ?",
+  "Qui est le plus susceptible de partager ses fantasmes ?",
+  "Qui est le plus accro aux films d'action ?",
+  "Qui est le plus susceptible de rêver d'avoir des enfants ?",
+  "Qui est le plus accro aux discussions tardives ?",
+  "Qui est le plus susceptible de parler de ses peurs en couple ?",
+  "Qui est le plus accro aux desserts ?",
+  "Qui est le plus susceptible de garder un souvenir sentimental ?",
+  "Qui est le plus accro aux jeux vidéo ?",
+  "Qui est le plus susceptible d'envoyer un message tendre en pleine nuit ?",
+  "Qui est le plus accro aux sorties en famille ?",
+  "Qui est le plus susceptible de parler de l'avenir du couple ?",
+  "Qui est le plus accro aux surprises ?",
+  "Qui est le plus susceptible de faire un compliment inattendu ?",
+  "Qui est le plus accro aux pizzas ?",
+  "Qui est le plus susceptible de vouloir tout contrôler dans la relation ?",
+  "Qui est le plus accro aux films romantiques ?",
+  "Qui est le plus susceptible de rire dans une situation sérieuse ?",
+  "Qui est le plus accro aux restaurants ?",
+  "Qui est le plus susceptible de raconter une histoire en exagérant ?",
+  "Qui est le plus accro aux bisous ?",
+  "Qui est le plus susceptible de se perdre dans son propre quartier ?",
+  "Qui est le plus accro aux plats faits maison ?",
+  "Qui est le plus susceptible de lancer une dispute pour une broutille ?",
+  "Qui est le plus accro aux photos de couple ?",
+  "Qui est le plus susceptible de chanter faux mais avec conviction ?",
+  "Qui est le plus accro aux films d'horreur ?",
+  "Qui est le plus susceptible de faire semblant de comprendre une explication compliquée ?",
+  "Qui est le plus accro aux bonbons ?",
+  "Qui est le plus susceptible de rêver d'une vie à l'étranger ?",
+  "Qui est le plus accro aux réseaux sociaux ?",
+  "Qui est le plus susceptible de garder rancune longtemps ?",
+  "Qui est le plus accro aux plats épicés ?",
+  "Qui est le plus susceptible de lancer un défi romantique ?",
+  "Qui est le plus accro aux glaces ?",
+  "Qui est le plus susceptible de surprendre avec un cadeau intime ?",
+  "Qui est le plus accro aux chips ?",
+  "Qui est le plus susceptible de dire « pardon » en premier ?",
+  "Qui est le plus accro aux soirées Netflix ?",
+  "Qui est le plus susceptible de rêver d'une maison ensemble ?",
+  "Qui est le plus accro aux plats étrangers ?",
+  "Qui est le plus susceptible de garder un souvenir d'un premier rendez-vous ?",
+  "Qui est le plus accro aux plats traditionnels ?",
+  "Qui est le plus susceptible de proposer un voyage improvisé ?",
+  "Qui est le plus accro aux plats sucrés ?",
+  "Qui est le plus susceptible de se projeter dans 10 ans ?",
+  "Qui est le plus accro aux plats salés ?",
+  "Qui est le plus susceptible de faire une déclaration publique ?",
+  "Qui est le plus susceptible de rêver d'un grand mariage ?",
+  "Qui est le plus susceptible de garder un secret longtemps ?",
+  "Qui est le plus susceptible de lancer une surprise romantique ?",
+  "Qui est le plus susceptible de rêver d'une lune de miel exotique ?",
+  "Qui est le plus susceptible de faire un compliment intime ?",
+  "Qui est le plus susceptible de rêver d'une grande famille ?",
+  "Qui est le plus accro au chocolat ?",
+  "Qui est le plus accro aux pâtisseries ?",
+  "Qui est le plus accro aux crêpes ?",
+  "Qui est le plus accro aux burgers ?",
+  "Qui est le plus accro aux smoothies ?",
+  "Qui est le plus accro aux fruits ?",
+  "Qui est le plus susceptible de garder une lettre d'amour ?",
+  "Qui est le plus susceptible de lancer une danse improvisée ?",
+  "Qui est le plus susceptible de lancer un jeu amoureux ?",
+  "Qui est le plus susceptible de garder un souvenir d'un baiser ?",
+  "Qui est le plus susceptible de rêver de nous en train de faire l'amour ?",
 ];
 
 const WOULD_YOU_RATHER = [
@@ -293,6 +536,235 @@ const WOULD_YOU_RATHER = [
   {
     option1: "Connaître la date exacte de notre mariage futur",
     option2: "Être surpris(e) quand ça arrivera",
+  },
+  // Nouvelles questions Tu préfères
+  {
+    option1: "Que je sois extrêmement drôle",
+    option2: "Que je sois extrêmement romantique",
+  },
+  {
+    option1: "Que je sois ultra sportif(ve)",
+    option2: "Que je sois ultra intellectuel(le)",
+  },
+  {
+    option1: "Que je cuisine tous les jours pour toi",
+    option2: "Que je t'emmène au restaurant chaque soir",
+  },
+  {
+    option1: "Que je sois très jaloux/jalouse mais passionné(e)",
+    option2: "Que je sois totalement détaché(e) mais fidèle",
+  },
+  {
+    option1: "Que je sois très câlin(e) en public",
+    option2: "Que je sois réservé(e) en public mais très affectueux/se en privé",
+  },
+  {
+    option1: "Que je t'écrive des lettres d'amour chaque semaine",
+    option2: "Que je te fasse des surprises sans prévenir",
+  },
+  {
+    option1: "Que je parle 10 langues",
+    option2: "Que je joue 10 instruments",
+  },
+  {
+    option1: "Que je sois célèbre",
+    option2: "Que je sois très riche mais inconnu(e)",
+  },
+  {
+    option1: "Que je sois toujours de bonne humeur",
+    option2: "Que je sois toujours honnête même quand c'est dur",
+  },
+  {
+    option1: "Que je t'envoie un message mignon chaque matin",
+    option2: "Que je t'appelle chaque soir avant de dormir",
+  },
+  {
+    option1: "Que je sois très protecteur/trice",
+    option2: "Que je te laisse une liberté totale",
+  },
+  {
+    option1: "Que je sois très aventurier/ère",
+    option2: "Que je sois très casanier/ère",
+  },
+  {
+    option1: "Que je sois un(e) excellent(e) danseur/euse",
+    option2: "Que je sois un(e) excellent(e) chanteur/euse",
+  },
+  {
+    option1: "Que je sois très organisé(e)",
+    option2: "Que je sois très spontané(e)",
+  },
+  {
+    option1: "Que je sois un génie en technologie",
+    option2: "Que je sois un génie en bricolage",
+  },
+  {
+    option1: "Que je te fasse rire tous les jours",
+    option2: "Que je te fasse pleurer de bonheur une fois par mois",
+  },
+  {
+    option1: "Que je sois très patient(e)",
+    option2: "Que je sois très passionné(e)",
+  },
+  {
+    option1: "Que je t'offre un voyage surprise",
+    option2: "Que je t'organise une fête surprise avec tous tes proches",
+  },
+  {
+    option1: "Que je sois très ambitieux/se",
+    option2: "Que je sois très détendu(e) et zen",
+  },
+  {
+    option1: "Que je te prépare un bain moussant après le travail",
+    option2: "Que je te fasse un massage chaque soir",
+  },
+  {
+    option1: "Que je sois un(e) artiste talentueux/se",
+    option2: "Que je sois un(e) athlète accompli(e)",
+  },
+  {
+    option1: "Que je sois toujours ponctuel(le)",
+    option2: "Que je sois toujours bien habillé(e)",
+  },
+  {
+    option1: "Que je sois très sociable avec plein d'amis",
+    option2: "Que je sois réservé(e) mais avec des amitiés profondes",
+  },
+  {
+    option1: "Que je te fasse le petit-déjeuner au lit chaque dimanche",
+    option2: "Que je t'emmène en weekend surprise chaque mois",
+  },
+  {
+    option1: "Que je sois incroyable en cuisine",
+    option2: "Que je sois incroyable en pâtisserie",
+  },
+  {
+    option1: "Que je sois très expressif(ve) avec mes émotions",
+    option2: "Que je sois mystérieux/se et difficile à déchiffrer",
+  },
+  {
+    option1: "Que je sois un(e) excellent(e) photographe",
+    option2: "Que je sois un(e) excellent(e) vidéaste",
+  },
+  {
+    option1: "Que je te dise je t'aime 100 fois par jour",
+    option2: "Que je te le montre sans jamais le dire",
+  },
+  {
+    option1: "Que je sois très matinal(e)",
+    option2: "Que je sois un oiseau de nuit",
+  },
+  {
+    option1: "Que je sache tout réparer à la maison",
+    option2: "Que je sache tout décorer magnifiquement",
+  },
+  {
+    option1: "Qu'on vive à la campagne ensemble",
+    option2: "Qu'on vive en plein centre-ville",
+  },
+  {
+    option1: "Que je sois un leader naturel",
+    option2: "Que je sois un excellent coéquipier",
+  },
+  {
+    option1: "Qu'on ait un animal de compagnie ensemble",
+    option2: "Qu'on voyage léger sans attaches",
+  },
+  {
+    option1: "Que je sois très tactile",
+    option2: "Que je communique surtout avec des mots",
+  },
+  {
+    option1: "Que je t'offre des fleurs chaque semaine",
+    option2: "Que je t'écrive un poème chaque mois",
+  },
+  {
+    option1: "Qu'on regarde un film ensemble chaque soir",
+    option2: "Qu'on lise un livre ensemble chaque soir",
+  },
+  {
+    option1: "Que je sois très compétitif(ve)",
+    option2: "Que je sois très coopératif(ve)",
+  },
+  {
+    option1: "Que je sois un cordon-bleu pour les dîners en amoureux",
+    option2: "Que je sois un as de la réservation dans les meilleurs restaurants",
+  },
+  {
+    option1: "Qu'on partage tous nos mots de passe",
+    option2: "Qu'on garde chacun notre jardin secret",
+  },
+  {
+    option1: "Que je te prépare une playlist personnalisée",
+    option2: "Que je te chante une chanson en personne",
+  },
+  {
+    option1: "Qu'on fasse du sport ensemble chaque jour",
+    option2: "Qu'on fasse la cuisine ensemble chaque jour",
+  },
+  {
+    option1: "Que je sois un grand rêveur / une grande rêveuse",
+    option2: "Que je sois très terre-à-terre et pragmatique",
+  },
+  {
+    option1: "Que je te défende toujours en public",
+    option2: "Que je te dise honnêtement quand tu as tort en privé",
+  },
+  {
+    option1: "Que je sois obsédé(e) par le fitness",
+    option2: "Que je sois obsédé(e) par la nourriture",
+  },
+  {
+    option1: "Qu'on ait une chanson 'à nous'",
+    option2: "Qu'on ait un lieu secret 'à nous'",
+  },
+  {
+    option1: "Que je sois un expert en road trip",
+    option2: "Que je sois un expert en voyages à l'étranger",
+  },
+  {
+    option1: "Qu'on s'endorme en se tenant la main chaque soir",
+    option2: "Qu'on se réveille avec un bisou chaque matin",
+  },
+  {
+    option1: "Que je puisse téléporter pour te rejoindre n'importe quand",
+    option2: "Que je puisse arrêter le temps pour nos moments ensemble",
+  },
+  {
+    option1: "Qu'on ait un carnet de souvenirs ensemble",
+    option2: "Qu'on fasse un mur de photos chez nous",
+  },
+  {
+    option1: "Que je sois très généreux/se avec tout le monde",
+    option2: "Que je sois très attentionné(e) uniquement avec toi",
+  },
+  {
+    option1: "Que je sois accro aux jeux vidéo",
+    option2: "Que je sois accro aux réseaux sociaux",
+  },
+  {
+    option1: "Qu'on ait un rituel du soir ensemble",
+    option2: "Qu'on ait un rituel du matin ensemble",
+  },
+  {
+    option1: "Que je sois très indépendant(e)",
+    option2: "Que je sois toujours avec toi",
+  },
+  {
+    option1: "Que je te fasse une déclaration devant tout le monde",
+    option2: "Que je te murmure un secret d'amour à l'oreille",
+  },
+  {
+    option1: "Qu'on apprenne une nouvelle langue ensemble",
+    option2: "Qu'on apprenne un instrument ensemble",
+  },
+  {
+    option1: "Que je sois quelqu'un du matin",
+    option2: "Que je sois quelqu'un du soir",
+  },
+  {
+    option1: "Qu'on se déguise ensemble pour Halloween",
+    option2: "Qu'on fasse un costume coordonné pour le carnaval",
   },
 ];
 
