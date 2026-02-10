@@ -295,9 +295,29 @@ export function NotificationProvider({ children }) {
     return token;
   }
 
+  // ✅ Déterminer le channelId Android selon le type de notification
+  const getChannelForType = (type) => {
+    switch (type) {
+      case 'game_invite':
+      case 'game_win':
+      case 'game_turn':
+        return 'game-invites';
+      case 'challenge':
+      case 'challenge_assigned':
+        return 'challenges';
+      case 'daily_reminder':
+      case 'smart_reminder':
+      case 'anniversary':
+        return 'reminders';
+      default:
+        // love_note, memory, capsule, online, wheel_spin, photo_change, etc.
+        return 'love-messages';
+    }
+  };
+
   // ✅ RESTRUCTURÉ: Envoyer une notification au partenaire via Expo Push
   const sendPushNotification = async (title, body, data = {}) => {
-    console.log('📤 Tentative envoi notification push:', { title, body, hasPartnerToken: !!partnerToken });
+    console.log('📤 Tentative envoi notification push:', { title, body, type: data?.type, hasPartnerToken: !!partnerToken });
     
     // ÉTAPE 1: Vérifier si on a un token partenaire valide
     // Si pas en mémoire, tenter de le récupérer depuis Firebase
@@ -338,6 +358,9 @@ export function NotificationProvider({ children }) {
 
     // ÉTAPE 3: Essayer d'envoyer via Expo Push Service
     try {
+      // ✅ Choisir le bon canal Android selon le type de notification
+      const channelId = getChannelForType(data?.type);
+
       const message = {
         to: tokenToUse,
         sound: 'default',
@@ -345,10 +368,10 @@ export function NotificationProvider({ children }) {
         body: body,
         data: data,
         priority: 'high',
-        channelId: 'love-messages',
+        channelId: channelId,
       };
 
-      console.log('🔗 Appel Expo Push Service...');
+      console.log('🔗 Appel Expo Push Service... (canal:', channelId, ')');
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
       
@@ -521,16 +544,16 @@ export function NotificationProvider({ children }) {
   const notifyGameInvite = async (userName, gameName) => {
     await sendPushNotification(
       '🎮 Invitation à jouer',
-      `${userName} t'invite à jouer à ${gameName} !`,
-      { type: 'game_invite' }
+      `${userName} t'invite à jouer à ${gameName} ! Viens vite ! 🎯`,
+      { type: 'game_invite', game: gameName }
     );
   };
 
-  // Notification quand la roue est tournée
+  // Notification quand la roue est tournée (une seule notification combinée)
   const notifyWheelSpin = async (userName, result) => {
     await sendPushNotification(
-      '🎡 Roue tournée !',
-      `${userName} a tourné la roue ! Résultat: ${result} 🎯`,
+      '🎰 Roue des Dates',
+      `${userName} a tourné la roue ! Résultat : "${result}" 🎯 Viens voir !`,
       { type: 'wheel_spin', result }
     );
   };

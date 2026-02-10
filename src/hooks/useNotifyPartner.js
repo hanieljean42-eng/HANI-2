@@ -184,22 +184,8 @@ export const useNotifyPartner = () => {
 
   // === ROUE DES DATES ===
   const notifyWheelSpin = async (result) => {
-    if (notifications?.sendPushNotification && user?.name) {
-      await notifications.sendPushNotification(
-        '🎰 Roue des Dates',
-        `${user.name} a tourné la roue ! Résultat : "${result}" 🎯`,
-        { type: 'wheel_spin' }
-      );
-    }
-  };
-
-  const notifyPartnerWheelSpin = async (result) => {
-    if (notifications?.sendPushNotification && user?.name) {
-      await notifications.sendPushNotification(
-        '🎰 À ton tour !',
-        `${user.name} a obtenu "${result}" ! 🎲 Veux-tu essayer aussi ? 😉`,
-        { type: 'wheel_spin_partner' }
-      );
+    if (notifications?.notifyWheelSpin && user?.name) {
+      await notifications.notifyWheelSpin(user.name, result);
     }
   };
 
@@ -316,7 +302,6 @@ export const useNotifyPartner = () => {
     notifyLoveMeterMilestone,
     // Roue
     notifyWheelSpin,
-    notifyPartnerWheelSpin,
     // Connexion & Couple
     notifyPartnerJoined,
     // Lettres d'amour programmées

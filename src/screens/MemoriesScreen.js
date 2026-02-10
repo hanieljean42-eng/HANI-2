@@ -23,7 +23,6 @@ import * as Haptics from 'expo-haptics';
 import { Video, ResizeMode } from 'expo-av';
 import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
-import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import AnimatedModal from '../components/AnimatedModal';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary';
@@ -90,7 +89,6 @@ export default function MemoriesScreen() {
     recordInteraction
   } = useData();
   const { notifyMemory, notifyCapsule, notifyCapsuleOpened, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
-  const notifications = useNotifications();
   const [activeTab, setActiveTab] = useState('gallery');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);

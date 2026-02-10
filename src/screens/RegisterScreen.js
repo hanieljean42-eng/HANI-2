@@ -18,7 +18,7 @@ const AVATARS = ['😊', '😍', '🥰', '😎', '🤗', '💖', '👸', '🤴',
 
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
-  const { notifyWelcome, testNotification } = useNotifications();
+  const { notifyWelcome } = useNotifications();
   const [formData, setFormData] = useState({
     name: '',
     email: '',

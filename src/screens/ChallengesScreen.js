@@ -50,7 +50,7 @@ export default function ChallengesScreen() {
   const navigation = useNavigation();
   const { loveMeter, updateLoveMeter, challenges, addChallenge } = useData();
   const { partner, user } = useAuth();
-  const { notifyChallenge, notifyNewChallenge } = useNotifyPartner();
+  const { notifyChallenge } = useNotifyPartner();
   const { 
     pendingGameInvite,
   } = useGame();
@@ -106,9 +106,8 @@ export default function ChallengesScreen() {
       completedById: user?.id,
     });
     
-    // Envoyer notification au partenaire (défi complété + nouveau défi assigné)
+    // ✅ Notifier le partenaire que le défi a été complété (une seule notification)
     await notifyChallenge(challenge.title);
-    await notifyNewChallenge(challenge.title);
     
     setShowChallengeModal(false);
   };

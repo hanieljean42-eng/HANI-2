@@ -1422,8 +1422,7 @@ export default function GamesScreen() {
     } else {
       setShowResult(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // ✅ Notifier le partenaire de la fin du jeu
-      notifyGameWin('Quiz Couple');
+      // ⛔ Pas de notification ici : mode local, les deux joueurs sont côte à côte
     }
   };
 
@@ -1749,8 +1748,7 @@ export default function GamesScreen() {
     } else {
       setShowResult(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // ✅ Notifier le partenaire de la fin du jeu
-      notifyGameWin('Tu Préfères');
+      // ⛔ Pas de notification ici : mode local, les deux joueurs sont côte à côte
     }
   };
 
@@ -1798,7 +1796,7 @@ export default function GamesScreen() {
       } else {
         setShowResult(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        notifyGameWin('Tu Préfères');
+        // ⛔ Pas de notification ici : mode local
       }
     };
 
@@ -2383,7 +2381,7 @@ export default function GamesScreen() {
       } else {
         setShowResult(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        notifyGameWin('Quiz Couple');
+        // ⛔ Pas de notification ici : mode local
       }
     };
 
@@ -3208,7 +3206,7 @@ export default function GamesScreen() {
       } else {
         setShowResult(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        notifyGameWin('Qui est le Plus');
+        // ⛔ Pas de notification ici : mode local
       }
     };
 
