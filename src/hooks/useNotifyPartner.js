@@ -146,7 +146,7 @@ export const useNotifyPartner = () => {
       const title = type === 'couple' ? '💑 Photo de couple' : '📷 Photo de profil';
       await notifications.sendPushNotification(
         title,
-        `${user.name} a changé ${type === 'couple' ? 'la photo de couple' : `${possessif} photo de profil`} !`,
+        `${user.name} a changé ${type === 'couple' ? 'la photo de couple' : 'sa photo de profil'} !`,
         { type: 'photo_change' }
       );
     }
