@@ -850,11 +850,11 @@ export function DataProvider({ children }) {
   };
 
   // 🔥 FLAMMES/STREAKS: Enregistrer une interaction du joueur actuel
-  // Appelé quand l'utilisateur interagit (chat, jeux, souvenirs, défis)
-  // Le streak augmente quand LES DEUX ont interagi dans la même journée
+  // Appelé quand l'utilisateur envoie un message dans le chat
+  // Le streak augmente quand AU MOINS UN des partenaires a écrit chaque jour
+  // La flamme s'éteint si 24h passent sans aucun message de personne
   const recordInteraction = async () => {
     const today = new Date().toISOString().split('T')[0]; // "2026-02-08"
-    const myId = user?.id || user?.name || 'unknown';
     
     if (!couple?.id) return;
 
@@ -862,48 +862,34 @@ export function DataProvider({ children }) {
       // Lire le streak actuel depuis Firebase ou local
       let currentStreak = { ...streak };
       
-      // Marquer mon interaction pour aujourd'hui
-      if (!currentStreak.interactions) currentStreak.interactions = {};
+      // Déjà compté aujourd'hui ? Ne rien faire
+      if (currentStreak.lastDate === today) return;
       
-      // Déjà interagi aujourd'hui ? Ne rien faire
-      if (currentStreak.interactions[myId] === today) return;
+      const lastDate = currentStreak.lastDate;
       
-      currentStreak.interactions[myId] = today;
-      
-      // Vérifier si les DEUX ont interagi aujourd'hui
-      const interactionDates = Object.values(currentStreak.interactions);
-      const bothInteractedToday = interactionDates.filter(d => d === today).length >= 2;
-      
-      if (bothInteractedToday) {
-        // Les deux ont interagi aujourd'hui !
-        const lastDate = currentStreak.lastDate;
+      // Vérifier si c'est consécutif (hier ou premier jour)
+      if (lastDate) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
         
-        // Vérifier si c'est consécutif (hier)
-        if (lastDate) {
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayStr = yesterday.toISOString().split('T')[0];
-          
-          if (lastDate === yesterdayStr) {
-            // Jour consécutif → augmenter le streak
-            currentStreak.count = (currentStreak.count || 0) + 1;
-          } else if (lastDate === today) {
-            // Déjà compté aujourd'hui, ne pas re-incrémenter
-          } else {
-            // Série cassée → reset à 1
-            currentStreak.count = 1;
-          }
+        if (lastDate === yesterdayStr) {
+          // Jour consécutif → augmenter le streak
+          currentStreak.count = (currentStreak.count || 0) + 1;
         } else {
-          // Premier jour → streak = 1
+          // Série cassée (plus de 24h sans message) → reset à 1
           currentStreak.count = 1;
         }
-        
-        currentStreak.lastDate = today;
-        
-        // Mettre à jour le meilleur streak
-        if (currentStreak.count > (currentStreak.bestStreak || 0)) {
-          currentStreak.bestStreak = currentStreak.count;
-        }
+      } else {
+        // Premier jour → streak = 1
+        currentStreak.count = 1;
+      }
+      
+      currentStreak.lastDate = today;
+      
+      // Mettre à jour le meilleur streak
+      if (currentStreak.count > (currentStreak.bestStreak || 0)) {
+        currentStreak.bestStreak = currentStreak.count;
       }
       
       // Sauvegarder
@@ -914,9 +900,7 @@ export function DataProvider({ children }) {
       if (isConfigured && database) {
         const streakRef = ref(database, `couples/${couple.id}/data/streak`);
         await set(streakRef, currentStreak);
-        if (bothInteractedToday) {
-          console.log(`🔥 Streak mis à jour: ${currentStreak.count} jours consécutifs !`);
-        }
+        console.log(`🔥 Streak mis à jour: ${currentStreak.count} jours consécutifs !`);
       }
     } catch (e) {
       console.log('⚠️ Erreur streak:', e.message);

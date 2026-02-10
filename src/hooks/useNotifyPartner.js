@@ -6,6 +6,11 @@ export const useNotifyPartner = () => {
   const { user } = useAuth();
   const notifications = useNotifications();
 
+  // Helper: obtenir le pronom selon le genre
+  const pronoun = (user?.gender === 'feminin') ? 'elle' : 'il';
+  const possessif = (user?.gender === 'feminin') ? 'sa' : 'son';
+  const accord = (user?.gender === 'feminin') ? 'e' : '';
+
   // === SOUVENIRS & CAPSULES ===
   const notifyMemory = async () => {
     if (notifications?.notifyNewMemory && user?.name) {
@@ -83,7 +88,7 @@ export const useNotifyPartner = () => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
         '🏆 Partie terminée !',
-        `${user.name} a gagné à ${gameName} ! Revanche ? 😏`,
+        `${user.name} a gagné${accord} à ${gameName} ! Revanche ? 😏`,
         { type: 'game_win' }
       );
     }
@@ -93,7 +98,7 @@ export const useNotifyPartner = () => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
         '🎮 À ton tour !',
-        `${user.name} a répondu. C'est à toi !`,
+        `${user.name} a répondu${accord}. C'est à toi !`,
         { type: 'game_turn' }
       );
     }
@@ -110,7 +115,7 @@ export const useNotifyPartner = () => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
         '👤 Profil modifié',
-        `${user.name} a mis à jour son profil`,
+        `${user.name} a mis à jour ${possessif} profil`,
         { type: 'profile_update' }
       );
     }
@@ -141,7 +146,7 @@ export const useNotifyPartner = () => {
       const title = type === 'couple' ? '💑 Photo de couple' : '📷 Photo de profil';
       await notifications.sendPushNotification(
         title,
-        `${user.name} a changé ${type === 'couple' ? 'la photo de couple' : 'sa photo de profil'} !`,
+        `${user.name} a changé ${type === 'couple' ? 'la photo de couple' : `${possessif} photo de profil`} !`,
         { type: 'photo_change' }
       );
     }
@@ -202,7 +207,7 @@ export const useNotifyPartner = () => {
   const notifyPartnerJoined = async (partnerName) => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
-        '👫 Partenaire connecté !',
+        `👫 Partenaire connecté${accord} !`,
         `${partnerName} a rejoint votre espace couple ! 🎉 Maintenant tout se synchronise en temps réel 💕`,
         { type: 'partner_joined' }
       );
@@ -225,7 +230,7 @@ export const useNotifyPartner = () => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
         '💌 Ta lettre a été lue !',
-        `${user.name} a ouvert et lu ta lettre d'amour ! 💕`,
+        `${user.name} a ouvert et lu${accord} ta lettre d'amour ! 💕`,
         { type: 'letter_read' }
       );
     }
@@ -270,7 +275,7 @@ export const useNotifyPartner = () => {
     if (notifications?.sendPushNotification && user?.name) {
       const messages = [
         `${user.name} pense à toi 💭`,
-        `${user.name} te manque... 🥺`,
+        `Tu manques à ${user.name}... 🥺`,
         `${user.name} a hâte de te voir ! 🤗`,
         `${user.name} t'envoie plein d'amour 💕`,
       ];

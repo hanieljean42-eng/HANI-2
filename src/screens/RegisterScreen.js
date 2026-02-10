@@ -26,6 +26,7 @@ export default function RegisterScreen({ navigation }) {
     confirmPassword: '',
     avatar: '😊',
     birthday: '',
+    gender: '',
   });
   const [showAvatars, setShowAvatars] = useState(false);
 
@@ -58,6 +59,12 @@ export default function RegisterScreen({ navigation }) {
     // Construire la date de naissance si fournie
     if (formData.birthDay && formData.birthMonth && formData.birthYear) {
       formData.birthday = `${formData.birthDay.padStart(2, '0')}/${formData.birthMonth.padStart(2, '0')}/${formData.birthYear}`;
+    }
+
+    // Valider le sexe
+    if (!formData.gender) {
+      Alert.alert('Erreur', 'Veuillez choisir votre sexe (Masculin ou Féminin)');
+      return;
     }
 
     // Valider les mots de passe
@@ -195,6 +202,39 @@ export default function RegisterScreen({ navigation }) {
                   keyboardType="number-pad"
                   maxLength={4}
                 />
+              </View>
+            </View>
+
+            {/* Gender Selector */}
+            <View style={styles.genderSection}>
+              <Text style={styles.genderLabel}>👤 Sexe</Text>
+              <View style={styles.genderRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.genderOption,
+                    formData.gender === 'masculin' && styles.genderSelected,
+                  ]}
+                  onPress={() => setFormData({ ...formData, gender: 'masculin' })}
+                >
+                  <Text style={styles.genderEmoji}>👨</Text>
+                  <Text style={[
+                    styles.genderText,
+                    formData.gender === 'masculin' && styles.genderTextSelected,
+                  ]}>Masculin</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.genderOption,
+                    formData.gender === 'feminin' && styles.genderSelected,
+                  ]}
+                  onPress={() => setFormData({ ...formData, gender: 'feminin' })}
+                >
+                  <Text style={styles.genderEmoji}>👩</Text>
+                  <Text style={[
+                    styles.genderText,
+                    formData.gender === 'feminin' && styles.genderTextSelected,
+                  ]}>Féminin</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -388,5 +428,48 @@ const styles = StyleSheet.create({
   },
   birthdayYear: {
     width: 100,
+  },
+  genderSection: {
+    marginBottom: 15,
+  },
+  genderLabel: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    marginBottom: 10,
+    marginLeft: 5,
+  },
+  genderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  genderOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 15,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  genderSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: '#fff',
+  },
+  genderEmoji: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  genderText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  genderTextSelected: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });

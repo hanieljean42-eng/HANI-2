@@ -34,6 +34,16 @@ const { width, height } = Dimensions.get('window');
 const MAX_IMAGE_WIDTH = width * 0.65;
 const MIN_IMAGE_WIDTH = 120;
 
+// 🔥 Helper: niveau de flamme selon le streak
+const getStreakLevel = (count) => {
+  if (count >= 365) return { emoji: '🌟', label: 'Éternel', color: '#FFD700' };
+  if (count >= 100) return { emoji: '💖', label: 'Indestructible', color: '#FF1493' };
+  if (count >= 30) return { emoji: '🔥🔥🔥', label: 'En feu !', color: '#FF4500' };
+  if (count >= 7) return { emoji: '🔥🔥', label: 'Flamme vive', color: '#FF6347' };
+  if (count >= 1) return { emoji: '🔥', label: 'Flamme allumée', color: '#FFA500' };
+  return { emoji: '❄️', label: 'Pas de série', color: '#87CEEB' };
+};
+
 // Composant image adaptative qui préserve les proportions
 const ChatImage = React.memo(({ uri }) => {
   const [dims, setDims] = useState(null);
@@ -99,7 +109,7 @@ export default function ChatScreen({ navigation }) {
   // Chat is now available
   const chatAvailable = true;
   const { notifyLoveNote, notifyNoteRead } = useNotifyPartner();
-  const { addDiaryEntry, recordInteraction } = useData();
+  const { addDiaryEntry, recordInteraction, streak } = useData();
 
   const [inputText, setInputText] = useState('');
   const [selectedMessage, setSelectedMessage] = useState(null);
@@ -591,6 +601,17 @@ export default function ChatScreen({ navigation }) {
             <Text style={styles.typingText}>écrit...</Text>
           )}
         </View>
+        {/* 🔥 Flamme / Streak */}
+        {(() => {
+          const level = getStreakLevel(streak?.count || 0);
+          const streakCount = streak?.count || 0;
+          return (
+            <View style={styles.streakBadge}>
+              <Text style={styles.streakBadgeEmoji}>{level.emoji}</Text>
+              <Text style={[styles.streakBadgeCount, { color: level.color }]}>{streakCount}</Text>
+            </View>
+          );
+        })()}
         <View style={styles.headerAvatar}>
           <Text style={styles.avatarText}>{partner?.avatar || '💕'}</Text>
         </View>
@@ -805,6 +826,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginRight: 10,
+  },
+  streakBadgeEmoji: {
+    fontSize: 16,
+  },
+  streakBadgeCount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 4,
   },
   disabledBanner: {
     backgroundColor: 'rgba(255,255,255,0.08)',

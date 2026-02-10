@@ -682,23 +682,6 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.loveMeterValue}>{loveMeter}%</Text>
       </View>
 
-      {/* Stats */}
-      <Text style={styles.sectionTitle}>📊 Nos Statistiques</Text>
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{memories.length}</Text>
-          <Text style={styles.statLabel}>Souvenirs</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{loveNotes.length}</Text>
-          <Text style={styles.statLabel}>Messages</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{bucketList.filter(b => b.completed).length}/{bucketList.length}</Text>
-          <Text style={styles.statLabel}>Bucket List</Text>
-        </View>
-      </View>
-
       {/* Quick Actions */}
       <Text style={styles.sectionTitle}>🚀 Actions rapides</Text>
       <View style={styles.quickActionsGrid}>
@@ -708,13 +691,6 @@ export default function ProfileScreen({ navigation }) {
         >
           <Text style={styles.quickActionIcon}>💬</Text>
           <Text style={styles.quickActionLabel}>Chat</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.quickActionCard}
-          onPress={() => navigation.navigate('Stats')}
-        >
-          <Text style={styles.quickActionIcon}>📈</Text>
-          <Text style={styles.quickActionLabel}>Statistiques</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.quickActionCard}
@@ -1009,18 +985,6 @@ export default function ProfileScreen({ navigation }) {
       <Text style={styles.sectionTitle}>📊 Données</Text>
       
       <View style={styles.settingsGroup}>
-        <TouchableOpacity 
-          style={styles.settingItem}
-          onPress={() => navigation.navigate('Stats')}
-        >
-          <Text style={styles.settingIcon}>📈</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.settingText}>Statistiques</Text>
-            <Text style={styles.settingSubtext}>Voir vos stats de couple</Text>
-          </View>
-          <Text style={styles.settingArrow}>›</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity 
           style={styles.settingItem}
           onPress={() => navigation.navigate('Retrospective')}

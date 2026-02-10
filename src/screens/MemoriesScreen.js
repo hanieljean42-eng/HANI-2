@@ -1353,7 +1353,7 @@ export default function MemoriesScreen() {
         <View style={styles.viewModalOverlay}>
           <View style={styles.viewModalContentLarge}>
             {selectedMemory && (
-              <>
+              <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
                 {(() => {
                   // Obtenir la source du média - priorité: URL Storage > base64 > URI local
                   let mediaSource = null;
@@ -1448,7 +1448,7 @@ export default function MemoriesScreen() {
                   >
                     <Text style={styles.closeViewButtonText}>Fermer 💕</Text>
                   </TouchableOpacity>
-              </>
+              </ScrollView>
             )}
           </View>
         </View>
@@ -2096,7 +2096,7 @@ const styles = StyleSheet.create({
   },
   viewImageLarge: {
     width: '100%',
-    height: height * 0.75,
+    height: height * 0.5,
     backgroundColor: '#000',
   },
   viewImagePlaceholder: {

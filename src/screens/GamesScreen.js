@@ -1909,7 +1909,7 @@ export default function GamesScreen() {
     return (
       <View style={styles.gameContainer}>
         {!showResult ? (
-          <>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / 10) * 100}%` }]} />
             </View>
@@ -2063,7 +2063,7 @@ export default function GamesScreen() {
                 </Text>
               </View>
             )}
-          </>
+          </ScrollView>
         ) : (
           <View style={styles.resultContainer}>
             <Text style={styles.resultEmoji}>🏆</Text>
