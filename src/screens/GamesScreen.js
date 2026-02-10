@@ -822,6 +822,8 @@ export default function GamesScreen() {
   const [player2Answer, setPlayer2Answer] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(1);
   const [quizOpenAnswer, setQuizOpenAnswer] = useState(''); // Réponse texte libre pour questions open
+  const [quizValidated, setQuizValidated] = useState(false); // Si le point a été validé/refusé dans cette question
+  const [quizLastValidationResult, setQuizLastValidationResult] = useState(null); // true = correct, false = incorrect, null = pas encore validé
 
   // États pour Action/Vérité — FIL DE CONVERSATION
   const [todResponse, setTodResponse] = useState('');
@@ -904,6 +906,8 @@ export default function GamesScreen() {
     setPlayer2Answer(null);
     setCurrentPlayer(1);
     setQuizOpenAnswer('');
+    setQuizValidated(false);
+    setQuizLastValidationResult(null);
     // Who is More
     setWimPhase('player1');
     setWimPlayer1Answer(null);
@@ -1010,6 +1014,44 @@ export default function GamesScreen() {
     // quand Firebase notifie que la réponse du partenaire existe
   };
 
+  // ✅ LISTENER: Détecte la validation quiz du partenaire (pour questions open en mode online)
+  useEffect(() => {
+    if (activeGame !== 'quiz' || gameMode !== 'online' || !isFirebaseReady) return;
+    if (!gameData?.answers) return;
+
+    const validationKey = `quiz_validation_${currentQuestion}`;
+    const dedupKey = `validation_${validationKey}`;
+    
+    if (processedOnlineKeys.current.has(dedupKey)) return;
+    
+    const validationData = gameData.answers[validationKey];
+    if (!validationData) return;
+
+    // Chercher la validation du partenaire (le répondeur)
+    const partnerValidation = Object.entries(validationData).find(
+      ([playerId]) => playerId !== myPlayerId && !playerId.startsWith('partner_')
+    );
+
+    if (partnerValidation) {
+      const [, data] = partnerValidation;
+      processedOnlineKeys.current.add(dedupKey);
+      console.log(`📥 Validation quiz reçue:`, data.isCorrect);
+      
+      setQuizValidated(true);
+      setQuizLastValidationResult(data.isCorrect);
+      if (data.isCorrect) {
+        // Le devineur (moi) gagne un point car le répondeur (partenaire) a validé
+        setScores(prev => ({
+          ...prev,
+          player1: prev.player1 + 1,
+        }));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    }
+  }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, myPlayerId]);
+
   // ✅ LISTENER ROBUSTE: Détecte quand le partenaire clique "Suivant" pour synchroniser
   useEffect(() => {
     if (!activeGame || activeGame === 'truthordare') return;
@@ -1072,6 +1114,8 @@ export default function GamesScreen() {
           setPlayer1Answer(null);
           setPlayer2Answer(null);
           setQuizOpenAnswer('');
+          setQuizValidated(false);
+          setQuizLastValidationResult(null);
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           return prevQ + 1;
         } else {
@@ -2276,6 +2320,13 @@ export default function GamesScreen() {
     const partnerName = partner?.name || 'Joueur 2';
     const isOnline = gameMode === 'online';
     
+    // ✅ ALTERNANCE: Questions paires → la question parle de MOI, questions impaires → parle du PARTENAIRE
+    // "Répondeur" = celui dont la question parle (il connaît la vraie réponse)
+    // "Devineur" = l'autre joueur (il doit deviner)
+    const iAmResponder = currentQuestion % 2 === 0; // Questions 0,2,4,6,8 → je suis le répondeur
+    const responderName = iAmResponder ? myName : partnerName;
+    const guesserName = iAmResponder ? partnerName : myName;
+
     // ══════ MODE ONLINE ══════
     const handleQuizAnswerOnline = async (answer) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -2293,6 +2344,21 @@ export default function GamesScreen() {
         setQuizPhase('passPhone1');
       } else if (quizPhase === 'player2') {
         setPlayer2Answer(answer);
+        // Pour les questions 'choice', on peut auto-valider
+        if (question.type === 'choice') {
+          // En mode local: player1 = répondeur (question parle de lui), player2 = devineur
+          // Vérifier si la réponse du devineur correspond
+          if (answer === player1Answer) {
+            // Le devineur a trouvé ! +1 point pour le devineur
+            setScores(prev => ({
+              ...prev,
+              player2: prev.player2 + 1,
+            }));
+            setQuizValidated(true);
+          } else {
+            setQuizValidated(true);
+          }
+        }
         setQuizPhase('reveal');
       }
     };
@@ -2311,6 +2377,8 @@ export default function GamesScreen() {
         setPlayer1Answer(null);
         setPlayer2Answer(null);
         setQuizOpenAnswer('');
+        setQuizValidated(false);
+        setQuizLastValidationResult(null);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
         setShowResult(true);
@@ -2319,16 +2387,48 @@ export default function GamesScreen() {
       }
     };
 
-    const handleCorrect = (player) => {
-      setScores(prev => ({
-        ...prev,
-        [player]: prev[player] + 1,
-      }));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // ✅ Valider la réponse du devineur (appelé par le répondeur pour les questions open)
+    const handleValidateAnswer = async (isCorrect) => {
+      if (quizValidated) return; // Empêcher double-validation
+      setQuizValidated(true);
+      setQuizLastValidationResult(isCorrect);
+      
+      // En mode online: envoyer la validation via Firebase pour que le devineur voie le résultat
+      if (isOnline) {
+        const validationKey = `quiz_validation_${currentQuestion}`;
+        await submitAnswer(validationKey, {
+          isCorrect,
+          responderName: responderName,
+          guesserName: guesserName,
+          timestamp: Date.now(),
+        }, user?.name);
+        
+        if (isCorrect) {
+          // Le devineur est le partenaire (player2) car je suis le répondeur
+          setScores(prev => ({
+            ...prev,
+            player2: prev.player2 + 1,
+          }));
+        }
+      } else {
+        // En mode local: player2 est toujours le devineur
+        if (isCorrect) {
+          setScores(prev => ({
+            ...prev,
+            player2: prev.player2 + 1,
+          }));
+        }
+      }
+      
+      if (isCorrect) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     };
 
     // Afficher les options de réponse (partagé)
-    const renderQuizOptions = (onAnswer) => (
+    const renderQuizOptions = (onAnswer, isResponder) => (
       question.type === 'choice' ? (
         <View style={styles.quizOptions}>
           {question.options.map((option, idx) => (
@@ -2346,12 +2446,14 @@ export default function GamesScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.quizOpenContainer}
         >
-          <Text style={styles.quizOpenLabel}>📝 Écris ta réponse :</Text>
+          <Text style={styles.quizOpenLabel}>
+            {isResponder ? '📝 Écris ta vraie réponse :' : '🤔 Devine la réponse :'}
+          </Text>
           <TextInput
             style={styles.quizOpenInput}
             value={quizOpenAnswer}
             onChangeText={setQuizOpenAnswer}
-            placeholder="Tape ta réponse ici..."
+            placeholder={isResponder ? 'Ta vraie réponse...' : 'Devine...'}
             placeholderTextColor="#999"
             multiline
             maxLength={200}
@@ -2371,7 +2473,7 @@ export default function GamesScreen() {
             disabled={!quizOpenAnswer.trim()}
           >
             <Text style={styles.quizOpenSubmitText}>
-              {quizOpenAnswer.trim() ? 'Envoyer ma réponse ✓' : 'Écris ta réponse...'}
+              {quizOpenAnswer.trim() ? 'Envoyer ✓' : 'Écris ta réponse...'}
             </Text>
           </TouchableOpacity>
         </KeyboardAvoidingView>
@@ -2404,12 +2506,21 @@ export default function GamesScreen() {
               <Text style={styles.questionText}>{question.question}</Text>
             </View>
 
-            {/* ══════ MODE ONLINE: Chaque joueur répond sur son tel ══════ */}
+            {/* ══════ MODE ONLINE: Chaque joueur a son rôle ══════ */}
             {isOnline && quizPhase === 'player1' && (
               <View style={styles.quizPhaseContainer}>
-                <Text style={styles.quizPhaseTitle}>🌐 Réponds à la question !</Text>
-                <Text style={styles.quizPhaseHint}>{partnerName} répond aussi de son côté</Text>
-                {renderQuizOptions(handleQuizAnswerOnline)}
+                {iAmResponder ? (
+                  <>
+                    <Text style={styles.quizPhaseTitle}>📝 Cette question parle de toi !</Text>
+                    <Text style={styles.quizPhaseHint}>Donne ta vraie réponse. {partnerName} doit deviner !</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.quizPhaseTitle}>🤔 Devine la réponse de {partnerName} !</Text>
+                    <Text style={styles.quizPhaseHint}>{partnerName} donne sa vraie réponse de son côté</Text>
+                  </>
+                )}
+                {renderQuizOptions(handleQuizAnswerOnline, iAmResponder)}
               </View>
             )}
 
@@ -2425,12 +2536,12 @@ export default function GamesScreen() {
               </View>
             )}
 
-            {/* ══════ MODE LOCAL: Phase 1 ══════ */}
+            {/* ══════ MODE LOCAL: Phase 1 — Le répondeur donne sa vraie réponse ══════ */}
             {!isOnline && quizPhase === 'player1' && (
               <View style={styles.quizPhaseContainer}>
-                <Text style={styles.quizPhaseTitle}>🎯 C'est au tour de {myName}</Text>
-                <Text style={styles.quizPhaseHint}>{partnerName} doit deviner ta réponse ensuite !</Text>
-                {renderQuizOptions(handleQuizAnswer)}
+                <Text style={styles.quizPhaseTitle}>📝 {myName}, cette question parle de toi !</Text>
+                <Text style={styles.quizPhaseHint}>Donne ta vraie réponse. {partnerName} devra deviner ensuite !</Text>
+                {renderQuizOptions(handleQuizAnswer, true)}
               </View>
             )}
 
@@ -2440,7 +2551,7 @@ export default function GamesScreen() {
                 <Text style={styles.passPhoneEmoji}>📱</Text>
                 <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
                 <Text style={styles.passPhoneText}>
-                  {myName} a répondu. Maintenant passe le téléphone à {partnerName} pour qu'il/elle devine.
+                  {myName} a donné sa réponse. Maintenant {partnerName} doit deviner !
                 </Text>
                 <Text style={styles.passPhoneWarning}>⚠️ {partnerName} ne doit pas voir la réponse !</Text>
                 <TouchableOpacity
@@ -2455,74 +2566,126 @@ export default function GamesScreen() {
               </View>
             )}
 
-            {/* MODE LOCAL: Phase 2 */}
+            {/* MODE LOCAL: Phase 2 — Le devineur devine */}
             {!isOnline && quizPhase === 'player2' && (
               <View style={styles.quizPhaseContainer}>
-                <Text style={styles.quizPhaseTitle}>🤔 C'est au tour de {partnerName}</Text>
-                <Text style={styles.quizPhaseHint}>Devine la réponse de {myName} !</Text>
-                {renderQuizOptions(handleQuizAnswer)}
+                <Text style={styles.quizPhaseTitle}>🤔 {partnerName}, devine la réponse !</Text>
+                <Text style={styles.quizPhaseHint}>Quelle est la réponse de {myName} selon toi ?</Text>
+                {renderQuizOptions(handleQuizAnswer, false)}
               </View>
             )}
 
             {/* ══════ REVEAL (online + local) ══════ */}
-            {quizPhase === 'reveal' && (
-              <View style={styles.quizRevealContainer}>
-                <Text style={styles.quizRevealTitle}>🎯 Comparez vos réponses !</Text>
-                
-                <View style={styles.quizRevealAnswers}>
-                  <View style={question.type === 'open' ? styles.quizRevealAnswerOpen : styles.quizRevealAnswer}>
-                    <Text style={styles.quizRevealLabel}>{myName} :</Text>
-                    <Text style={question.type === 'open' ? styles.quizRevealValueOpen : styles.quizRevealValue}>
-                      {player1Answer}
-                    </Text>
+            {quizPhase === 'reveal' && (() => {
+              // Déterminer les réponses du répondeur et du devineur
+              const responderAnswer = isOnline
+                ? (iAmResponder ? player1Answer : onlinePartnerAnswer)
+                : player1Answer;
+              const guesserAnswer = isOnline
+                ? (iAmResponder ? onlinePartnerAnswer : player1Answer)
+                : player2Answer;
+              
+              // Pour les questions choice en mode online: auto-validation
+              const isChoiceCorrect = question.type === 'choice' && responderAnswer === guesserAnswer;
+              
+              // Auto-attribuer le point pour choice en mode online (une seule fois)
+              if (isOnline && question.type === 'choice' && !quizValidated) {
+                if (isChoiceCorrect) {
+                  const scoringPlayer = iAmResponder ? 'player2' : 'player1';
+                  setScores(prev => ({
+                    ...prev,
+                    [scoringPlayer]: prev[scoringPlayer] + 1,
+                  }));
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+                setQuizValidated(true);
+              }
+
+              return (
+                <View style={styles.quizRevealContainer}>
+                  <Text style={styles.quizRevealTitle}>🎯 Révélation !</Text>
+                  
+                  <View style={styles.quizRevealAnswers}>
+                    {/* Réponse du répondeur (la vraie réponse) */}
+                    <View style={question.type === 'open' ? styles.quizRevealAnswerOpen : styles.quizRevealAnswer}>
+                      <Text style={styles.quizRevealLabel}>✅ {responderName} (vraie réponse) :</Text>
+                      <Text style={question.type === 'open' ? styles.quizRevealValueOpen : styles.quizRevealValue}>
+                        {responderAnswer}
+                      </Text>
+                    </View>
+                    {/* Réponse du devineur */}
+                    <View style={question.type === 'open' ? styles.quizRevealAnswerOpen : styles.quizRevealAnswer}>
+                      <Text style={styles.quizRevealLabel}>🤔 {guesserName} (a deviné) :</Text>
+                      <Text style={question.type === 'open' ? styles.quizRevealValueOpen : styles.quizRevealValue}>
+                        {guesserAnswer}
+                      </Text>
+                    </View>
+
+                    {/* Résultat pour questions CHOICE: automatique */}
+                    {question.type === 'choice' && (
+                      isChoiceCorrect ? (
+                        <Text style={styles.quizMatch}>✅ {guesserName} a trouvé la bonne réponse ! +1 point</Text>
+                      ) : (
+                        <Text style={styles.wimDisagree}>❌ Mauvaise réponse ! La bonne réponse était : {responderAnswer}</Text>
+                      )
+                    )}
+
+                    {/* Résultat pour questions OPEN: le répondeur valide */}
+                    {question.type === 'open' && !quizValidated && (
+                      <View>
+                        <Text style={styles.quizRevealQuestion}>
+                          {isOnline 
+                            ? (iAmResponder 
+                              ? `${myName}, est-ce que ${guesserName} a bien deviné ?`
+                              : `⏳ ${responderName} vérifie ta réponse...`)
+                            : `${responderName}, est-ce que ${guesserName} a bien deviné ?`
+                          }
+                        </Text>
+                        {/* Afficher les boutons seulement si je suis le répondeur (online) ou toujours (local) */}
+                        {(!isOnline || iAmResponder) && (
+                          <View style={styles.quizRevealButtons}>
+                            <TouchableOpacity
+                              style={[styles.quizRevealBtn, { backgroundColor: '#10B981' }]}
+                              onPress={() => handleValidateAnswer(true)}
+                            >
+                              <Text style={styles.quizRevealBtnText}>✅ Correct !</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.quizRevealBtn, { backgroundColor: '#EF4444' }]}
+                              onPress={() => handleValidateAnswer(false)}
+                            >
+                              <Text style={[styles.quizRevealBtnText, { color: '#fff' }]}>❌ Incorrect</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        {isOnline && !iAmResponder && (
+                          <ActivityIndicator size="small" color="#fff" style={{ marginTop: 10 }} />
+                        )}
+                      </View>
+                    )}
+
+                    {/* Résultat affiché après validation pour les questions open */}
+                    {question.type === 'open' && quizValidated && (
+                      <Text style={quizLastValidationResult ? styles.quizMatch : styles.wimDisagree}>
+                        {quizLastValidationResult 
+                          ? `✅ Bonne réponse ! ${guesserName} gagne 1 point !`
+                          : `❌ Pas tout à fait... Pas de point cette fois !`
+                        }
+                      </Text>
+                    )}
                   </View>
-                  <View style={question.type === 'open' ? styles.quizRevealAnswerOpen : styles.quizRevealAnswer}>
-                    <Text style={styles.quizRevealLabel}>{partnerName} :</Text>
-                    <Text style={question.type === 'open' ? styles.quizRevealValueOpen : styles.quizRevealValue}>
-                      {isOnline ? onlinePartnerAnswer : player2Answer}
-                    </Text>
-                  </View>
-                  {question.type === 'choice' && (isOnline ? player1Answer === onlinePartnerAnswer : player1Answer === player2Answer) && (
-                    <Text style={styles.quizMatch}>✨ Match parfait !</Text>
-                  )}
-                  {question.type === 'open' && (
-                    <Text style={styles.quizOpenCompareHint}>💬 Discutez de vos réponses !</Text>
+
+                  {/* Bouton suivant : visible seulement après validation */}
+                  {(question.type === 'choice' || quizValidated) && (
+                    <TouchableOpacity style={styles.quizNextButton} onPress={handleQuizNext}>
+                      <Text style={styles.quizNextButtonText}>
+                        {currentQuestion < 9 ? 'Question suivante →' : 'Voir résultats 🏆'}
+                      </Text>
+                    </TouchableOpacity>
                   )}
                 </View>
-
-                <Text style={styles.quizRevealQuestion}>Qui a bien deviné ?</Text>
-                
-                <View style={styles.quizRevealButtons}>
-                  <TouchableOpacity
-                    style={styles.quizRevealBtn}
-                    onPress={() => handleCorrect('player1')}
-                  >
-                    <Text style={styles.quizRevealBtnText}>{myName} ✓</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.quizRevealBtn}
-                    onPress={() => handleCorrect('player2')}
-                  >
-                    <Text style={styles.quizRevealBtnText}>{partnerName} ✓</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.quizRevealBtn, styles.quizRevealBtnBoth]}
-                    onPress={() => {
-                      handleCorrect('player1');
-                      handleCorrect('player2');
-                    }}
-                  >
-                    <Text style={styles.quizRevealBtnText}>Les deux !</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={styles.quizNextButton} onPress={handleQuizNext}>
-                  <Text style={styles.quizNextButtonText}>
-                    {currentQuestion < 9 ? 'Question suivante →' : 'Voir résultats 🏆'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              );
+            })()}
 
             {/* ══════ MODE ONLINE: En attente que le partenaire clique Suivant ══════ */}
             {isOnline && quizPhase === 'waitingNext' && (
@@ -2563,6 +2726,8 @@ export default function GamesScreen() {
                 setPlayer1Answer(null);
                 setPlayer2Answer(null);
                 setQuizOpenAnswer('');
+                setQuizValidated(false);
+                setQuizLastValidationResult(null);
               }}
             >
               <Text style={styles.playAgainText}>🔄 Rejouer</Text>
