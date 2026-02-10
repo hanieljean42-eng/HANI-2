@@ -2359,6 +2359,11 @@ export default function GamesScreen() {
     const responderName = iAmResponder ? myName : partnerName;
     const guesserName = iAmResponder ? partnerName : myName;
 
+    // ✅ ALTERNANCE MODE LOCAL: Questions paires → myName répond, partnerName devine
+    //                           Questions impaires → partnerName répond, myName devine
+    const localResponder = currentQuestion % 2 === 0 ? myName : partnerName;
+    const localGuesser = currentQuestion % 2 === 0 ? partnerName : myName;
+
     // ══════ MODE ONLINE ══════
     const handleQuizAnswerOnline = async (answer) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -2378,13 +2383,14 @@ export default function GamesScreen() {
         setPlayer2Answer(answer);
         // Pour les questions 'choice', on peut auto-valider
         if (question.type === 'choice') {
-          // En mode local: player1 = répondeur (question parle de lui), player2 = devineur
-          // Vérifier si la réponse du devineur correspond
+          // Vérifier si la réponse du devineur correspond à celle du répondeur
           if (answer === player1Answer) {
             // Le devineur a trouvé ! +1 point pour le devineur
+            // Questions paires → partnerName devine (player2), questions impaires → myName devine (player1)
+            const scoringPlayer = currentQuestion % 2 === 0 ? 'player2' : 'player1';
             setScores(prev => ({
               ...prev,
-              player2: prev.player2 + 1,
+              [scoringPlayer]: prev[scoringPlayer] + 1,
             }));
             setQuizValidated(true);
           } else {
@@ -2443,11 +2449,13 @@ export default function GamesScreen() {
           }));
         }
       } else {
-        // En mode local: player2 est toujours le devineur
+        // En mode local: alterner le devineur selon la question
+        // Questions paires → partnerName devine (player2), questions impaires → myName devine (player1)
         if (isCorrect) {
+          const scoringPlayer = currentQuestion % 2 === 0 ? 'player2' : 'player1';
           setScores(prev => ({
             ...prev,
-            player2: prev.player2 + 1,
+            [scoringPlayer]: prev[scoringPlayer] + 1,
           }));
         }
       }
@@ -2571,8 +2579,8 @@ export default function GamesScreen() {
             {/* ══════ MODE LOCAL: Phase 1 — Le répondeur donne sa vraie réponse ══════ */}
             {!isOnline && quizPhase === 'player1' && (
               <View style={styles.quizPhaseContainer}>
-                <Text style={styles.quizPhaseTitle}>📝 {myName}, cette question parle de toi !</Text>
-                <Text style={styles.quizPhaseHint}>Donne ta vraie réponse. {partnerName} devra deviner ensuite !</Text>
+                <Text style={styles.quizPhaseTitle}>📝 {localResponder}, cette question parle de toi !</Text>
+                <Text style={styles.quizPhaseHint}>Donne ta vraie réponse. {localGuesser} devra deviner ensuite !</Text>
                 {renderQuizOptions(handleQuizAnswer, true)}
               </View>
             )}
@@ -2583,9 +2591,9 @@ export default function GamesScreen() {
                 <Text style={styles.passPhoneEmoji}>📱</Text>
                 <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
                 <Text style={styles.passPhoneText}>
-                  {myName} a donné sa réponse. Maintenant {partnerName} doit deviner !
+                  {localResponder} a donné sa réponse. Maintenant {localGuesser} doit deviner !
                 </Text>
-                <Text style={styles.passPhoneWarning}>⚠️ {partnerName} ne doit pas voir la réponse !</Text>
+                <Text style={styles.passPhoneWarning}>⚠️ {localGuesser} ne doit pas voir la réponse !</Text>
                 <TouchableOpacity
                   style={styles.passPhoneButton}
                   onPress={() => {
@@ -2593,7 +2601,7 @@ export default function GamesScreen() {
                     setQuizPhase('player2');
                   }}
                 >
-                  <Text style={styles.passPhoneButtonText}>👋 {partnerName} est prêt(e)</Text>
+                  <Text style={styles.passPhoneButtonText}>👋 {localGuesser} est prêt(e)</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -2601,8 +2609,8 @@ export default function GamesScreen() {
             {/* MODE LOCAL: Phase 2 — Le devineur devine */}
             {!isOnline && quizPhase === 'player2' && (
               <View style={styles.quizPhaseContainer}>
-                <Text style={styles.quizPhaseTitle}>🤔 {partnerName}, devine la réponse !</Text>
-                <Text style={styles.quizPhaseHint}>Quelle est la réponse de {myName} selon toi ?</Text>
+                <Text style={styles.quizPhaseTitle}>🤔 {localGuesser}, devine la réponse !</Text>
+                <Text style={styles.quizPhaseHint}>Quelle est la réponse de {localResponder} selon toi ?</Text>
                 {renderQuizOptions(handleQuizAnswer, false)}
               </View>
             )}
@@ -2610,6 +2618,8 @@ export default function GamesScreen() {
             {/* ══════ REVEAL (online + local) ══════ */}
             {quizPhase === 'reveal' && (() => {
               // Déterminer les réponses du répondeur et du devineur
+              const currentResponderName = isOnline ? responderName : localResponder;
+              const currentGuesserName = isOnline ? guesserName : localGuesser;
               const responderAnswer = isOnline
                 ? (iAmResponder ? player1Answer : onlinePartnerAnswer)
                 : player1Answer;
@@ -2617,24 +2627,37 @@ export default function GamesScreen() {
                 ? (iAmResponder ? onlinePartnerAnswer : player1Answer)
                 : player2Answer;
               
-              // Pour les questions choice en mode online: auto-validation
+              // Pour les questions choice: auto-validation
               const isChoiceCorrect = question.type === 'choice' && responderAnswer === guesserAnswer;
 
               return (
                 <View style={styles.quizRevealContainer}>
+                  {/* ✅ Grand feedback visuel immédiat pour les questions choice */}
+                  {question.type === 'choice' && (
+                    <View style={[styles.quizBigFeedback, { backgroundColor: isChoiceCorrect ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)' }]}>
+                      <Text style={{ fontSize: 60 }}>{isChoiceCorrect ? '🎉' : '😅'}</Text>
+                      <Text style={[styles.quizBigFeedbackText, { color: isChoiceCorrect ? '#10B981' : '#EF4444' }]}>
+                        {isChoiceCorrect
+                          ? `${currentGuesserName} a trouvé !`
+                          : `${currentGuesserName} s'est trompé(e) !`
+                        }
+                      </Text>
+                    </View>
+                  )}
+
                   <Text style={styles.quizRevealTitle}>🎯 Révélation !</Text>
                   
                   <View style={styles.quizRevealAnswers}>
                     {/* Réponse du répondeur (la vraie réponse) */}
                     <View style={question.type === 'open' ? styles.quizRevealAnswerOpen : styles.quizRevealAnswer}>
-                      <Text style={styles.quizRevealLabel}>✅ {responderName} (vraie réponse) :</Text>
+                      <Text style={styles.quizRevealLabel}>✅ {currentResponderName} (vraie réponse) :</Text>
                       <Text style={question.type === 'open' ? styles.quizRevealValueOpen : styles.quizRevealValue}>
                         {responderAnswer}
                       </Text>
                     </View>
                     {/* Réponse du devineur */}
                     <View style={question.type === 'open' ? styles.quizRevealAnswerOpen : styles.quizRevealAnswer}>
-                      <Text style={styles.quizRevealLabel}>🤔 {guesserName} (a deviné) :</Text>
+                      <Text style={styles.quizRevealLabel}>🤔 {currentGuesserName} (a deviné) :</Text>
                       <Text style={question.type === 'open' ? styles.quizRevealValueOpen : styles.quizRevealValue}>
                         {guesserAnswer}
                       </Text>
@@ -2643,7 +2666,7 @@ export default function GamesScreen() {
                     {/* Résultat pour questions CHOICE: automatique */}
                     {question.type === 'choice' && (
                       isChoiceCorrect ? (
-                        <Text style={styles.quizMatch}>✅ {guesserName} a trouvé la bonne réponse ! +1 point</Text>
+                        <Text style={styles.quizMatch}>✅ {currentGuesserName} a trouvé la bonne réponse ! +1 point</Text>
                       ) : (
                         <Text style={styles.wimDisagree}>❌ Mauvaise réponse ! La bonne réponse était : {responderAnswer}</Text>
                       )
@@ -2655,9 +2678,9 @@ export default function GamesScreen() {
                         <Text style={styles.quizRevealQuestion}>
                           {isOnline 
                             ? (iAmResponder 
-                              ? `${myName}, est-ce que ${guesserName} a bien deviné ?`
-                              : `⏳ ${responderName} vérifie ta réponse...`)
-                            : `${responderName}, est-ce que ${guesserName} a bien deviné ?`
+                              ? `${myName}, est-ce que ${currentGuesserName} a bien deviné ?`
+                              : `⏳ ${currentResponderName} vérifie ta réponse...`)
+                            : `${currentResponderName}, est-ce que ${currentGuesserName} a bien deviné ?`
                           }
                         </Text>
                         {/* Afficher les boutons seulement si je suis le répondeur (online) ou toujours (local) */}
@@ -2685,12 +2708,23 @@ export default function GamesScreen() {
 
                     {/* Résultat affiché après validation pour les questions open */}
                     {question.type === 'open' && quizValidated && (
-                      <Text style={quizLastValidationResult ? styles.quizMatch : styles.wimDisagree}>
-                        {quizLastValidationResult 
-                          ? `✅ Bonne réponse ! ${guesserName} gagne 1 point !`
-                          : `❌ Pas tout à fait... Pas de point cette fois !`
-                        }
-                      </Text>
+                      <View>
+                        <View style={[styles.quizBigFeedback, { backgroundColor: quizLastValidationResult ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)' }]}>
+                          <Text style={{ fontSize: 50 }}>{quizLastValidationResult ? '🎉' : '😅'}</Text>
+                          <Text style={[styles.quizBigFeedbackText, { color: quizLastValidationResult ? '#10B981' : '#EF4444' }]}>
+                            {quizLastValidationResult 
+                              ? `${currentGuesserName} a bien deviné !`
+                              : `${currentGuesserName} s'est trompé(e) !`
+                            }
+                          </Text>
+                        </View>
+                        <Text style={quizLastValidationResult ? styles.quizMatch : styles.wimDisagree}>
+                          {quizLastValidationResult 
+                            ? `✅ Bonne réponse ! ${currentGuesserName} gagne 1 point !`
+                            : `❌ Pas tout à fait... Pas de point cette fois !`
+                          }
+                        </Text>
+                      </View>
                     )}
                   </View>
 
@@ -4387,6 +4421,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginTop: 15,
+  },
+  quizBigFeedback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 15,
+  },
+  quizBigFeedbackText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginTop: 10,
+    textAlign: 'center',
   },
   quizRevealQuestion: {
     fontSize: 18,
