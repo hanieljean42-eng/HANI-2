@@ -1,43 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1284" height="2778" viewBox="0 0 1284 2778">
   <defs>
     <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="30%" style="stop-color:#E91E63"/>
-      <stop offset="60%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
+      <stop offset="0%" style="stop-color:#E91E63"/>
+      <stop offset="50%" style="stop-color:#C2185B"/>
+      <stop offset="100%" style="stop-color:#880E4F"/>
     </linearGradient>
-    <linearGradient id="letterGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
-    </linearGradient>
-    <linearGradient id="heartGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF1744"/>
-      <stop offset="100%" style="stop-color:#FF6B9D"/>
-    </linearGradient>
+    <filter id="textShadow3">
+      <feDropShadow dx="2" dy="5" stdDeviation="5" flood-color="rgba(0,0,0,0.45)"/>
+    </filter>
     <filter id="shadow3">
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.25)"/>
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="rgba(0,0,0,0.4)"/>
     </filter>
   </defs>
   <!-- Background -->
   <rect width="1284" height="2778" fill="url(#bg3)"/>
-  <!-- Decorative elements -->
-  <circle cx="200" cy="400" r="200" fill="white" opacity="0.03"/>
-  <circle cx="1084" cy="2400" r="250" fill="white" opacity="0.03"/>
-  <circle cx="1000" cy="600" r="100" fill="white" opacity="0.02"/>
-  <circle cx="300" cy="2200" r="150" fill="white" opacity="0.02"/>
-  <!-- Main white card -->
-  <rect x="342" y="1000" width="600" height="420" rx="50" fill="white" opacity="0.95" filter="url(#shadow3)"/>
-  <!-- Letter H -->
-  <text x="400" y="1280" font-family="Georgia, serif" font-size="240" font-weight="bold" fill="url(#letterGrad3)">H</text>
+  <!-- Subtle decor -->
+  <circle cx="200" cy="500" r="200" fill="white" opacity="0.04"/>
+  <circle cx="1084" cy="2300" r="250" fill="white" opacity="0.03"/>
+  <!-- Letter H - WHITE -->
+  <text x="330" y="1480" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="bold" fill="white" filter="url(#textShadow3)">H</text>
   <!-- Heart -->
-  <path d="M642 1100 C642 1065, 685 1030, 720 1030 C770 1030, 805 1080, 805 1115 C805 1190, 642 1290, 642 1290 C642 1290, 479 1190, 479 1115 C479 1080, 514 1030, 564 1030 C599 1030, 642 1065, 642 1100Z" fill="url(#heartGrad3)" filter="url(#shadow3)"/>
-  <!-- Letter A -->
-  <text x="660" y="1280" font-family="Georgia, serif" font-size="240" font-weight="bold" fill="url(#letterGrad3)">A</text>
+  <path d="M642 1150 C642 1115, 675 1085, 700 1085 C735 1085, 762 1118, 762 1150 C762 1210, 642 1290, 642 1290 C642 1290, 522 1210, 522 1150 C522 1118, 549 1085, 584 1085 C609 1085, 642 1115, 642 1150Z" fill="#FF1744" filter="url(#shadow3)"/>
+  <path d="M642 1170 C642 1162, 651 1154, 658 1154 C668 1154, 675 1164, 675 1170 C675 1183, 642 1200, 642 1200 C642 1200, 609 1183, 609 1170 C609 1164, 616 1154, 626 1154 C633 1154, 642 1162, 642 1170Z" fill="white" opacity="0.35"/>
+  <!-- Letter A - WHITE -->
+  <text x="650" y="1480" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="bold" fill="white" filter="url(#textShadow3)">A</text>
   <!-- App name -->
-  <text x="642" y="1560" font-family="Georgia, serif" font-size="90" font-weight="bold" fill="white" text-anchor="middle" filter="url(#shadow3)">HANI 2</text>
-  <text x="642" y="1650" font-family="Arial, sans-serif" font-size="36" fill="rgba(255,255,255,0.7)" text-anchor="middle">Votre espace couple privé</text>
-  <!-- Small hearts decoration -->
-  <text x="400" y="1800" font-size="40" opacity="0.3">💕</text>
-  <text x="842" y="1780" font-size="35" opacity="0.25">💖</text>
-  <text x="600" y="1850" font-size="30" opacity="0.2">✨</text>
+  <text x="642" y="1680" font-family="Georgia, 'Times New Roman', serif" font-size="100" font-weight="bold" fill="white" text-anchor="middle" filter="url(#textShadow3)">HANI 2</text>
+  <text x="642" y="1770" font-family="Arial, Helvetica, sans-serif" font-size="40" fill="rgba(255,255,255,0.8)" text-anchor="middle">Votre espace couple privé</text>
 </svg>

@@ -1,28 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="40%" style="stop-color:#E91E63"/>
-      <stop offset="70%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
+      <stop offset="0%" style="stop-color:#E91E63"/>
+      <stop offset="50%" style="stop-color:#C2185B"/>
+      <stop offset="100%" style="stop-color:#880E4F"/>
     </linearGradient>
-    <linearGradient id="letterGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
-    </linearGradient>
-    <linearGradient id="heartGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF1744"/>
-      <stop offset="100%" style="stop-color:#FF6B9D"/>
-    </linearGradient>
+    <filter id="textShadow2">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
+    <filter id="shadow2">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
   </defs>
-  <!-- Background with padding for adaptive icon safe zone -->
+  <!-- Background - adaptive safe zone -->
   <rect width="1024" height="1024" fill="url(#bg2)"/>
-  <!-- Main white card - centered for safe zone -->
-  <rect x="212" y="280" width="600" height="400" rx="50" fill="white" opacity="0.95"/>
-  <!-- Letter H -->
-  <text x="280" y="550" font-family="Georgia, serif" font-size="240" font-weight="bold" fill="url(#letterGrad2)">H</text>
-  <!-- Heart -->
-  <path d="M512 380 C512 345, 555 310, 590 310 C640 310, 675 360, 675 395 C675 470, 512 570, 512 570 C512 570, 349 470, 349 395 C349 360, 384 310, 434 310 C469 310, 512 345, 512 380Z" fill="url(#heartGrad2)"/>
-  <!-- Letter A -->
-  <text x="540" y="550" font-family="Georgia, serif" font-size="240" font-weight="bold" fill="url(#letterGrad2)">A</text>
+  <!-- Letter H - WHITE -->
+  <text x="220" y="590" font-family="Georgia, 'Times New Roman', serif" font-size="360" font-weight="bold" fill="white" filter="url(#textShadow2)">H</text>
+  <!-- Heart - small -->
+  <path d="M512 340 C512 310, 540 285, 562 285 C594 285, 617 315, 617 340 C617 390, 512 455, 512 455 C512 455, 407 390, 407 340 C407 315, 430 285, 462 285 C484 285, 512 310, 512 340Z" fill="#FF1744" filter="url(#shadow2)"/>
+  <!-- Letter A - WHITE -->
+  <text x="510" y="590" font-family="Georgia, 'Times New Roman', serif" font-size="360" font-weight="bold" fill="white" filter="url(#textShadow2)">A</text>
 </svg>

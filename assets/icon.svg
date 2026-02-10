@@ -1,52 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="40%" style="stop-color:#E91E63"/>
-      <stop offset="70%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
-    </linearGradient>
-    <linearGradient id="letterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
-    </linearGradient>
-    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF1744"/>
-      <stop offset="100%" style="stop-color:#FF6B9D"/>
+      <stop offset="0%" style="stop-color:#E91E63"/>
+      <stop offset="50%" style="stop-color:#C2185B"/>
+      <stop offset="100%" style="stop-color:#880E4F"/>
     </linearGradient>
     <filter id="shadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="rgba(0,0,0,0.3)"/>
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="rgba(0,0,0,0.5)"/>
     </filter>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <filter id="textShadow">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/>
     </filter>
   </defs>
   <!-- Background -->
   <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
-  <!-- Decorative circles -->
-  <circle cx="200" cy="200" r="120" fill="white" opacity="0.05"/>
-  <circle cx="824" cy="824" r="150" fill="white" opacity="0.05"/>
-  <circle cx="800" cy="250" r="80" fill="white" opacity="0.03"/>
-  <!-- Main white card -->
-  <rect x="132" y="200" width="760" height="520" rx="60" fill="white" opacity="0.95" filter="url(#shadow)"/>
-  <!-- Sparkles -->
-  <text x="180" y="250" font-size="40" opacity="0.6">✨</text>
-  <text x="800" y="300" font-size="35" opacity="0.5">💫</text>
-  <text x="160" y="700" font-size="30" opacity="0.4">⭐</text>
-  <text x="830" y="680" font-size="35" opacity="0.5">✨</text>
-  <!-- Letter H -->
-  <text x="230" y="570" font-family="Georgia, serif" font-size="320" font-weight="bold" fill="url(#letterGrad)" filter="url(#glow)">H</text>
-  <!-- Heart between letters -->
-  <path d="M512 370 C512 320, 570 270, 620 270 C690 270, 740 340, 740 390 C740 490, 512 620, 512 620 C512 620, 284 490, 284 390 C284 340, 334 270, 404 270 C454 270, 512 320, 512 370Z" fill="url(#heartGrad)" filter="url(#shadow)"/>
-  <!-- Small white heart inside -->
-  <path d="M512 400 C512 385, 530 370, 545 370 C565 370, 580 390, 580 400 C580 425, 512 460, 512 460 C512 460, 444 425, 444 400 C444 390, 459 370, 479 370 C494 370, 512 385, 512 400Z" fill="white" opacity="0.5"/>
-  <!-- Letter A -->
-  <text x="570" y="570" font-family="Georgia, serif" font-size="320" font-weight="bold" fill="url(#letterGrad)" filter="url(#glow)">A</text>
-  <!-- App name at bottom -->
-  <text x="512" y="810" font-family="Georgia, serif" font-size="60" font-weight="bold" fill="white" text-anchor="middle" filter="url(#shadow)">HANI 2</text>
-  <text x="512" y="860" font-family="Arial, sans-serif" font-size="28" fill="rgba(255,255,255,0.7)" text-anchor="middle">Votre espace couple</text>
+  <!-- Subtle glow -->
+  <circle cx="180" cy="180" r="140" fill="white" opacity="0.06"/>
+  <circle cx="850" cy="850" r="170" fill="white" opacity="0.04"/>
+  <!-- Letter H - WHITE -->
+  <text x="170" y="610" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="bold" fill="white" filter="url(#textShadow)">H</text>
+  <!-- Heart between letters - small and centered -->
+  <path d="M512 320 C512 288, 542 260, 567 260 C602 260, 627 292, 627 320 C627 375, 512 445, 512 445 C512 445, 397 375, 397 320 C397 292, 422 260, 457 260 C482 260, 512 288, 512 320Z" fill="#FF1744" filter="url(#shadow)"/>
+  <path d="M512 340 C512 330, 523 322, 532 322 C545 322, 553 334, 553 340 C553 356, 512 378, 512 378 C512 378, 471 356, 471 340 C471 334, 479 322, 492 322 C501 322, 512 330, 512 340Z" fill="white" opacity="0.35"/>
+  <!-- Letter A - WHITE -->
+  <text x="510" y="610" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="bold" fill="white" filter="url(#textShadow)">A</text>
+  <!-- App name -->
+  <text x="512" y="810" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle" filter="url(#textShadow)">HANI 2</text>
+  <text x="512" y="875" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="rgba(255,255,255,0.8)" text-anchor="middle">Votre espace couple</text>
 </svg>
