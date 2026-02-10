@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, get, onValue, off } from 'firebase/database';
 import { useAuth } from './AuthContext';
+import { navigate } from '../navigation/navigationRef';
 
 const NotificationContext = createContext({});
 
@@ -33,6 +34,87 @@ export function NotificationProvider({ children }) {
   const [userId, setUserId] = useState(null);
   const [coupleId, setCoupleId] = useState(null);
   const [partnerToken, setPartnerToken] = useState(null);
+
+  // ✅ Mapping type de notification → écran de destination
+  const getScreenForType = (type) => {
+    switch (type) {
+      // Chat & Messages
+      case 'love_note':
+      case 'note_read':
+      case 'chat_message':
+      case 'voice_message':
+        return { stack: 'Chat' };
+      // Jeux
+      case 'game_invite':
+      case 'game_win':
+      case 'game_turn':
+        return { stack: 'Games' };
+      // Souvenirs & Capsules
+      case 'memory':
+      case 'capsule':
+      case 'capsule_opened':
+      case 'scheduled_letter':
+      case 'letter_read':
+      case 'diary_entry':
+        return { tab: 'Memories' };
+      // Défis
+      case 'challenge':
+      case 'challenge_assigned':
+        return { tab: 'Challenges' };
+      // Roue
+      case 'wheel_spin':
+      case 'wheel_spin_partner':
+        return { tab: 'Wheel' };
+      // Profil & Couple
+      case 'online':
+      case 'profile_update':
+      case 'couple_name':
+      case 'anniversary':
+      case 'photo_change':
+      case 'partner_joined':
+      case 'partner_joined_creator':
+        return { tab: 'Home' };
+      // Love Meter
+      case 'love_meter':
+      case 'miss_you':
+        return { tab: 'Home' };
+      // Bucket list
+      case 'bucket':
+      case 'new_bucket':
+        return { tab: 'Profile' };
+      // Stats
+      case 'stats':
+        return { stack: 'Stats' };
+      // Test / Welcome / Login
+      case 'test':
+      case 'welcome':
+      case 'login':
+      case 'couple_created':
+        return { tab: 'Home' };
+      default:
+        return { tab: 'Home' };
+    }
+  };
+
+  // ✅ Naviguer vers le bon écran selon le type de notification
+  const handleNotificationNavigation = (data) => {
+    if (!data?.type) {
+      console.log('⚠️ Pas de type dans la notification, navigation vers Home');
+      navigate('MainTabs', { screen: 'Home' });
+      return;
+    }
+
+    const destination = getScreenForType(data.type);
+    console.log('🧭 Navigation notification:', data.type, '→', destination);
+
+    if (destination.stack) {
+      // Navigation vers un écran Stack (Chat, Games, Stats...)
+      navigate(destination.stack, destination.params || undefined);
+    } else if (destination.tab) {
+      // Navigation vers un onglet (Home, Wheel, Memories, Challenges, Profile...)
+      navigate('MainTabs', { screen: destination.tab });
+    }
+  };
 
   // ✅ Réagir aux changements d'authentification (login/logout/join couple)
   useEffect(() => {
@@ -69,9 +151,16 @@ export function NotificationProvider({ children }) {
       setNotification(notif);
     });
 
-    // Listener pour quand l'utilisateur clique sur la notification
+    // ✅ Listener pour quand l'utilisateur clique sur la notification → navigation
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('👆 Notification cliquée:', response);
+      console.log('👆 Notification cliquée:', response.notification?.request?.content?.title);
+      const data = response.notification?.request?.content?.data;
+      if (data) {
+        // Petit délai pour s'assurer que la navigation est prête
+        setTimeout(() => {
+          handleNotificationNavigation(data);
+        }, 500);
+      }
     });
 
     return () => {
@@ -610,6 +699,7 @@ export function NotificationProvider({ children }) {
         body: body,
         sound: 'default',
         priority: Notifications.AndroidNotificationPriority.DEFAULT,
+        data: { type: isChallengeIncomplete ? 'challenge' : 'smart_reminder' },
       },
       trigger: {
         type: SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -643,6 +733,7 @@ export function NotificationProvider({ children }) {
           title: '🎂 Rappel important !',
           body: `Demain c'est votre anniversaire de couple ! Prépare quelque chose de spécial 💕`,
           sound: 'default',
+          data: { type: 'anniversary' },
         },
         trigger: {
           type: SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -776,6 +867,7 @@ export function NotificationProvider({ children }) {
           body: `Salut ${userName} ! Ton compte a été créé avec succès. L'amour t'attend ! 💕`,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
+          data: { type: 'welcome' },
         },
         trigger: { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2 },
       });
@@ -814,7 +906,7 @@ export function NotificationProvider({ children }) {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
           vibrate: [0, 250, 250, 250],
-          data: { test: true },
+          data: { type: 'test' },
         },
         trigger: null, // NULL = immédiat, pas de délai
       });
@@ -837,6 +929,7 @@ export function NotificationProvider({ children }) {
           body: `Cette notification était programmée pour ${seconds} secondes. Ça fonctionne ! 🎯`,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
+          data: { type: 'test' },
         },
         trigger: { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: seconds },
       });
@@ -857,6 +950,7 @@ export function NotificationProvider({ children }) {
           body: `Félicitations ! Tu es maintenant en couple avec ${partnerName} sur HANI 2 ! 💕`,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
+          data: { type: 'couple_created' },
         },
         trigger: { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 1 }, // Immédiat (après 1 seconde)
       });
@@ -891,6 +985,7 @@ export function NotificationProvider({ children }) {
           body: `Content de te revoir ${userName} ! Ton amour t'attend 💕`,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.DEFAULT,
+          data: { type: 'login' },
         },
         trigger: null, // Immédiat
       });

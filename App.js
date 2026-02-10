@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import { navigationRef } from './src/navigation/navigationRef';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import { GameProvider } from './src/context/GameContext';
@@ -157,7 +158,7 @@ export default function App() {
                   <SecurityProvider>
                     <ChatProvider>
                       <GameProvider>
-                        <NavigationContainer>
+                        <NavigationContainer ref={navigationRef}>
                           <StatusBar style="light" />
                           <AppNavigator />
                         </NavigationContainer>
