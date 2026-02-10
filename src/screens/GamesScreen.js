@@ -782,8 +782,9 @@ export default function GamesScreen() {
   const { notifyGame, notifyGameAnswer, notifyGameWin } = useNotifyPartner();
   const { recordInteraction } = useData();
 
-  // Quiz: 10 questions aléatoires parmi les 50 disponibles
-  const [shuffledQuizQuestions, setShuffledQuizQuestions] = useState(() => shuffleAndPick(QUIZ_QUESTIONS, 10));
+  // Quiz: utiliser TOUTES les questions disponibles (mélangées aléatoirement)
+  const [shuffledQuizQuestions, setShuffledQuizQuestions] = useState(() => shuffleAndPick(QUIZ_QUESTIONS, QUIZ_QUESTIONS.length));
+  const totalQuizQuestions = shuffledQuizQuestions.length;
   const { 
     createGameSession, 
     joinGameSession, 
@@ -1143,7 +1144,7 @@ export default function GamesScreen() {
     setCurrentQuestion(prevQ => {
       // Lire activeGame depuis la closure mais c'est OK car ce useCallback a activeGame en dep
       if (activeGame === 'quiz') {
-        if (prevQ < 9) {
+        if (prevQ < totalQuizQuestions - 1) {
           setQuizPhase('player1');
           setPlayer1Answer(null);
           setPlayer2Answer(null);
@@ -1450,7 +1451,7 @@ export default function GamesScreen() {
   };
 
   const nextQuestion = () => {
-    if (currentQuestion < 9) {
+    if (currentQuestion < totalQuizQuestions - 1) {
       setCurrentQuestion(currentQuestion + 1);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } else {
@@ -2409,7 +2410,7 @@ export default function GamesScreen() {
         return;
       }
       // MODE LOCAL: Avancer directement
-      if (currentQuestion < 9) {
+      if (currentQuestion < totalQuizQuestions - 1) {
         setCurrentQuestion(currentQuestion + 1);
         setQuizPhase('player1');
         setPlayer1Answer(null);
@@ -2525,7 +2526,7 @@ export default function GamesScreen() {
         {!showResult ? (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / 10) * 100}%` }]} />
+              <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / totalQuizQuestions) * 100}%` }]} />
             </View>
             
             <View style={styles.quizScoreBoard}>
@@ -2540,7 +2541,7 @@ export default function GamesScreen() {
               </View>
             </View>
 
-            <Text style={styles.questionNumber}>Question {currentQuestion + 1}/10</Text>
+            <Text style={styles.questionNumber}>Question {currentQuestion + 1}/{totalQuizQuestions}</Text>
             
             <View style={styles.questionCard}>
               <Text style={styles.questionText}>{question.question}</Text>
@@ -2732,7 +2733,7 @@ export default function GamesScreen() {
                   {(question.type === 'choice' || quizValidated) && (
                     <TouchableOpacity style={styles.quizNextButton} onPress={handleQuizNext}>
                       <Text style={styles.quizNextButtonText}>
-                        {currentQuestion < 9 ? 'Question suivante →' : 'Voir résultats 🏆'}
+                        {currentQuestion < totalQuizQuestions - 1 ? 'Question suivante →' : 'Voir résultats 🏆'}
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -2764,7 +2765,7 @@ export default function GamesScreen() {
                 : `Égalité ${scores.player1}-${scores.player2} !`
               }
             </Text>
-            <Text style={styles.quizResultHint}>Vous vous connaissez {Math.round((scores.player1 + scores.player2) / 10 * 100)}% 💕</Text>
+            <Text style={styles.quizResultHint}>Vous vous connaissez {Math.round((scores.player1 + scores.player2) / totalQuizQuestions * 100)}% 💕</Text>
             <TouchableOpacity
               style={styles.playAgainButton}
               onPress={async () => {
@@ -2772,7 +2773,7 @@ export default function GamesScreen() {
                   await clearGameAnswers(); // Nettoyer Firebase avant de rejouer
                   nextOnlineQuestion();
                 }
-                setShuffledQuizQuestions(shuffleAndPick(QUIZ_QUESTIONS, 10));
+                setShuffledQuizQuestions(shuffleAndPick(QUIZ_QUESTIONS, QUIZ_QUESTIONS.length));
                 setCurrentQuestion(0);
                 setScores({ player1: 0, player2: 0 });
                 setShowResult(false);
