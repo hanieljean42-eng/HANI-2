@@ -778,7 +778,7 @@ export function NotificationProvider({ children }) {
         console.log('📱 Nouveau status:', newStatus);
         if (newStatus !== 'granted') {
           console.log('❌ Permissions refusées');
-          return { success: false, error: 'Permissions refusées. Allez dans Paramètres > Applications > Couple H > Notifications pour les activer.' };
+          return { success: false, error: 'Permissions refusées. Allez dans Paramètres > Applications > HANI 2 > Notifications pour les activer.' };
         }
       }
 
@@ -786,7 +786,7 @@ export function NotificationProvider({ children }) {
       console.log('📤 Envoi notification immédiate...');
       const notifId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: '💕 Test Couple H',
+          title: '💕 Test HANI 2',
           body: 'Super ! Les notifications fonctionnent parfaitement ! 🎉',
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,

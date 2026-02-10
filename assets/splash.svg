@@ -2,21 +2,42 @@
   <defs>
     <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="50%" style="stop-color:#C44569"/>
+      <stop offset="30%" style="stop-color:#E91E63"/>
+      <stop offset="60%" style="stop-color:#C44569"/>
       <stop offset="100%" style="stop-color:#8B5CF6"/>
     </linearGradient>
+    <linearGradient id="letterGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#C44569"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="heartGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF1744"/>
+      <stop offset="100%" style="stop-color:#FF6B9D"/>
+    </linearGradient>
+    <filter id="shadow3">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.25)"/>
+    </filter>
   </defs>
   <!-- Background -->
   <rect width="1284" height="2778" fill="url(#bg3)"/>
-  <!-- White circle -->
-  <circle cx="642" cy="1200" r="250" fill="white" opacity="0.95"/>
-  <!-- Letter C -->
-  <text x="480" y="1260" font-family="Arial, sans-serif" font-size="180" font-weight="bold" fill="#C44569">C</text>
-  <!-- Heart -->
-  <path d="M642 1130 C642 1105, 670 1080, 695 1080 C732 1080, 758 1110, 758 1135 C758 1185, 642 1260, 642 1260 C642 1260, 526 1185, 526 1135 C526 1110, 552 1080, 589 1080 C614 1080, 642 1105, 642 1130Z" fill="#FF6B9D"/>
+  <!-- Decorative elements -->
+  <circle cx="200" cy="400" r="200" fill="white" opacity="0.03"/>
+  <circle cx="1084" cy="2400" r="250" fill="white" opacity="0.03"/>
+  <circle cx="1000" cy="600" r="100" fill="white" opacity="0.02"/>
+  <circle cx="300" cy="2200" r="150" fill="white" opacity="0.02"/>
+  <!-- Main white card -->
+  <rect x="342" y="1000" width="600" height="420" rx="50" fill="white" opacity="0.95" filter="url(#shadow3)"/>
   <!-- Letter H -->
-  <text x="670" y="1260" font-family="Arial, sans-serif" font-size="180" font-weight="bold" fill="#C44569">H</text>
+  <text x="400" y="1280" font-family="Georgia, serif" font-size="240" font-weight="bold" fill="url(#letterGrad3)">H</text>
+  <!-- Heart -->
+  <path d="M642 1100 C642 1065, 685 1030, 720 1030 C770 1030, 805 1080, 805 1115 C805 1190, 642 1290, 642 1290 C642 1290, 479 1190, 479 1115 C479 1080, 514 1030, 564 1030 C599 1030, 642 1065, 642 1100Z" fill="url(#heartGrad3)" filter="url(#shadow3)"/>
+  <!-- Letter A -->
+  <text x="660" y="1280" font-family="Georgia, serif" font-size="240" font-weight="bold" fill="url(#letterGrad3)">A</text>
   <!-- App name -->
-  <text x="642" y="1550" font-family="Arial, sans-serif" font-size="80" font-weight="bold" fill="white" text-anchor="middle">Couple H</text>
-  <text x="642" y="1630" font-family="Arial, sans-serif" font-size="36" fill="rgba(255,255,255,0.8)" text-anchor="middle">Votre espace couple privé</text>
+  <text x="642" y="1560" font-family="Georgia, serif" font-size="90" font-weight="bold" fill="white" text-anchor="middle" filter="url(#shadow3)">HANI 2</text>
+  <text x="642" y="1650" font-family="Arial, sans-serif" font-size="36" fill="rgba(255,255,255,0.7)" text-anchor="middle">Votre espace couple privé</text>
+  <!-- Small hearts decoration -->
+  <text x="400" y="1800" font-size="40" opacity="0.3">💕</text>
+  <text x="842" y="1780" font-size="35" opacity="0.25">💖</text>
+  <text x="600" y="1850" font-size="30" opacity="0.2">✨</text>
 </svg>

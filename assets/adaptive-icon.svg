@@ -2,18 +2,27 @@
   <defs>
     <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="50%" style="stop-color:#C44569"/>
+      <stop offset="40%" style="stop-color:#E91E63"/>
+      <stop offset="70%" style="stop-color:#C44569"/>
       <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="letterGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#C44569"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="heartGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF1744"/>
+      <stop offset="100%" style="stop-color:#FF6B9D"/>
     </linearGradient>
   </defs>
   <!-- Background with padding for adaptive icon safe zone -->
   <rect width="1024" height="1024" fill="url(#bg2)"/>
-  <!-- White circle - centered and smaller for safe zone -->
-  <circle cx="512" cy="512" r="280" fill="white" opacity="0.95"/>
-  <!-- Letter C -->
-  <text x="320" y="570" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="#C44569">C</text>
-  <!-- Heart -->
-  <path d="M512 440 C512 410, 545 380, 575 380 C620 380, 650 420, 650 450 C650 510, 512 600, 512 600 C512 600, 374 510, 374 450 C374 420, 404 380, 449 380 C479 380, 512 410, 512 440Z" fill="#FF6B9D"/>
+  <!-- Main white card - centered for safe zone -->
+  <rect x="212" y="280" width="600" height="400" rx="50" fill="white" opacity="0.95"/>
   <!-- Letter H -->
-  <text x="560" y="570" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="#C44569">H</text>
+  <text x="280" y="550" font-family="Georgia, serif" font-size="240" font-weight="bold" fill="url(#letterGrad2)">H</text>
+  <!-- Heart -->
+  <path d="M512 380 C512 345, 555 310, 590 310 C640 310, 675 360, 675 395 C675 470, 512 570, 512 570 C512 570, 349 470, 349 395 C349 360, 384 310, 434 310 C469 310, 512 345, 512 380Z" fill="url(#heartGrad2)"/>
+  <!-- Letter A -->
+  <text x="540" y="550" font-family="Georgia, serif" font-size="240" font-weight="bold" fill="url(#letterGrad2)">A</text>
 </svg>

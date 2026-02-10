@@ -1052,6 +1052,14 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.settingText}>À propos</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => navigation.navigate('Guide')}
+        >
+          <Text style={styles.settingIcon}>📖</Text>
+          <Text style={styles.settingText}>Guide d'utilisation</Text>
+          <Text style={styles.settingArrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity 

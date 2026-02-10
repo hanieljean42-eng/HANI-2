@@ -203,4 +203,4 @@ Pour toute question ou bug report, veuillez créer une issue sur GitHub.
 **Fait avec ❤️ pour les couples**
 
 **Version:** 1.0.0  
-**Auteur:** Couple H Team 💕
+**Auteur:** HANI 2 Team 💕

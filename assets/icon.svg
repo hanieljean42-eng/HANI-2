@@ -2,18 +2,51 @@
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="50%" style="stop-color:#C44569"/>
+      <stop offset="40%" style="stop-color:#E91E63"/>
+      <stop offset="70%" style="stop-color:#C44569"/>
       <stop offset="100%" style="stop-color:#8B5CF6"/>
     </linearGradient>
+    <linearGradient id="letterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#C44569"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF1744"/>
+      <stop offset="100%" style="stop-color:#FF6B9D"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="rgba(0,0,0,0.3)"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
   <!-- Background -->
-  <rect width="1024" height="1024" fill="url(#bg)"/>
-  <!-- White circle -->
-  <circle cx="512" cy="512" r="350" fill="white" opacity="0.95"/>
-  <!-- Letter C -->
-  <text x="280" y="580" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="#C44569">C</text>
-  <!-- Heart emoji (simplified as heart shape) -->
-  <path d="M512 420 C512 380, 560 340, 600 340 C660 340, 700 400, 700 440 C700 520, 512 650, 512 650 C512 650, 324 520, 324 440 C324 400, 364 340, 424 340 C464 340, 512 380, 512 420Z" fill="#FF6B9D"/>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <!-- Decorative circles -->
+  <circle cx="200" cy="200" r="120" fill="white" opacity="0.05"/>
+  <circle cx="824" cy="824" r="150" fill="white" opacity="0.05"/>
+  <circle cx="800" cy="250" r="80" fill="white" opacity="0.03"/>
+  <!-- Main white card -->
+  <rect x="132" y="200" width="760" height="520" rx="60" fill="white" opacity="0.95" filter="url(#shadow)"/>
+  <!-- Sparkles -->
+  <text x="180" y="250" font-size="40" opacity="0.6">✨</text>
+  <text x="800" y="300" font-size="35" opacity="0.5">💫</text>
+  <text x="160" y="700" font-size="30" opacity="0.4">⭐</text>
+  <text x="830" y="680" font-size="35" opacity="0.5">✨</text>
   <!-- Letter H -->
-  <text x="600" y="580" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="#C44569">H</text>
+  <text x="230" y="570" font-family="Georgia, serif" font-size="320" font-weight="bold" fill="url(#letterGrad)" filter="url(#glow)">H</text>
+  <!-- Heart between letters -->
+  <path d="M512 370 C512 320, 570 270, 620 270 C690 270, 740 340, 740 390 C740 490, 512 620, 512 620 C512 620, 284 490, 284 390 C284 340, 334 270, 404 270 C454 270, 512 320, 512 370Z" fill="url(#heartGrad)" filter="url(#shadow)"/>
+  <!-- Small white heart inside -->
+  <path d="M512 400 C512 385, 530 370, 545 370 C565 370, 580 390, 580 400 C580 425, 512 460, 512 460 C512 460, 444 425, 444 400 C444 390, 459 370, 479 370 C494 370, 512 385, 512 400Z" fill="white" opacity="0.5"/>
+  <!-- Letter A -->
+  <text x="570" y="570" font-family="Georgia, serif" font-size="320" font-weight="bold" fill="url(#letterGrad)" filter="url(#glow)">A</text>
+  <!-- App name at bottom -->
+  <text x="512" y="810" font-family="Georgia, serif" font-size="60" font-weight="bold" fill="white" text-anchor="middle" filter="url(#shadow)">HANI 2</text>
+  <text x="512" y="860" font-family="Arial, sans-serif" font-size="28" fill="rgba(255,255,255,0.7)" text-anchor="middle">Votre espace couple</text>
 </svg>
