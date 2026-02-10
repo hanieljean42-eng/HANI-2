@@ -67,8 +67,11 @@ export default function WheelScreen() {
       setSelectedItem(WHEEL_ITEMS[randomIndex]);
       setShowModal(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // ✅ Notifier le partenaire du résultat (une seule notification)
-      await notifyWheelSpin(WHEEL_ITEMS[randomIndex].text);
+      // ✅ Notifier le partenaire (masquer les items intimes pour la confidentialité)
+      const itemText = WHEEL_ITEMS[randomIndex].text;
+      const isIntimate = randomIndex >= 12; // Items 13-17 sont intimes
+      const notifText = isIntimate ? '🔥 Surprise coquine... 😈' : itemText;
+      await notifyWheelSpin(notifText);
     });
   };
 

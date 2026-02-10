@@ -3,7 +3,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 
 export const useNotifyPartner = () => {
-  const { user } = useAuth();
+  const { user, partner } = useAuth();
   const notifications = useNotifications();
 
   // Helper: obtenir le pronom selon le genre
@@ -87,8 +87,8 @@ export const useNotifyPartner = () => {
   const notifyGameWin = async (gameName) => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
-        '🏆 Partie terminée !',
-        `${user.name} a gagné${accord} à ${gameName} ! Revanche ? 😏`,
+        '� Partie terminée !',
+        `La partie de ${gameName} avec ${user.name} est terminée ! Viens voir les résultats 🎯`,
         { type: 'game_win' }
       );
     }
@@ -243,9 +243,10 @@ export const useNotifyPartner = () => {
   };
 
   const sendSmartReminder = async (isChallengeIncomplete = false) => {
-    if (notifications?.scheduleSmartReminder && user?.name) {
-      // Passer le nom du partenaire si dispo
-      await notifications.scheduleSmartReminder(user.name, isChallengeIncomplete);
+    if (notifications?.scheduleSmartReminder) {
+      // ✅ Passer le nom du PARTENAIRE (car le rappel dit "tu n'as pas parlé avec [nom]")
+      const partnerName = partner?.name || 'ton partenaire';
+      await notifications.scheduleSmartReminder(partnerName, isChallengeIncomplete);
     }
   };
 

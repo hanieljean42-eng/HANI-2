@@ -259,6 +259,8 @@ export default function ChatScreen({ navigation }) {
           const { url, publicId } = await uploadToCloudinary(file);
           await sendMessage(url, 'image', publicId);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          // ✅ Notifier le partenaire qu'une image a été envoyée
+          await notifyLoveNote('📸 Photo');
         } catch (error) {
           Alert.alert('Erreur', 'Impossible de télécharger l\'image');
         }
