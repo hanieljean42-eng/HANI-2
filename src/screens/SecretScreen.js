@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useSecurity } from '../context/SecurityContext';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadToCloudinary } from '../utils/cloudUpload';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 export default function SecretScreen() {
   const { theme } = useTheme();
