@@ -1,3 +1,4 @@
+// Cloudinary upload utilities v1.0.0
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
 
 export const uploadToCloudinary = async (file) => {

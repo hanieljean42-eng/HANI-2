@@ -1,6 +1,7 @@
 /**
  * Module de chiffrement pour données sensibles
  * Utilise AES-256 pour chiffrer les messages, notes d'amour, etc.
+ * v1.0.0
  */
 
 import CryptoJS from 'crypto-js';
