@@ -18,7 +18,7 @@ const AVATARS = ['😊', '😍', '🥰', '😎', '🤗', '💖', '👸', '🤴',
 
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
-  const { notifyWelcome, testNotification } = useNotifications();
+  const { notifyWelcome } = useNotifications();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -26,13 +26,34 @@ export default function RegisterScreen({ navigation }) {
     confirmPassword: '',
     avatar: '😊',
     birthday: '',
+    gender: '',
   });
   const [showAvatars, setShowAvatars] = useState(false);
 
   const handleRegister = async () => {
-    if (!formData.name || !formData.password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
+    // Valider le nom
+    if (!formData.name || !formData.name.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer votre prénom');
       return;
+    }
+    
+    if (formData.name.trim().length < 2) {
+      Alert.alert('Erreur', 'Le prénom doit contenir au moins 2 caractères');
+      return;
+    }
+    
+    if (formData.name.length > 50) {
+      Alert.alert('Erreur', 'Le prénom ne peut pas dépasser 50 caractères');
+      return;
+    }
+
+    // Valider l'email (si fourni)
+    if (formData.email && formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        Alert.alert('Erreur', 'Veuillez entrer un email valide');
+        return;
+      }
     }
     
     // Construire la date de naissance si fournie
@@ -40,13 +61,30 @@ export default function RegisterScreen({ navigation }) {
       formData.birthday = `${formData.birthDay.padStart(2, '0')}/${formData.birthMonth.padStart(2, '0')}/${formData.birthYear}`;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+    // Valider le sexe
+    if (!formData.gender) {
+      Alert.alert('Erreur', 'Veuillez choisir votre sexe (Masculin ou Féminin)');
+      return;
+    }
+
+    // Valider les mots de passe
+    if (!formData.password || formData.password.length === 0) {
+      Alert.alert('Erreur', 'Veuillez entrer un mot de passe');
       return;
     }
 
     if (formData.password.length < 6) {
       Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (formData.password.length > 100) {
+      Alert.alert('Erreur', 'Le mot de passe ne peut pas dépasser 100 caractères');
       return;
     }
 
@@ -164,6 +202,39 @@ export default function RegisterScreen({ navigation }) {
                   keyboardType="number-pad"
                   maxLength={4}
                 />
+              </View>
+            </View>
+
+            {/* Gender Selector */}
+            <View style={styles.genderSection}>
+              <Text style={styles.genderLabel}>👤 Sexe</Text>
+              <View style={styles.genderRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.genderOption,
+                    formData.gender === 'masculin' && styles.genderSelected,
+                  ]}
+                  onPress={() => setFormData({ ...formData, gender: 'masculin' })}
+                >
+                  <Text style={styles.genderEmoji}>👨</Text>
+                  <Text style={[
+                    styles.genderText,
+                    formData.gender === 'masculin' && styles.genderTextSelected,
+                  ]}>Masculin</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.genderOption,
+                    formData.gender === 'feminin' && styles.genderSelected,
+                  ]}
+                  onPress={() => setFormData({ ...formData, gender: 'feminin' })}
+                >
+                  <Text style={styles.genderEmoji}>👩</Text>
+                  <Text style={[
+                    styles.genderText,
+                    formData.gender === 'feminin' && styles.genderTextSelected,
+                  ]}>Féminin</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -357,5 +428,48 @@ const styles = StyleSheet.create({
   },
   birthdayYear: {
     width: 100,
+  },
+  genderSection: {
+    marginBottom: 15,
+  },
+  genderLabel: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    marginBottom: 10,
+    marginLeft: 5,
+  },
+  genderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  genderOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 15,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  genderSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: '#fff',
+  },
+  genderEmoji: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  genderText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  genderTextSelected: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });

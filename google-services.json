@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "692477466695",
+    "firebase_url": "https://h-couple-default-rtdb.firebaseio.com",
+    "project_id": "h-couple",
+    "storage_bucket": "h-couple.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:692477466695:android:c441be620d8a441792b962",
+        "android_client_info": {
+          "package_name": "com.loveapp.couple2026"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "692477466695-nbk8ke52kf2jta63vsee32n64o92apec.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkMpFfgLuYY8v-uRqLop0C2fjxSTZmOu8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "692477466695-nbk8ke52kf2jta63vsee32n64o92apec.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

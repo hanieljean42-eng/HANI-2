@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import { navigationRef } from './src/navigation/navigationRef';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import { GameProvider } from './src/context/GameContext';
@@ -66,6 +67,8 @@ import ChatScreen from './src/screens/ChatScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import RetrospectiveScreen from './src/screens/RetrospectiveScreen';
 import WidgetsScreen from './src/screens/WidgetsScreen';
+import GamesScreen from './src/screens/GamesScreen';
+import GuideScreen from './src/screens/GuideScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -120,6 +123,22 @@ function AppNavigator() {
               presentation: 'card'
             }} 
           />
+          <Stack.Screen 
+            name="Games" 
+            component={GamesScreen} 
+            options={{ 
+              animation: 'slide_from_bottom',
+              presentation: 'card'
+            }} 
+          />
+          <Stack.Screen 
+            name="Guide" 
+            component={GuideScreen} 
+            options={{ 
+              animation: 'slide_from_right',
+              presentation: 'card'
+            }} 
+          />
         </Stack.Group>
       )}
     </Stack.Navigator>
@@ -137,7 +156,7 @@ export default function App() {
                   <SecurityProvider>
                     <ChatProvider>
                       <GameProvider>
-                        <NavigationContainer>
+                        <NavigationContainer ref={navigationRef}>
                           <StatusBar style="light" />
                           <AppNavigator />
                         </NavigationContainer>

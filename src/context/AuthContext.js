@@ -60,6 +60,8 @@ export function AuthProvider({ children }) {
             name: data.name || prev?.name,
             anniversary: data.anniversary || prev?.anniversary,
             loveMeter: data.loveMeter || 0,
+            couplePhoto: data.couplePhoto || prev?.couplePhoto || null,
+            couplePhotoPublicId: data.couplePhotoPublicId || prev?.couplePhotoPublicId || null,
           };
           AsyncStorage.setItem('@couple', JSON.stringify(updated));
           return updated;
@@ -76,6 +78,7 @@ export function AuthProvider({ children }) {
               name: partnerData.name,
               avatar: partnerData.avatar || '💕',
               email: partnerData.email,
+              gender: partnerData.gender || '',
               isOnline: partnerData.isOnline || false,
             };
             setPartner(newPartner);
@@ -268,6 +271,7 @@ export function AuthProvider({ children }) {
                 name: user.name,
                 email: user.email,
                 avatar: user.avatar || '😊',
+                gender: user.gender || '',
                 joinedAt: new Date().toISOString(),
                 isCreator: true,
                 isOnline: true,
@@ -369,6 +373,7 @@ export function AuthProvider({ children }) {
               name: user.name,
               email: user.email,
               avatar: user.avatar || '😊',
+              gender: user.gender || '',
               joinedAt: new Date().toISOString(),
               isCreator: false,
               isOnline: true,
@@ -405,6 +410,7 @@ export function AuthProvider({ children }) {
               name: creatorData.name || partnerData.partnerName,
               avatar: creatorData.avatar || '💕',
               email: creatorData.email,
+              gender: creatorData.gender || '',
             };
             console.log('👫 Partenaire (créateur) trouvé:', newPartner.name);
           }

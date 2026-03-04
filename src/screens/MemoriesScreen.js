@@ -11,6 +11,9 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
@@ -20,9 +23,9 @@ import * as Haptics from 'expo-haptics';
 import { Video, ResizeMode } from 'expo-av';
 import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
-import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import AnimatedModal from '../components/AnimatedModal';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 const { width, height } = Dimensions.get('window');
 
@@ -42,21 +45,25 @@ const convertToBase64 = async (uri) => {
 // Fonction pour obtenir les infos d'un fichier
 const getFileInfo = async (uri) => {
   try {
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    const sizeMB = fileInfo.size / (1024 * 1024);
-    const extension = uri.split('.').pop()?.toLowerCase();
+    const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
+    const sizeMB = (fileInfo.size || 0) / (1024 * 1024);
+    const extension = uri.split('.').pop()?.toLowerCase()?.split('?')[0]; // Enlever les query params
     const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'].includes(extension);
-    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(extension);
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'bmp'].includes(extension);
+    
+    // Si l'URI vient de ImagePicker, c'est forcément une image valide
+    const isFromPicker = uri.includes('ImagePicker') || uri.includes('ImageManipulator') || uri.includes('cache');
     
     return {
       exists: fileInfo.exists,
       sizeMB,
       isVideo,
-      isImage,
-      canUpload: isImage && sizeMB <= 5, // Max 5MB pour les images
+      isImage: isImage || isFromPicker,
+      canUpload: (isImage || isFromPicker) && sizeMB <= 10, // Max 10MB pour les images
     };
   } catch (error) {
-    return { exists: false, sizeMB: 0, canUpload: false };
+    // En cas d'erreur de FileSystem, autoriser quand même (on laisse Cloudinary vérifier)
+    return { exists: true, sizeMB: 0, isImage: true, canUpload: true };
   }
 };
 
@@ -78,10 +85,10 @@ export default function MemoriesScreen() {
   const { 
     memories, addMemory, timeCapsules, addTimeCapsule, deleteMemory, deleteTimeCapsule, updateMemory,
     scheduledLetters, addScheduledLetter, markLetterAsRead, deleteScheduledLetter, updateScheduledLetter, getDeliverableLetters,
-    sharedDiary, addDiaryEntry, deleteDiaryEntry, updateDiaryEntry
+    sharedDiary, addDiaryEntry, deleteDiaryEntry, updateDiaryEntry,
+    recordInteraction
   } = useData();
-  const { notifyMemory, notifyCapsule, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
-  const notifications = useNotifications();
+  const { notifyMemory, notifyCapsule, notifyCapsuleOpened, notifyScheduledLetter, notifyDiaryEntry, notifyLetterDelivered } = useNotifyPartner();
   const [activeTab, setActiveTab] = useState('gallery');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -105,8 +112,8 @@ export default function MemoriesScreen() {
   const convertToBase64 = async (uri, mediaType = 'image') => {
     try {
       // Vérifier d'abord la taille du fichier
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      const fileSizeMB = fileInfo.size / (1024 * 1024);
+      const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
+      const fileSizeMB = (fileInfo.size || 0) / (1024 * 1024);
       
       // Limiter à 5MB pour les images (Firebase Realtime DB a des limites)
       if (mediaType === 'image' && fileSizeMB > 5) {
@@ -141,12 +148,31 @@ export default function MemoriesScreen() {
   };
 
   const pickImage = async () => {
-    // Fonction désactivée — ajout de photos non disponible pour le moment
-    Alert.alert(
-      '📸 Ajout de photos non disponible',
-      "L'ajout de photos n'est pas disponible pour le moment. Cette fonctionnalité arrivera dans une prochaine mise à jour.",
-      [{ text: 'OK' }]
-    );
+    try {
+      // Demander la permission galerie (nécessaire Android 13+)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          '📸 Permission requise',
+          'L\'accès à la galerie photo est nécessaire pour ajouter des images.\n\nAllez dans Paramètres > Applications > HANI 2 > Permissions > Photos pour l\'activer.',
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setNewMemory({ ...newMemory, imageUri: result.assets[0].uri });
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de sélectionner une image');
+    }
   };
 
   // Vidéos non disponibles actuellement
@@ -176,38 +202,48 @@ export default function MemoriesScreen() {
     setIsUploading(true);
     setUploadProgress(0);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // 🔥 Compter comme interaction pour les flammes
+    recordInteraction();
     
-    let mediaBase64 = null;
+    let imageUrl = null;
+    let publicId = null;
     let syncMessage = 'Souvenir ajouté !';
     
-    // Si une image est sélectionnée, la convertir en base64
     if (newMemory.imageUri) {
       setUploadProgress(30);
       
-      // Vérifier la taille du fichier
-      const fileInfo = await getFileInfo(newMemory.imageUri);
-      
-      if (!fileInfo.canUpload) {
-        setIsUploading(false);
-        Alert.alert(
-          '📸 Image trop grande',
-          `L'image fait ${fileInfo.sizeMB?.toFixed(1) || '?'} MB.\n\nMaximum: 5 MB.\n\nConseil: Prenez une photo avec une résolution plus basse.`,
-          [{ text: 'Compris' }]
-        );
-        return;
-      }
-      
-      setUploadProgress(50);
-      
-      // Convertir en base64
-      mediaBase64 = await convertToBase64(newMemory.imageUri);
-      
-      setUploadProgress(80);
-      
-      if (mediaBase64) {
+      try {
+        const fileInfo = await getFileInfo(newMemory.imageUri);
+        
+        if (!fileInfo.canUpload) {
+          setIsUploading(false);
+          Alert.alert(
+            '📸 Image trop grande',
+            `L'image fait ${fileInfo.sizeMB?.toFixed(1) || '?'} MB.\n\nMaximum: 10 MB.\n\nEssayez de réduire la qualité ou de choisir une autre image.`,
+            [{ text: 'Compris' }]
+          );
+          return;
+        }
+        
+        setUploadProgress(50);
+        
+        const file = {
+          uri: newMemory.imageUri,
+          type: 'image/jpeg',
+          name: `memory_${Date.now()}.jpg`
+        };
+        
+        const cloudinaryResult = await uploadToCloudinary(file);
+        imageUrl = cloudinaryResult.url;
+        publicId = cloudinaryResult.publicId;
+        
+        setUploadProgress(80);
         syncMessage = 'Souvenir ajouté et synchronisé ! 💕';
-      } else {
-        syncMessage = 'Souvenir ajouté localement';
+      } catch (error) {
+        console.error('Upload Cloudinary error:', error);
+        Alert.alert('Erreur', 'Impossible de télécharger l\'image');
+        setIsUploading(false);
+        return;
       }
     }
     
@@ -220,15 +256,14 @@ export default function MemoriesScreen() {
       date: new Date().toLocaleDateString('fr-FR'),
       emoji: newMemory.imageUri ? '📸' : '💌',
       color: ['#FF6B9D', '#8B5CF6', '#10B981', '#F59E0B'][Math.floor(Math.random() * 4)],
-      imageUri: newMemory.imageUri,
+      imageUri: imageUrl || newMemory.imageUri,
+      publicId: publicId,
       mediaType: 'image',
-      mediaBase64: mediaBase64,
-      isSynced: mediaBase64 !== null,
+      isSynced: imageUrl !== null,
     };
 
     await addMemory(memory);
     
-    // Envoyer notification au partenaire
     await notifyMemory();
     
     setNewMemory({ title: '', note: '', date: '', time: '', imageUri: null, mediaType: 'image' });
@@ -354,7 +389,7 @@ export default function MemoriesScreen() {
                         </View>
                       </View>
                     ) : (
-                      <Image source={mediaSource} style={styles.galleryImage} />
+                      <Image source={mediaSource} style={styles.galleryImage} resizeMode="cover" />
                     )
                   ) : (
                     <LinearGradient
@@ -462,7 +497,22 @@ export default function MemoriesScreen() {
       ) : (
         <View style={styles.capsulesList}>
           {(timeCapsules || []).map((capsule, index) => (
-            <View key={`capsule-${capsule?.id || index}-${index}`} style={styles.capsuleCard}>
+            <TouchableOpacity 
+              key={`capsule-${capsule?.id || index}-${index}`} 
+              style={styles.capsuleCard}
+              activeOpacity={capsule.locked ? 1 : 0.7}
+              onPress={() => {
+                if (!capsule.locked) {
+                  // ✅ Notifier le partenaire qu'une capsule a été ouverte
+                  notifyCapsuleOpened(capsule.title);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Alert.alert('💊 ' + capsule.title, capsule.note || 'Cette capsule temporelle est ouverte ! 💕');
+                } else {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  Alert.alert('🔒 Capsule verrouillée', `Cette capsule s'ouvrira le ${formatDateTime(capsule.openDate)}`);
+                }
+              }}
+            >
               <LinearGradient
                 colors={capsule.locked ? ['#94A3B8', '#64748B'] : ['#8B5CF6', '#A855F7']}
                 style={styles.capsuleGradient}
@@ -501,7 +551,7 @@ export default function MemoriesScreen() {
                   <Text style={styles.capsuleNote}>{capsule.note}</Text>
                 )}
               </LinearGradient>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       )}
@@ -589,16 +639,11 @@ export default function MemoriesScreen() {
         deliveryDate: isoDate,
       });
 
-      // Notifier le partenaire qu'une lettre a été programmée
-      await notifyScheduledLetter();
-
-      // Planifier localement la notification de livraison (sur cet appareil)
+      // ✅ Notifier le partenaire qu'une lettre l'attend (sans spoiler le contenu)
       try {
-        if (notifications && notifications.scheduleLetterNotification) {
-          await notifications.scheduleLetterNotification(letter.id, letter.title, letter.content, isoDate, user?.name || '');
-        }
+        await notifyScheduledLetter(formatDateTime(isoDate));
       } catch (e) {
-        console.warn('⚠️ Impossible de planifier notification lettre localement:', e.message);
+        console.log('Erreur notification lettre:', e);
       }
 
       // Remise à zéro du form
@@ -614,7 +659,7 @@ export default function MemoriesScreen() {
     }
   };
 
-  const openLetter = (letter) => {
+  const openLetter = async (letter) => {
     if (letter.fromId === user?.id) {
       // C'est sa propre lettre
       Alert.alert(
@@ -633,6 +678,8 @@ export default function MemoriesScreen() {
       // Lettre du partenaire, délivrable
       if (!letter.isRead) {
         markLetterAsRead(letter.id);
+        // ✅ Notifier l'auteur que sa lettre a été lue par le destinataire
+        await notifyLetterDelivered();
       }
       setSelectedLetter(letter);
       setShowLetterModal(true);
@@ -780,90 +827,204 @@ export default function MemoriesScreen() {
   const MOOD_EMOJIS = ['😊', '🥰', '😍', '🤗', '😌', '🥺', '😢', '😤', '🤔', '✨'];
 
   const handleAddDiaryEntry = async () => {
-    // Journal is currently unavailable
-    Alert.alert('📔 Journal indisponible', "La fonctionnalité du journal intime n'est pas disponible pour le moment.");
-    return;
+    if (!newDiaryEntry.content.trim()) {
+      Alert.alert('Erreur', 'Veuillez écrire quelque chose dans votre journal');
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    try {
+      await addDiaryEntry({
+        mood: newDiaryEntry.mood,
+        content: newDiaryEntry.content,
+        author: user?.name || 'Moi',
+        authorId: user?.id,
+      });
+
+      // ✅ Notifier le partenaire qu'une entrée journal a été ajoutée
+      await notifyDiaryEntry();
+
+      setNewDiaryEntry({ mood: '😊', content: '' });
+      setShowAddModal(false);
+      Alert.alert('📖', 'Entrée ajoutée au journal intime ! 💕');
+    } catch (error) {
+      console.error('Erreur ajout journal:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter l\'entrée. Réessayez.');
+    }
   };
 
   const renderDiary = () => {
+    const sortedDiary = sharedDiary && Array.isArray(sharedDiary) 
+      ? [...sharedDiary].filter(e => e != null).sort((a, b) => {
+          const dateA = a.createdAt || a.date || '';
+          const dateB = b.createdAt || b.date || '';
+          return dateB > dateA ? 1 : -1;
+        })
+      : [];
+
+    // Regrouper par date
+    const groupedByDate = {};
+    sortedDiary.forEach(entry => {
+      const dateKey = entry.date || 'Aujourd\'hui';
+      if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
+      groupedByDate[dateKey].push(entry);
+    });
+
     return (
       <View style={styles.diaryContainer}>
-        <Text style={styles.sectionTitle}>📖 Journal Intime Partagé</Text>
-        <Text style={styles.sectionDesc}>
-          Écrivez ensemble votre histoire, jour après jour. Partagez vos pensées, vos moments, vos émotions.
-        </Text>
+        {/* En-tête livre */}
+        <View style={styles.diaryBookHeader}>
+          <View style={styles.diaryBookSpine} />
+          <View style={styles.diaryBookCover}>
+            <Text style={styles.diaryBookIcon}>📔</Text>
+            <Text style={styles.diaryBookTitle}>Notre Journal Intime</Text>
+            <Text style={styles.diaryBookSubtitle}>
+              {sortedDiary.length} {sortedDiary.length <= 1 ? 'page écrite' : 'pages écrites'} ensemble
+            </Text>
+          </View>
+        </View>
 
-        {/* Bouton ajouter une entrée */}
+        {/* Bouton écrire */}
         <TouchableOpacity
-          style={styles.addDiaryButton}
+          style={styles.diaryWriteBtn}
           onPress={() => {
             setAddType('diary');
             setShowAddModal(true);
           }}
+          activeOpacity={0.8}
         >
-          <LinearGradient colors={['#8B5CF6', '#6366F1']} style={styles.addDiaryGradient}>
-            <Text style={styles.addDiaryText}>✍️ Écrire dans le journal</Text>
+          <LinearGradient 
+            colors={['#667eea', '#764ba2']} 
+            start={{ x: 0, y: 0 }} 
+            end={{ x: 1, y: 0 }}
+            style={styles.diaryWriteGradient}
+          >
+            <Text style={styles.diaryWriteIcon}>✍️</Text>
+            <View style={styles.diaryWriteTextWrap}>
+              <Text style={styles.diaryWriteTitle}>Écrire une page</Text>
+              <Text style={styles.diaryWriteHint}>Partagez ce que vous ressentez...</Text>
+            </View>
+            <Text style={styles.diaryWriteArrow}>→</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Entrées du journal */}
-        {sharedDiary && Array.isArray(sharedDiary) && sharedDiary.length > 0 ? (
-          <View style={styles.diaryEntries}>
-            {sharedDiary.filter(e => e != null).map((entry, index) => (
-              <View key={entry?.id || `diary-${index}`} style={styles.diaryEntry}>
-                <View style={styles.diaryEntryHeader}>
-                  <Text style={styles.diaryMood}>{entry.mood}</Text>
-                  <View style={styles.diaryMeta}>
-                    <Text style={styles.diaryAuthor}>{entry.author}</Text>
-                    <Text style={styles.diaryDate}>{entry.date}</Text>
+        {/* Entrées groupées par date */}
+        {sortedDiary.length > 0 ? (
+          <View style={styles.diaryTimeline}>
+            {Object.keys(groupedByDate).map((dateKey, groupIndex) => (
+              <View key={`group-${groupIndex}`} style={styles.diaryDateGroup}>
+                {/* Séparateur de date */}
+                <View style={styles.diaryDateSeparator}>
+                  <View style={styles.diaryDateLine} />
+                  <View style={styles.diaryDateBadge}>
+                    <Text style={styles.diaryDateBadgeText}>📅 {dateKey}</Text>
                   </View>
-                  {entry.authorId === user?.id && (
-                    <View style={styles.diaryActionsRow}>
-                      <TouchableOpacity
-                        style={styles.diaryEditBtn}
-                        onPress={() => {
-                          setEditItem({
-                            id: entry.id,
-                            mood: entry.mood,
-                            content: entry.content,
-                          });
-                          setEditType('diary');
-                          setShowEditModal(true);
-                        }}
-                      >
-                        <Text style={styles.diaryEditText}>✏️</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.diaryDeleteBtn}
-                        onPress={() => {
-                          Alert.alert(
-                            'Supprimer',
-                            'Supprimer cette entrée ?',
-                            [
-                              { text: 'Annuler', style: 'cancel' },
-                              { 
-                                text: 'Supprimer', 
-                                style: 'destructive',
-                                onPress: () => deleteDiaryEntry(entry.id)
-                              }
-                            ]
-                          );
-                        }}
-                      >
-                        <Text style={styles.diaryDeleteText}>🗑️</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                  <View style={styles.diaryDateLine} />
                 </View>
-                <Text style={styles.diaryContent}>{entry.content}</Text>
+
+                {groupedByDate[dateKey].map((entry, index) => {
+                  const isMe = entry.authorId === user?.id;
+                  return (
+                    <View 
+                      key={entry?.id || `diary-${groupIndex}-${index}`} 
+                      style={[
+                        styles.diaryPageCard,
+                        isMe ? styles.diaryPageMine : styles.diaryPagePartner,
+                      ]}
+                    >
+                      {/* Coin de page plié */}
+                      <View style={[styles.diaryPageCorner, isMe ? styles.diaryPageCornerMine : styles.diaryPageCornerPartner]} />
+                      
+                      {/* En-tête de l'entrée */}
+                      <View style={styles.diaryPageHeader}>
+                        <View style={styles.diaryPageAuthorWrap}>
+                          <View style={[
+                            styles.diaryPageAvatar,
+                            isMe ? styles.diaryPageAvatarMine : styles.diaryPageAvatarPartner
+                          ]}>
+                            <Text style={styles.diaryPageAvatarText}>
+                              {isMe ? '💜' : '💗'}
+                            </Text>
+                          </View>
+                          <View>
+                            <Text style={styles.diaryPageAuthor}>
+                              {isMe ? 'Moi' : entry.author}
+                            </Text>
+                            <Text style={styles.diaryPageTime}>
+                              {entry.date || 'Récemment'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.diaryPageMoodBig}>{entry.mood}</Text>
+                      </View>
+
+                      {/* Ligne de séparation fine */}
+                      <View style={styles.diaryPageDivider} />
+
+                      {/* Contenu */}
+                      <Text style={styles.diaryPageContent}>{entry.content}</Text>
+
+                      {/* Actions (seulement pour mes entrées) */}
+                      {isMe && (
+                        <View style={styles.diaryPageActions}>
+                          <TouchableOpacity
+                            style={styles.diaryPageActionBtn}
+                            onPress={() => {
+                              setEditItem({
+                                id: entry.id,
+                                mood: entry.mood,
+                                content: entry.content,
+                              });
+                              setEditType('diary');
+                              setShowEditModal(true);
+                            }}
+                          >
+                            <Text style={styles.diaryPageActionIcon}>✏️</Text>
+                            <Text style={styles.diaryPageActionText}>Modifier</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.diaryPageActionBtn, styles.diaryPageDeleteBtn]}
+                            onPress={() => {
+                              Alert.alert(
+                                '🗑️ Supprimer cette page',
+                                'Cette entrée sera supprimée définitivement.',
+                                [
+                                  { text: 'Annuler', style: 'cancel' },
+                                  { 
+                                    text: 'Supprimer', 
+                                    style: 'destructive',
+                                    onPress: () => {
+                                      deleteDiaryEntry(entry.id);
+                                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                    }
+                                  }
+                                ]
+                              );
+                            }}
+                          >
+                            <Text style={styles.diaryPageActionIcon}>🗑️</Text>
+                            <Text style={[styles.diaryPageActionText, { color: '#EF4444' }]}>Supprimer</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
             ))}
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>📖</Text>
-            <Text style={styles.emptyText}>Votre journal est vide</Text>
-            <Text style={styles.emptyHint}>Commencez à écrire votre histoire ensemble !</Text>
+          <View style={styles.diaryEmptyState}>
+            <View style={styles.diaryEmptyBook}>
+              <Text style={styles.diaryEmptyIcon}>📖</Text>
+              <Text style={styles.diaryEmptyTitle}>Votre journal est vierge</Text>
+              <Text style={styles.diaryEmptyDesc}>
+                C'est ici que vous écrirez votre histoire ensemble.{"\n"}
+                Chaque page est un moment partagé, une émotion capturée.{"\n"}              
+                Commencez votre première page ! ✨
+              </Text>
+            </View>
           </View>
         )}
       </View>
@@ -950,10 +1111,19 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {addType === 'capsule' ? '⏰ Nouvelle Capsule' : 
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => Keyboard.dismiss()}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+          <ScrollView 
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          > 
+            <Text style={styles.modalTitle}>{
                addType === 'letter' ? '💌 Nouvelle Lettre' :
                addType === 'diary' ? '📖 Nouvelle Entrée' :
                '✨ Nouveau Souvenir'}
@@ -1055,13 +1225,6 @@ export default function MemoriesScreen() {
                   </View>
                 )}
 
-                {addType === 'diary' && (
-                  <View style={{padding:20, alignItems:'center'}}>
-                    <Text style={{fontSize:18, fontWeight:'bold', color:'#333'}}>📔 Journal intime</Text>
-                    <Text style={{color:'#666', marginTop:10, textAlign:'center'}}>La fonctionnalité du journal intime n'est pas disponible pour le moment. Nous travaillons dessus ❤️</Text>
-                  </View>
-                )}
-
                 {newMemory.imageUri && (
                   <View style={styles.imagePreview}>
                     {newMemory.mediaType === 'video' ? (
@@ -1087,6 +1250,50 @@ export default function MemoriesScreen() {
                   </View>
                 )}
               </>
+            )}
+
+            {/* Formulaire pour Journal Intime */}
+            {addType === 'diary' && (
+              <View style={styles.diaryFormContainer}>
+                {/* Sélecteur d'humeur */}
+                <Text style={styles.diaryFormLabel}>Comment te sens-tu ? 💭</Text>
+                <View style={styles.diaryMoodGrid}>
+                  {MOOD_EMOJIS.map((emoji) => (
+                    <TouchableOpacity
+                      key={emoji}
+                      style={[
+                        styles.diaryMoodBtn,
+                        newDiaryEntry.mood === emoji && styles.diaryMoodBtnActive,
+                      ]}
+                      onPress={() => {
+                        setNewDiaryEntry({ ...newDiaryEntry, mood: emoji });
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                    >
+                      <Text style={[
+                        styles.diaryMoodEmoji,
+                        newDiaryEntry.mood === emoji && styles.diaryMoodEmojiActive,
+                      ]}>{emoji}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Zone de texte */}
+                <Text style={styles.diaryFormLabel}>Écris ta page... ✍️</Text>
+                <TextInput
+                  style={styles.diaryFormTextArea}
+                  placeholder="Qu'as-tu sur le cœur aujourd'hui ? Raconte ta journée, un moment spécial, ou ce que tu ressens..."
+                  placeholderTextColor="#aaa"
+                  multiline
+                  numberOfLines={8}
+                  textAlignVertical="top"
+                  value={newDiaryEntry.content}
+                  onChangeText={(text) => setNewDiaryEntry({ ...newDiaryEntry, content: text })}
+                />
+                <Text style={styles.diaryFormCharCount}>
+                  {newDiaryEntry.content.length} caractères
+                </Text>
+              </View>
             )}
 
             <View style={styles.modalButtons}>
@@ -1129,8 +1336,10 @@ export default function MemoriesScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* View Memory Modal */}
@@ -1143,7 +1352,7 @@ export default function MemoriesScreen() {
         <View style={styles.viewModalOverlay}>
           <View style={styles.viewModalContentLarge}>
             {selectedMemory && (
-              <>
+              <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
                 {(() => {
                   // Obtenir la source du média - priorité: URL Storage > base64 > URI local
                   let mediaSource = null;
@@ -1238,7 +1447,7 @@ export default function MemoriesScreen() {
                   >
                     <Text style={styles.closeViewButtonText}>Fermer 💕</Text>
                   </TouchableOpacity>
-              </>
+              </ScrollView>
             )}
           </View>
         </View>
@@ -1280,10 +1489,19 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowEditModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editType === 'memory' ? '✏️ Modifier le souvenir' : 
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => Keyboard.dismiss()}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+          <ScrollView 
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <Text style={styles.modalTitle}>{
                editType === 'letter' ? '✏️ Modifier la lettre' : 
                '✏️ Modifier l\'entrée'}
             </Text>
@@ -1407,8 +1625,10 @@ export default function MemoriesScreen() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </LinearGradient>
   );
@@ -1469,7 +1689,7 @@ const styles = StyleSheet.create({
   },
   galleryItem: {
     width: (width - 50) / 2,
-    height: 180,
+    height: 260,
     marginBottom: 15,
     borderRadius: 15,
     overflow: 'hidden',
@@ -1478,6 +1698,7 @@ const styles = StyleSheet.create({
   galleryImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   galleryPlaceholder: {
     width: '100%',
@@ -1751,7 +1972,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 30,
-    maxHeight: '85%',
+    maxHeight: Dimensions.get('window').height * 0.85,
   },
   modalTitle: {
     fontSize: 22,
@@ -1794,14 +2015,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewImage: {
-    width: 200,
-    height: 150,
+    width: width - 40,
+    height: 400,
     borderRadius: 15,
+    resizeMode: 'contain',
+    backgroundColor: '#f8f8f8',
   },
   removeImage: {
     position: 'absolute',
     top: -10,
-    right: 60,
+    right: 10,
     backgroundColor: '#EF4444',
     width: 30,
     height: 30,
@@ -1872,7 +2095,7 @@ const styles = StyleSheet.create({
   },
   viewImageLarge: {
     width: '100%',
-    height: height * 0.6,
+    height: height * 0.5,
     backgroundColor: '#000',
   },
   viewImagePlaceholder: {
@@ -2068,65 +2291,324 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#FFD700',
   },
-  // ===== STYLES JOURNAL =====
+  // ===== STYLES JOURNAL INTIME (REDESIGN) =====
   diaryContainer: {
-    padding: 15,
+    padding: 12,
   },
-  addDiaryButton: {
+  // En-tête livre
+  diaryBookHeader: {
+    flexDirection: 'row',
     marginBottom: 20,
-    borderRadius: 15,
+    borderRadius: 16,
     overflow: 'hidden',
   },
-  addDiaryGradient: {
-    padding: 15,
-    alignItems: 'center',
+  diaryBookSpine: {
+    width: 8,
+    backgroundColor: '#5B21B6',
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
   },
-  addDiaryText: {
+  diaryBookCover: {
+    flex: 1,
+    backgroundColor: 'rgba(91, 33, 182, 0.25)',
+    padding: 20,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  diaryBookIcon: {
+    fontSize: 36,
+    marginBottom: 8,
+  },
+  diaryBookTitle: {
+    fontSize: 22,
+    fontWeight: '800',
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+    letterSpacing: 0.5,
   },
-  diaryEntries: {
-    marginTop: 10,
+  diaryBookSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
-  diaryEntry: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
+  // Bouton écrire
+  diaryWriteBtn: {
+    marginBottom: 24,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#764ba2',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  diaryEntryHeader: {
+  diaryWriteGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    padding: 18,
+    paddingHorizontal: 20,
   },
-  diaryMood: {
+  diaryWriteIcon: {
     fontSize: 28,
-    marginRight: 10,
+    marginRight: 14,
   },
-  diaryMeta: {
+  diaryWriteTextWrap: {
     flex: 1,
   },
-  diaryAuthor: {
-    fontSize: 15,
-    fontWeight: 'bold',
+  diaryWriteTitle: {
+    fontSize: 17,
+    fontWeight: '700',
     color: '#fff',
   },
-  diaryDate: {
+  diaryWriteHint: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
   },
-  diaryDeleteBtn: {
-    padding: 8,
+  diaryWriteArrow: {
+    fontSize: 22,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '700',
   },
-  diaryDeleteText: {
-    fontSize: 16,
+  // Timeline
+  diaryTimeline: {
+    paddingLeft: 4,
+  },
+  diaryDateGroup: {
+    marginBottom: 8,
+  },
+  diaryDateSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  diaryDateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  diaryDateBadge: {
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginHorizontal: 10,
+  },
+  diaryDateBadgeText: {
+    fontSize: 12,
+    color: '#E0D4FF',
+    fontWeight: '600',
+  },
+  // Page card
+  diaryPageCard: {
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  diaryPageMine: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.25)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#8B5CF6',
+  },
+  diaryPagePartner: {
+    backgroundColor: 'rgba(236, 72, 153, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(236, 72, 153, 0.2)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#EC4899',
+  },
+  diaryPageCorner: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 0,
+    height: 0,
+    borderStyle: 'solid',
+    borderTopWidth: 28,
+    borderLeftWidth: 28,
+    borderLeftColor: 'transparent',
+  },
+  diaryPageCornerMine: {
+    borderTopColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  diaryPageCornerPartner: {
+    borderTopColor: 'rgba(236, 72, 153, 0.25)',
+  },
+  diaryPageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  diaryPageAuthorWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  diaryPageAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  diaryPageAvatarMine: {
+    backgroundColor: 'rgba(139, 92, 246, 0.35)',
+  },
+  diaryPageAvatarPartner: {
+    backgroundColor: 'rgba(236, 72, 153, 0.3)',
+  },
+  diaryPageAvatarText: {
+    fontSize: 18,
+  },
+  diaryPageAuthor: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  diaryPageTime: {
+    fontSize: 11,
     color: 'rgba(255,255,255,0.5)',
+    marginTop: 1,
   },
-  diaryContent: {
+  diaryPageMoodBig: {
+    fontSize: 32,
+  },
+  diaryPageDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 14,
+  },
+  diaryPageContent: {
     fontSize: 15,
     color: '#fff',
+    lineHeight: 24,
+    fontStyle: 'italic',
+    letterSpacing: 0.2,
+  },
+  diaryPageActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 14,
+    gap: 10,
+  },
+  diaryPageActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    gap: 5,
+  },
+  diaryPageDeleteBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  diaryPageActionIcon: {
+    fontSize: 14,
+  },
+  diaryPageActionText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
+  },
+  // Empty state
+  diaryEmptyState: {
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 10,
+  },
+  diaryEmptyBook: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderStyle: 'dashed',
+    width: '100%',
+  },
+  diaryEmptyIcon: {
+    fontSize: 56,
+    marginBottom: 16,
+  },
+  diaryEmptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  diaryEmptyDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
     lineHeight: 22,
+  },
+  // Formulaire ajout journal
+  diaryFormContainer: {
+    paddingVertical: 10,
+  },
+  diaryFormLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#444',
+    marginBottom: 10,
+    marginTop: 5,
+  },
+  diaryMoodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 18,
+    gap: 8,
+  },
+  diaryMoodBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  diaryMoodBtnActive: {
+    backgroundColor: '#EDE9FE',
+    borderColor: '#8B5CF6',
+    transform: [{ scale: 1.15 }],
+  },
+  diaryMoodEmoji: {
+    fontSize: 24,
+  },
+  diaryMoodEmojiActive: {
+    fontSize: 26,
+  },
+  diaryFormTextArea: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 15,
+    color: '#333',
+    minHeight: 160,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    textAlignVertical: 'top',
+    lineHeight: 24,
+  },
+  diaryFormCharCount: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'right',
+    marginTop: 6,
   },
   // ===== STYLES MODAL FORMULAIRES =====
   modalTextAreaLarge: {
@@ -2258,20 +2740,7 @@ const styles = StyleSheet.create({
   letterActionText: {
     fontSize: 16,
   },
-  // Styles pour les boutons d'action sur le journal
-  diaryActionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  diaryEditBtn: {
-    padding: 5,
-  },
-  diaryEditText: {
-    fontSize: 16,
-  },
-  diaryDeleteText: {
-    fontSize: 16,
-  },
+  // (diary action styles moved to redesigned section above)
   // Styles pour la modale d'édition
   textAreaLarge: {
     height: 200,

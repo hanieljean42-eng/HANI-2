@@ -3,8 +3,13 @@ import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 
 export const useNotifyPartner = () => {
-  const { user } = useAuth();
+  const { user, partner } = useAuth();
   const notifications = useNotifications();
+
+  // Helper: obtenir le pronom selon le genre
+  const pronoun = (user?.gender === 'feminin') ? 'elle' : 'il';
+  const possessif = (user?.gender === 'feminin') ? 'sa' : 'son';
+  const accord = (user?.gender === 'feminin') ? 'e' : '';
 
   // === SOUVENIRS & CAPSULES ===
   const notifyMemory = async () => {
@@ -20,12 +25,8 @@ export const useNotifyPartner = () => {
   };
 
   const notifyCapsuleOpened = async (title) => {
-    if (notifications?.sendPushNotification && user?.name) {
-      await notifications.sendPushNotification(
-        '💊 Capsule ouverte !',
-        `${user.name} a ouvert la capsule "${title}" !`,
-        { type: 'capsule_opened' }
-      );
+    if (notifications?.notifyCapsuleOpened && user?.name) {
+      await notifications.notifyCapsuleOpened(user.name, title);
     }
   };
 
@@ -54,12 +55,8 @@ export const useNotifyPartner = () => {
   };
 
   const notifyNewChallenge = async (challengeName) => {
-    if (notifications?.sendPushNotification && user?.name) {
-      await notifications.sendPushNotification(
-        '⚡ Nouveau défi !',
-        `${user.name} a ajouté un défi : "${challengeName}"`,
-        { type: 'new_challenge' }
-      );
+    if (notifications?.notifyChallengeAssigned && user?.name) {
+      await notifications.notifyChallengeAssigned(user.name, challengeName);
     }
   };
 
@@ -90,8 +87,8 @@ export const useNotifyPartner = () => {
   const notifyGameWin = async (gameName) => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
-        '🏆 Partie terminée !',
-        `${user.name} a gagné à ${gameName} ! Revanche ? 😏`,
+        '� Partie terminée !',
+        `La partie de ${gameName} avec ${user.name} est terminée ! Viens voir les résultats 🎯`,
         { type: 'game_win' }
       );
     }
@@ -101,7 +98,7 @@ export const useNotifyPartner = () => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
         '🎮 À ton tour !',
-        `${user.name} a répondu. C'est à toi !`,
+        `${user.name} a répondu${accord}. C'est à toi !`,
         { type: 'game_turn' }
       );
     }
@@ -118,7 +115,7 @@ export const useNotifyPartner = () => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
         '👤 Profil modifié',
-        `${user.name} a mis à jour son profil`,
+        `${user.name} a mis à jour ${possessif} profil`,
         { type: 'profile_update' }
       );
     }
@@ -187,32 +184,40 @@ export const useNotifyPartner = () => {
 
   // === ROUE DES DATES ===
   const notifyWheelSpin = async (result) => {
+    if (notifications?.notifyWheelSpin && user?.name) {
+      await notifications.notifyWheelSpin(user.name, result);
+    }
+  };
+
+  // === CONNEXION & COUPLE ===
+  const notifyPartnerJoined = async (partnerName) => {
     if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
-        '🎰 Roue des Dates',
-        `${user.name} a tourné la roue ! Résultat : "${result}" 🎯`,
-        { type: 'wheel_spin' }
+        `👫 Partenaire connecté${accord} !`,
+        `${partnerName} a rejoint votre espace couple ! 🎉 Maintenant tout se synchronise en temps réel 💕`,
+        { type: 'partner_joined' }
       );
     }
   };
 
   // === LETTRES D'AMOUR PROGRAMMÉES ===
-  const notifyScheduledLetter = async () => {
+  const notifyScheduledLetter = async (deliveryDateStr) => {
     if (notifications?.sendPushNotification && user?.name) {
+      const dateInfo = deliveryDateStr ? ` Elle s'ouvrira le ${deliveryDateStr} ❤️` : '';
       await notifications.sendPushNotification(
         '💌 Lettre programmée',
-        `${user.name} t'a écrit une lettre d'amour pour plus tard... 💕`,
+        `${user.name} t'a écrit une lettre d'amour pour plus tard...${dateInfo} 💕`,
         { type: 'scheduled_letter' }
       );
     }
   };
 
-  const notifyLetterDelivered = async (from) => {
-    if (notifications?.sendPushNotification) {
+  const notifyLetterDelivered = async () => {
+    if (notifications?.sendPushNotification && user?.name) {
       await notifications.sendPushNotification(
-        '💌 Lettre d\'amour !',
-        `${from} t'a envoyé une lettre d'amour ! Ouvre-la vite ! 💕`,
-        { type: 'letter_delivered' }
+        '💌 Ta lettre a été lue !',
+        `${user.name} a ouvert et lu${accord} ta lettre d'amour ! 💕`,
+        { type: 'letter_read' }
       );
     }
   };
@@ -228,14 +233,20 @@ export const useNotifyPartner = () => {
     }
   };
 
-  // === CONNEXION / PRÉSENCE ===
-  const notifyPartnerJoined = async () => {
-    if (notifications?.sendPushNotification && user?.name) {
-      await notifications.sendPushNotification(
-        '🎉 Partenaire connecté !',
-        `${user.name} a rejoint votre couple ! Bienvenue ! 💕`,
-        { type: 'partner_joined' }
-      );
+
+
+  // === RAPPELS INTELLIGENTS ===
+  const sendDailyReminder = async () => {
+    if (notifications?.scheduleDailyReminder) {
+      await notifications.scheduleDailyReminder();
+    }
+  };
+
+  const sendSmartReminder = async (isChallengeIncomplete = false) => {
+    if (notifications?.scheduleSmartReminder) {
+      // ✅ Passer le nom du PARTENAIRE (car le rappel dit "tu n'as pas parlé avec [nom]")
+      const partnerName = partner?.name || 'ton partenaire';
+      await notifications.scheduleSmartReminder(partnerName, isChallengeIncomplete);
     }
   };
 
@@ -251,7 +262,7 @@ export const useNotifyPartner = () => {
     if (notifications?.sendPushNotification && user?.name) {
       const messages = [
         `${user.name} pense à toi 💭`,
-        `${user.name} te manque... 🥺`,
+        `Tu manques à ${user.name}... 🥺`,
         `${user.name} a hâte de te voir ! 🤗`,
         `${user.name} t'envoie plein d'amour 💕`,
       ];
@@ -292,13 +303,16 @@ export const useNotifyPartner = () => {
     notifyLoveMeterMilestone,
     // Roue
     notifyWheelSpin,
+    // Connexion & Couple
+    notifyPartnerJoined,
     // Lettres d'amour programmées
     notifyScheduledLetter,
     notifyLetterDelivered,
     // Journal intime
     notifyDiaryEntry,
-    // Connexion
-    notifyPartnerJoined,
+    // Rappels intelligents
+    sendDailyReminder,
+    sendSmartReminder,
     // Custom
     sendCustomNotification,
     notifyMissYou,

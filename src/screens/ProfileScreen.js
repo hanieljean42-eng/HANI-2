@@ -11,10 +11,12 @@ import {
   Dimensions,
   Switch,
   Share,
-  Clipboard,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 import { useTheme, THEMES } from '../context/ThemeContext';
 import { useSecurity } from '../context/SecurityContext';
 import * as Haptics from 'expo-haptics';
@@ -22,7 +24,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import { useNotifications } from '../context/NotificationContext';
 import AnimatedModal from '../components/AnimatedModal';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 const { width } = Dimensions.get('window');
 
@@ -60,8 +64,11 @@ export default function ProfileScreen({ navigation }) {
     notifyProfileUpdate, 
     notifyCoupleNameChanged, 
     notifyAnniversarySet,
-    notifyPhotoChanged 
+    notifyPhotoChanged,
+    notifyLoveMeterMilestone,
   } = useNotifyPartner();
+  const { scheduleAnniversaryReminder } = useNotifications();
+  const lastMilestoneRef = React.useRef(0);
   const [activeSection, setActiveSection] = useState('profile');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showBucketModal, setShowBucketModal] = useState(false);
@@ -92,6 +99,18 @@ export default function ProfileScreen({ navigation }) {
   const [pinStep, setPinStep] = useState(1);
 
   // Handlers pour thème et PIN
+  // ✅ Fonction pour vérifier les paliers du Love Meter
+  const checkLoveMeterMilestone = (newValue) => {
+    const milestones = [25, 50, 75, 100];
+    for (const milestone of milestones) {
+      if (newValue >= milestone && lastMilestoneRef.current < milestone) {
+        lastMilestoneRef.current = milestone;
+        notifyLoveMeterMilestone(milestone);
+        break;
+      }
+    }
+  };
+
   const handleThemeChange = (themeId) => {
     changeTheme(themeId);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -191,6 +210,17 @@ export default function ProfileScreen({ navigation }) {
   // Fonction pour choisir une photo de profil
   const pickProfilePhoto = async () => {
     try {
+      // Demander la permission galerie (nécessaire Android 13+)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          '📸 Permission requise',
+          'L\'accès à la galerie photo est nécessaire.\n\nAllez dans Paramètres > Applications > HANI 2 > Permissions > Photos pour l\'activer.',
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
@@ -199,12 +229,22 @@ export default function ProfileScreen({ navigation }) {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await updateUser({ profilePhoto: result.assets[0].uri });
-        setShowPhotoModal(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Notifier le partenaire
-        await notifyPhotoChanged('profil');
-        Alert.alert('✅', 'Photo de profil mise à jour !');
+        const file = {
+          uri: result.assets[0].uri,
+          type: 'image/jpeg',
+          name: `profile_${Date.now()}.jpg`
+        };
+
+        try {
+          const { url, publicId } = await uploadToCloudinary(file);
+          await updateUser({ profilePhoto: url, profilePhotoPublicId: publicId });
+          setShowPhotoModal(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await notifyPhotoChanged('profil');
+          Alert.alert('✅', 'Photo de profil mise à jour !');
+        } catch (error) {
+          Alert.alert('Erreur', 'Impossible de télécharger la photo');
+        }
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');
@@ -227,12 +267,22 @@ export default function ProfileScreen({ navigation }) {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await updateUser({ profilePhoto: result.assets[0].uri });
-        setShowPhotoModal(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Notifier le partenaire
-        await notifyPhotoChanged('profil');
-        Alert.alert('✅', 'Photo de profil mise à jour !');
+        const file = {
+          uri: result.assets[0].uri,
+          type: 'image/jpeg',
+          name: `profile_camera_${Date.now()}.jpg`
+        };
+
+        try {
+          const { url, publicId } = await uploadToCloudinary(file);
+          await updateUser({ profilePhoto: url, profilePhotoPublicId: publicId });
+          setShowPhotoModal(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await notifyPhotoChanged('profil');
+          Alert.alert('✅', 'Photo de profil mise à jour !');
+        } catch (error) {
+          Alert.alert('Erreur', 'Impossible de télécharger la photo');
+        }
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible d\'accéder à la caméra');
@@ -242,6 +292,17 @@ export default function ProfileScreen({ navigation }) {
   // Fonction pour choisir une photo du couple
   const pickCouplePhoto = async () => {
     try {
+      // Demander la permission galerie (nécessaire Android 13+)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          '📸 Permission requise',
+          'L\'accès à la galerie photo est nécessaire.\n\nAllez dans Paramètres > Applications > HANI 2 > Permissions > Photos pour l\'activer.',
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
@@ -250,12 +311,22 @@ export default function ProfileScreen({ navigation }) {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await updateCouple({ couplePhoto: result.assets[0].uri });
-        setShowCouplePhotoModal(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Notifier le partenaire
-        await notifyPhotoChanged('couple');
-        Alert.alert('✅', 'Photo de couple mise à jour !');
+        const file = {
+          uri: result.assets[0].uri,
+          type: 'image/jpeg',
+          name: `couple_${Date.now()}.jpg`
+        };
+
+        try {
+          const { url, publicId } = await uploadToCloudinary(file);
+          await updateCouple({ couplePhoto: url, couplePhotoPublicId: publicId });
+          setShowCouplePhotoModal(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await notifyPhotoChanged('couple');
+          Alert.alert('✅', 'Photo de couple mise à jour !');
+        } catch (error) {
+          Alert.alert('Erreur', 'Impossible de télécharger la photo');
+        }
       }
     } catch (error) {
       Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');
@@ -277,7 +348,10 @@ export default function ProfileScreen({ navigation }) {
     await notifyLoveNote(newNote);
     
     // Augmenter le love meter
-    await updateLoveMeter(loveMeter + 2);
+    const newLoveMeter = loveMeter + 2;
+    await updateLoveMeter(newLoveMeter);
+    // ✅ Vérifier si on atteint un palier du Love Meter (25, 50, 75, 100)
+    checkLoveMeterMilestone(newLoveMeter);
     
     setNewNote('');
     setShowNoteModal(false);
@@ -313,7 +387,10 @@ export default function ProfileScreen({ navigation }) {
     // Envoyer notification au partenaire
     await notifyLoveNote(message);
     
-    await updateLoveMeter(loveMeter + 1);
+    const newLoveMeter = loveMeter + 1;
+    await updateLoveMeter(newLoveMeter);
+    // ✅ Vérifier palier Love Meter
+    checkLoveMeterMilestone(newLoveMeter);
     Alert.alert('💕', 'Message envoyé !');
   };
 
@@ -327,7 +404,10 @@ export default function ProfileScreen({ navigation }) {
     
     // Augmenter le love meter quand on complète un élément
     if (item && !item.completed) {
-      await updateLoveMeter(loveMeter + 5);
+      const newLoveMeter = loveMeter + 5;
+      await updateLoveMeter(newLoveMeter);
+      // ✅ Vérifier palier Love Meter
+      checkLoveMeterMilestone(newLoveMeter);
       // Envoyer notification au partenaire
       await notifyBucket(item.text);
       Alert.alert('🎉', 'Félicitations ! Un rêve réalisé !');
@@ -375,7 +455,15 @@ export default function ProfileScreen({ navigation }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     // Notifier le partenaire
     await notifyAnniversarySet(formattedDate);
-    Alert.alert('✅', 'Date d\'anniversaire mise à jour !\n\nLe compteur de jours est maintenant actif 💕');
+    // ✅ Programmer le rappel la veille de l'anniversaire
+    try {
+      if (scheduleAnniversaryReminder) {
+        await scheduleAnniversaryReminder(formattedDate, couple?.name || 'notre couple');
+      }
+    } catch (e) {
+      console.warn('⚠️ Erreur programmation rappel anniversaire:', e.message);
+    }
+    Alert.alert('✅', 'Date d\'anniversaire mise à jour !\n\nLe compteur de jours est maintenant actif 💕\nRappel programmé la veille 🎂');
   };
 
   const handleSelectAvatar = async (avatar) => {
@@ -431,9 +519,9 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const handleCopyCode = () => {
+  const handleCopyCode = async () => {
     const code = couple?.code || 'LOVE-XXXXX';
-    Clipboard.setString(code);
+    await Clipboard.setStringAsync(code);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('📋', 'Code copié !');
   };
@@ -466,7 +554,7 @@ export default function ProfileScreen({ navigation }) {
         {couple?.couplePhoto ? (
           <Image source={{ uri: couple.couplePhoto }} style={styles.couplePhoto} />
         ) : (
-          <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.couplePhotoPlaceholder}>
+          <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.couplePhotoPlaceholder}>
             <Text style={styles.couplePhotoPlaceholderText}>💑</Text>
             <Text style={styles.couplePhotoAddText}>Ajouter une photo de couple</Text>
           </LinearGradient>
@@ -585,30 +673,13 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.loveMeterTitle}>💕 Love Meter</Text>
         <View style={styles.loveMeterBar}>
           <LinearGradient
-            colors={['#FF6B9D', '#C44569']}
+            colors={[theme.secondary, theme.accent]}
             style={[styles.loveMeterFill, { width: `${loveMeter}%` }]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           />
         </View>
         <Text style={styles.loveMeterValue}>{loveMeter}%</Text>
-      </View>
-
-      {/* Stats */}
-      <Text style={styles.sectionTitle}>📊 Nos Statistiques</Text>
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{memories.length}</Text>
-          <Text style={styles.statLabel}>Souvenirs</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{loveNotes.length}</Text>
-          <Text style={styles.statLabel}>Messages</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{bucketList.filter(b => b.completed).length}/{bucketList.length}</Text>
-          <Text style={styles.statLabel}>Bucket List</Text>
-        </View>
       </View>
 
       {/* Quick Actions */}
@@ -981,6 +1052,14 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.settingText}>À propos</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => navigation.navigate('Guide')}
+        >
+          <Text style={styles.settingIcon}>📖</Text>
+          <Text style={styles.settingText}>Guide d'utilisation</Text>
+          <Text style={styles.settingArrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity 
@@ -1006,13 +1085,13 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.deleteAccountButtonText}>🗑️ Supprimer mon compte</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>HANI 2 v5.0.0 - by Djeble Haniel Henoc 💕</Text>
+      <Text style={styles.version}>HANI 2 v1.0.0 - by Djeble Haniel Henoc 💕</Text>
     </View>
   );
 
   return (
     <LinearGradient
-      colors={['#8B5CF6', '#C44569', '#FF6B9D']}
+      colors={theme.primary}
       style={styles.container}
     >
       <View style={styles.header}>
@@ -1065,6 +1144,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowNoteModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💌 Love Note</Text>
@@ -1092,6 +1172,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Bucket List Modal */}
@@ -1101,6 +1182,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowBucketModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>✨ Nouveau Rêve</Text>
@@ -1127,6 +1209,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Profile Modal */}
@@ -1136,6 +1219,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditProfileModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>👤 Modifier le profil</Text>
@@ -1162,6 +1246,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Avatar Selection Modal */}
@@ -1205,6 +1290,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditAnniversaryModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>📅 Date d'anniversaire</Text>
@@ -1238,6 +1324,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Photo de profil Modal */}
@@ -1370,6 +1457,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditPartnerModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💕 Modifier le nom du partenaire</Text>
@@ -1399,6 +1487,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Couple Name Modal */}
@@ -1408,6 +1497,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditCoupleNameModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💑 Modifier le nom du couple</Text>
@@ -1437,6 +1527,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Bucket Item Modal */}
@@ -1446,6 +1537,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditBucketModal(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>✏️ Modifier le rêve</Text>
@@ -1483,6 +1575,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Theme Modal */}
@@ -1540,6 +1633,7 @@ export default function ProfileScreen({ navigation }) {
           setPinStep(1);
         }}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🔐 Code PIN</Text>
@@ -1600,6 +1694,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* About Modal - Animée */}
@@ -1615,7 +1710,7 @@ export default function ProfileScreen({ navigation }) {
       >
         <View style={styles.aboutContent}>
           <View style={styles.aboutVersionBadge}>
-            <Text style={styles.aboutVersionText}>Version 5.0.0</Text>
+            <Text style={styles.aboutVersionText}>Version 1.0.0</Text>
           </View>
           
           <View style={styles.aboutSection}>

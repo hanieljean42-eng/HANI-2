@@ -67,8 +67,11 @@ export default function WheelScreen() {
       setSelectedItem(WHEEL_ITEMS[randomIndex]);
       setShowModal(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Notifier le partenaire du résultat
-      await notifyWheelSpin(WHEEL_ITEMS[randomIndex].text);
+      // ✅ Notifier le partenaire (masquer les items intimes pour la confidentialité)
+      const itemText = WHEEL_ITEMS[randomIndex].text;
+      const isIntimate = randomIndex >= 12; // Items 13-17 sont intimes
+      const notifText = isIntimate ? '🔥 Surprise coquine... 😈' : itemText;
+      await notifyWheelSpin(notifText);
     });
   };
 
@@ -79,18 +82,18 @@ export default function WheelScreen() {
 
   return (
     <LinearGradient
-      colors={['#8B5CF6', '#C44569', '#FF6B9D']}
+      colors={theme.primary}
       style={styles.container}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>🎰 Roue des Dates</Text>
-        <Text style={styles.subtitle}>Tournez pour décider de votre prochaine activité !</Text>
+        <Text style={[styles.title, { color: theme.text }]}>🎰 Roue des Dates</Text>
+        <Text style={[styles.subtitle, { color: theme.text + 'CC' }]}>Tournez pour décider de votre prochaine activité !</Text>
 
         {/* Wheel Container */}
         <View style={styles.wheelContainer}>
           {/* Pointer */}
           <View style={styles.pointer}>
-            <Text style={styles.pointerArrow}>▼</Text>
+            <Text style={[styles.pointerArrow, { color: theme.text }]}>▼</Text>
           </View>
 
           {/* Wheel */}
@@ -138,14 +141,14 @@ export default function WheelScreen() {
           onPress={spinWheel}
           disabled={spinning}
         >
-          <Text style={styles.spinButtonText}>
+          <Text style={[styles.spinButtonText, { color: theme.accent }]}>
             {spinning ? 'Ça tourne... 🎲' : 'TOURNER LA ROUE !'}
           </Text>
         </TouchableOpacity>
 
         {/* Recent Results */}
         <View style={styles.historySection}>
-          <Text style={styles.historyTitle}>Dernières activités</Text>
+          <Text style={[styles.historyTitle, { color: theme.text + 'B3' }]}>Dernières activités</Text>
           <View style={styles.historyItems}>
             {WHEEL_ITEMS.slice(0, 3).map((item) => (
               <View key={`history-${item.id}`} style={styles.historyItem}>
@@ -165,7 +168,7 @@ export default function WheelScreen() {
         type="spring"
         size="medium"
         closeButtonText="Super ! 💖"
-        gradientColors={selectedItem ? [selectedItem.color, '#C44569'] : ['#FF6B9D', '#C44569']}
+        gradientColors={selectedItem ? [selectedItem.color, theme.accent] : [theme.secondary, theme.accent]}
       >
         {selectedItem && (
           <View style={styles.modalResultContent}>

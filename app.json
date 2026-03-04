@@ -2,7 +2,7 @@
   "expo": {
     "name": "HANI 2",
     "slug": "loveapp2026",
-    "version": "5.0.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -28,12 +28,19 @@
         "backgroundColor": "#FF6B9D"
       },
       "package": "com.loveapp.couple2026",
+      "softwareKeyboardLayoutMode": "pan",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
         "android.permission.WAKE_LOCK",
-        "android.permission.SCHEDULE_EXACT_ALARM"
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "useNextNotificationsApi": true
     },
@@ -42,6 +49,13 @@
     },
     "plugins": [
       "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "L'application a besoin d'accéder à vos photos pour ajouter des souvenirs et des images.",
+          "cameraPermission": "L'application a besoin d'accéder à votre caméra pour prendre des photos."
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -61,9 +75,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "b1f00575-c61e-45ee-84ac-b1644dff132f"
+        "projectId": "de6488a3-2b3d-4a48-b503-185e188052c6"
       }
     },
-    "owner": "25aa00445b"
+    "owner": "25aa01280s"
   }
 }

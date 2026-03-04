@@ -4,57 +4,80 @@ const path = require('path');
 
 const assetsDir = './assets';
 
-// SVG pour l'icône principale (1024x1024)
+// SVG pour l'icône principale (1024x1024) — H❤️A haute visibilité
 const iconSVG = `
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="50%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
+      <stop offset="0%" style="stop-color:#E91E63"/>
+      <stop offset="50%" style="stop-color:#C2185B"/>
+      <stop offset="100%" style="stop-color:#880E4F"/>
     </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="rgba(0,0,0,0.5)"/>
+    </filter>
+    <filter id="textShadow">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
   </defs>
-  <rect width="1024" height="1024" rx="200" fill="url(#bg)"/>
-  <circle cx="512" cy="480" r="300" fill="white"/>
-  <text x="300" y="560" font-family="Arial Black, Arial, sans-serif" font-size="240" font-weight="900" fill="#C44569">C</text>
-  <text x="540" y="560" font-family="Arial Black, Arial, sans-serif" font-size="240" font-weight="900" fill="#C44569">H</text>
-  <path d="M512 700 Q512 650 560 650 Q620 650 620 710 Q620 780 512 860 Q404 780 404 710 Q404 650 464 650 Q512 650 512 700Z" fill="#FF6B9D"/>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <circle cx="180" cy="180" r="140" fill="white" opacity="0.06"/>
+  <circle cx="850" cy="850" r="170" fill="white" opacity="0.04"/>
+  <text x="170" y="610" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="bold" fill="white" filter="url(#textShadow)">H</text>
+  <path d="M512 320 C512 288, 542 260, 567 260 C602 260, 627 292, 627 320 C627 375, 512 445, 512 445 C512 445, 397 375, 397 320 C397 292, 422 260, 457 260 C482 260, 512 288, 512 320Z" fill="#FF1744" filter="url(#shadow)"/>
+  <path d="M512 340 C512 330, 523 322, 532 322 C545 322, 553 334, 553 340 C553 356, 512 378, 512 378 C512 378, 471 356, 471 340 C471 334, 479 322, 492 322 C501 322, 512 330, 512 340Z" fill="white" opacity="0.35"/>
+  <text x="510" y="610" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="bold" fill="white" filter="url(#textShadow)">A</text>
+  <text x="512" y="810" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle" filter="url(#textShadow)">HANI 2</text>
+  <text x="512" y="875" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="rgba(255,255,255,0.8)" text-anchor="middle">Votre espace couple</text>
 </svg>`;
 
-// SVG pour l'icône adaptive Android (foreground)
+// SVG pour l'icône adaptive Android
 const adaptiveSVG = `
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="50%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
+      <stop offset="0%" style="stop-color:#E91E63"/>
+      <stop offset="50%" style="stop-color:#C2185B"/>
+      <stop offset="100%" style="stop-color:#880E4F"/>
     </linearGradient>
+    <filter id="textShadow2">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
+    <filter id="shadow2">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
   </defs>
   <rect width="1024" height="1024" fill="url(#bg2)"/>
-  <circle cx="512" cy="460" r="260" fill="white"/>
-  <text x="330" y="530" font-family="Arial Black, Arial, sans-serif" font-size="200" font-weight="900" fill="#C44569">C</text>
-  <text x="530" y="530" font-family="Arial Black, Arial, sans-serif" font-size="200" font-weight="900" fill="#C44569">H</text>
-  <path d="M512 660 Q512 620 555 620 Q605 620 605 670 Q605 730 512 800 Q419 730 419 670 Q419 620 469 620 Q512 620 512 660Z" fill="#FF6B9D"/>
+  <text x="220" y="590" font-family="Georgia, 'Times New Roman', serif" font-size="360" font-weight="bold" fill="white" filter="url(#textShadow2)">H</text>
+  <path d="M512 340 C512 310, 540 285, 562 285 C594 285, 617 315, 617 340 C617 390, 512 455, 512 455 C512 455, 407 390, 407 340 C407 315, 430 285, 462 285 C484 285, 512 310, 512 340Z" fill="#FF1744" filter="url(#shadow2)"/>
+  <text x="510" y="590" font-family="Georgia, 'Times New Roman', serif" font-size="360" font-weight="bold" fill="white" filter="url(#textShadow2)">A</text>
 </svg>`;
 
-// SVG pour le splash screen
+// Splash screen
 const splashSVG = `
 <svg xmlns="http://www.w3.org/2000/svg" width="1284" height="2778" viewBox="0 0 1284 2778">
   <defs>
     <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="50%" style="stop-color:#C44569"/>
-      <stop offset="100%" style="stop-color:#8B5CF6"/>
+      <stop offset="0%" style="stop-color:#E91E63"/>
+      <stop offset="50%" style="stop-color:#C2185B"/>
+      <stop offset="100%" style="stop-color:#880E4F"/>
     </linearGradient>
+    <filter id="textShadow3">
+      <feDropShadow dx="2" dy="5" stdDeviation="5" flood-color="rgba(0,0,0,0.45)"/>
+    </filter>
+    <filter id="shadow3">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
   </defs>
   <rect width="1284" height="2778" fill="url(#bg3)"/>
-  <circle cx="642" cy="1150" r="200" fill="white"/>
-  <text x="490" y="1205" font-family="Arial Black, Arial, sans-serif" font-size="150" font-weight="900" fill="#C44569">C</text>
-  <text x="645" y="1205" font-family="Arial Black, Arial, sans-serif" font-size="150" font-weight="900" fill="#C44569">H</text>
-  <path d="M642 1280 Q642 1250 675 1250 Q715 1250 715 1290 Q715 1340 642 1400 Q569 1340 569 1290 Q569 1250 609 1250 Q642 1250 642 1280Z" fill="#FF6B9D"/>
-  <text x="642" y="1520" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle">Couple H</text>
-  <text x="642" y="1590" font-family="Arial, sans-serif" font-size="32" fill="rgba(255,255,255,0.85)" text-anchor="middle">Votre espace couple privé 💕</text>
+  <circle cx="200" cy="500" r="200" fill="white" opacity="0.04"/>
+  <circle cx="1084" cy="2300" r="250" fill="white" opacity="0.03"/>
+  <text x="330" y="1480" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="bold" fill="white" filter="url(#textShadow3)">H</text>
+  <path d="M642 1150 C642 1115, 675 1085, 700 1085 C735 1085, 762 1118, 762 1150 C762 1210, 642 1290, 642 1290 C642 1290, 522 1210, 522 1150 C522 1118, 549 1085, 584 1085 C609 1085, 642 1115, 642 1150Z" fill="#FF1744" filter="url(#shadow3)"/>
+  <path d="M642 1170 C642 1162, 651 1154, 658 1154 C668 1154, 675 1164, 675 1170 C675 1183, 642 1200, 642 1200 C642 1200, 609 1183, 609 1170 C609 1164, 616 1154, 626 1154 C633 1154, 642 1162, 642 1170Z" fill="white" opacity="0.35"/>
+  <text x="650" y="1480" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="bold" fill="white" filter="url(#textShadow3)">A</text>
+  <text x="642" y="1680" font-family="Georgia, 'Times New Roman', serif" font-size="100" font-weight="bold" fill="white" text-anchor="middle" filter="url(#textShadow3)">HANI 2</text>
+  <text x="642" y="1770" font-family="Arial, Helvetica, sans-serif" font-size="40" fill="rgba(255,255,255,0.8)" text-anchor="middle">Votre espace couple privé</text>
 </svg>`;
 
 // Favicon
@@ -62,20 +85,23 @@ const faviconSVG = `
 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
   <defs>
     <linearGradient id="bg4" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B9D"/>
-      <stop offset="100%" style="stop-color:#C44569"/>
+      <stop offset="0%" style="stop-color:#E91E63"/>
+      <stop offset="50%" style="stop-color:#C2185B"/>
+      <stop offset="100%" style="stop-color:#880E4F"/>
     </linearGradient>
+    <filter id="ts4">
+      <feDropShadow dx="0.5" dy="1" stdDeviation="0.8" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
   </defs>
-  <rect width="48" height="48" rx="10" fill="url(#bg4)"/>
-  <circle cx="24" cy="22" r="14" fill="white"/>
-  <text x="11" y="28" font-family="Arial" font-size="14" font-weight="bold" fill="#C44569">C</text>
-  <text x="25" y="28" font-family="Arial" font-size="14" font-weight="bold" fill="#C44569">H</text>
-  <path d="M24 34 Q24 31 27 31 Q31 31 31 35 Q31 39 24 43 Q17 39 17 35 Q17 31 21 31 Q24 31 24 34Z" fill="#FF6B9D" transform="scale(0.6) translate(16, -8)"/>
+  <rect width="48" height="48" rx="12" fill="url(#bg4)"/>
+  <text x="5" y="34" font-family="Georgia, serif" font-size="22" font-weight="bold" fill="white" filter="url(#ts4)">H</text>
+  <path d="M24 14 C24 12, 26 10.5, 27.5 10.5 C29.5 10.5, 31 12.5, 31 14 C31 17, 24 21, 24 21 C24 21, 17 17, 17 14 C17 12.5, 18.5 10.5, 20.5 10.5 C22 10.5, 24 12, 24 14Z" fill="#FF1744"/>
+  <text x="23" y="34" font-family="Georgia, serif" font-size="22" font-weight="bold" fill="white" filter="url(#ts4)">A</text>
 </svg>`;
 
 async function generateIcons() {
   try {
-    console.log('🎨 Génération des icônes Couple H...\n');
+    console.log('🎨 Génération des icônes HANI 2 (H❤️A)...\n');
 
     // Icon principal
     await sharp(Buffer.from(iconSVG))

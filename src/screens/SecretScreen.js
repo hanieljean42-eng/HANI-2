@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useSecurity } from '../context/SecurityContext';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadToCloudinary } from '../utils/uploadToCloudinary';
 
 export default function SecretScreen() {
   const { theme } = useTheme();
@@ -37,14 +38,38 @@ export default function SecretScreen() {
     }
     
     if (note.trim().length === 0 && !image) return;
-    await addPrivateContent({ type: image ? 'image' : 'note', data: image ? image : note });
+    
+    let imageUrl = null;
+    let publicId = null;
+    
+    if (image) {
+      try {
+        const file = {
+          uri: image,
+          type: 'image/jpeg',
+          name: `secret_${Date.now()}.jpg`
+        };
+        
+        const { url, publicId: pubId } = await uploadToCloudinary(file);
+        imageUrl = url;
+        publicId = pubId;
+      } catch (error) {
+        Alert.alert('Erreur', 'Impossible de télécharger l\'image');
+        return;
+      }
+    }
+    
+    await addPrivateContent({ 
+      type: imageUrl ? 'image' : 'note', 
+      data: imageUrl ? imageUrl : note,
+      publicId: publicId
+    });
     setNote('');
     setImage(null);
     setAdding(false);
   };
 
   const pickImage = async () => {
-    // Vérifier si le code PIN est configuré
     if (!isSecretModeEnabled) {
       Alert.alert(
         '🔐 Code secret requis',
@@ -57,9 +82,28 @@ export default function SecretScreen() {
       return;
     }
     
-    let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImage(result.assets[0].uri);
+    try {
+      // Demander la permission galerie (nécessaire Android 13+)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          '📸 Permission requise',
+          'L\'accès à la galerie photo est nécessaire pour ajouter des images.\n\nAllez dans Paramètres > Applications > HANI 2 > Permissions > Photos pour l\'activer.',
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({ 
+        mediaTypes: ['images'], 
+        quality: 0.7 
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de sélectionner une image');
     }
   };
 
@@ -131,7 +175,8 @@ export default function SecretScreen() {
 
   return (
     <LinearGradient colors={theme.primary} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={[styles.title, { color: theme.text }]}>🔐 Espace Secret</Text>
         <Text style={[styles.subtitle, { color: theme.text }]}>Ici, tu peux écrire des notes intimes ou stocker des photos privées, protégées par ton code secret.</Text>
 
@@ -239,6 +284,7 @@ export default function SecretScreen() {
           </>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Modal Configuration PIN */}
       <Modal
@@ -252,6 +298,7 @@ export default function SecretScreen() {
           setPinStep(1);
         }}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🔐 Créer ton code secret</Text>
@@ -308,6 +355,7 @@ export default function SecretScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </LinearGradient>
   );
