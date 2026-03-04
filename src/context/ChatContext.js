@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, onValue, off, push } from 'firebase/database';
 import { useAuth } from './AuthContext';
-import { encryptMessageObject, decryptMessageObject } from '../utils/encryption';
+import { encryptMessageObject, decryptMessageObject } from '../utils/encrypt';
 
 const ChatContext = createContext({});
 

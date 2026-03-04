@@ -26,7 +26,7 @@ import { useData } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useNotifications } from '../context/NotificationContext';
 import AnimatedModal from '../components/AnimatedModal';
-import { uploadToCloudinary } from '../utils/uploadToCloudinary';
+import { uploadToCloudinary } from '../utils/cloudUpload';
 
 const { width } = Dimensions.get('window');
 
