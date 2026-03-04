@@ -9,24 +9,155 @@ import {
   AppState,
   Alert,
   Image,
+  Share,
+  Modal,
+  TextInput,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { useData } from '../context/DataContext';
+import { useData, BADGES_LIST, getLevelInfo, MILESTONES, SPECIAL_DATES } from '../context/DataContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import { useNotifications } from '../context/NotificationContext';
+import { useChat } from '../context/ChatContext';
 
 const { width } = Dimensions.get('window');
+
+// Questions "Tu préfères" du jour (pool)
+const TU_PREFERES_POOL = [
+  { a: 'Petit-déjeuner au lit tous les matins', b: 'Dîner romantique chaque semaine' },
+  { a: 'Voyager ensemble pour toujours', b: 'Avoir la maison de nos rêves' },
+  { a: 'Lire les pensées de ton partenaire', b: 'Que ton partenaire lise tes pensées' },
+  { a: 'Revoir notre premier rendez-vous', b: 'Voir notre futur dans 10 ans' },
+  { a: 'Ne jamais se disputer', b: 'Toujours se réconcilier parfaitement' },
+  { a: 'Être incroyablement riche mais occupé', b: 'Peu d\'argent mais tout le temps ensemble' },
+  { a: 'Un baiser de 5 minutes', b: 'Un câlin de 30 minutes' },
+  { a: 'Une lettre d\'amour chaque jour', b: 'Un cadeau surprise chaque mois' },
+  { a: 'Danser sous la pluie ensemble', b: 'Regarder les étoiles ensemble' },
+  { a: 'Un road trip spontané', b: 'Des vacances planifiées de luxe' },
+  { a: 'Connaître la date exacte de notre mariage', b: 'Être surpris quand ça arrivera' },
+  { a: 'Vivre sur une île déserte ensemble', b: 'Vivre dans une grande ville ensemble' },
+  { a: 'Toujours dire la vérité', b: 'Pouvoir faire une surprise secrète' },
+  { a: 'Avoir le même rêve chaque nuit', b: 'Ne jamais oublier un souvenir' },
+];
 
 export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, couple, partner, isOnline, isSynced } = useAuth();
-  const { loveMeter, challenges, memories } = useData();
+  const { loveMeter, challenges, memories, loveNotes, countdownEvents, addCountdownEvent, deleteCountdownEvent, unlockedBadges, checkBadges } = useData();
   const { notifyMissYou, notifyLoveNote, sendCustomNotification } = useNotifyPartner();
+  const { notifyMilestone, notifyBadgeUnlocked, notifyLevelUp, scheduleCountdownReminder } = useNotifications();
+  const { messages: chatMessages } = useChat();
   const [daysCount, setDaysCount] = useState(0);
   const [timeTogetherText, setTimeTogetherText] = useState('');
   const [hasValidDate, setHasValidDate] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date().toDateString());
+  const [showCountdownModal, setShowCountdownModal] = useState(false);
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventDate, setNewEventDate] = useState('');
+  const [newEventEmoji, setNewEventEmoji] = useState('🎉');
+  const [tuPreferesAnswer, setTuPreferesAnswer] = useState(null);
+
+  // "Tu préfères" du jour (déterministe)
+  const dailyTuPreferes = useMemo(() => {
+    const today = new Date();
+    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    return TU_PREFERES_POOL[seed % TU_PREFERES_POOL.length];
+  }, []);
+
+  // Milestone du jour
+  const todayMilestone = useMemo(() => {
+    if (!daysCount) return null;
+    if (MILESTONES.includes(daysCount)) return daysCount;
+    return null;
+  }, [daysCount]);
+
+  // Date spéciale aujourd'hui
+  const todaySpecial = useMemo(() => {
+    const today = new Date();
+    const d = today.getDate();
+    const m = today.getMonth() + 1;
+    return SPECIAL_DATES.find(s => s.month === m && s.day === d) || null;
+  }, []);
+
+  // Prochain countdown event
+  const nextCountdown = useMemo(() => {
+    if (!countdownEvents || countdownEvents.length === 0) return null;
+    const now = new Date();
+    const future = countdownEvents.filter(e => {
+      const evDate = new Date(e.date);
+      return evDate > now;
+    });
+    if (future.length === 0) return null;
+    const ev = future[0]; // already sorted by date
+    const evDate = new Date(ev.date);
+    const diffDays = Math.ceil((evDate - now) / (1000 * 60 * 60 * 24));
+    return { ...ev, daysLeft: diffDays };
+  }, [countdownEvents]);
+
+  // Badges info
+  const levelInfo = useMemo(() => {
+    const xp = challenges?.reduce((sum, c) => sum + (c?.xp || 0), 0) || 0;
+    return getLevelInfo(xp);
+  }, [challenges]);
+
+  const totalBadges = useMemo(() => {
+    return unlockedBadges?.length || 0;
+  }, [unlockedBadges]);
+
+  // Check badges quand les données changent
+  useEffect(() => {
+    if (!user?.id) return;
+    const completedChallenges = challenges?.filter(c => c.completed)?.length || 0;
+    const statsObj = {
+      streak: 0, // streak est calculé dans ChallengesScreen, les badges flamme se débloquent là-bas
+      challenges: completedChallenges,
+      messages: chatMessages?.length || 0,
+      memories: memories?.length || 0,
+      notes: loveNotes?.length || 0,
+      days: daysCount,
+      level: levelInfo.level,
+    };
+    checkBadges(statsObj).then(newBadges => {
+      if (newBadges && newBadges.length > 0) {
+        const badge = BADGES_LIST.find(b => b.id === newBadges[0].id);
+        if (badge) {
+          notifyBadgeUnlocked(badge.name, badge.emoji);
+          Alert.alert(`${badge.emoji} Nouveau badge !`, `Tu as débloqué "${badge.name}" !\n${badge.desc}`);
+        }
+      }
+    });
+  }, [challenges?.length, memories?.length, daysCount, levelInfo.level, chatMessages?.length, loveNotes?.length]);
+
+  // Check milestones
+  useEffect(() => {
+    if (todayMilestone && daysCount > 0) {
+      const emoji = daysCount >= 1000 ? '💎' : daysCount >= 365 ? '🎂' : daysCount >= 100 ? '💯' : '🎉';
+      notifyMilestone(daysCount, emoji);
+    }
+  }, [todayMilestone]);
+
+  // Notification level up quand le rang change
+  const [prevLevel, setPrevLevel] = useState(null);
+  useEffect(() => {
+    if (prevLevel !== null && levelInfo.level > prevLevel) {
+      notifyLevelUp(levelInfo.level, levelInfo.rank, levelInfo.rankEmoji);
+    }
+    setPrevLevel(levelInfo.level);
+  }, [levelInfo.level]);
+
+  // Programmer les rappels de countdown pour les événements futurs
+  useEffect(() => {
+    if (countdownEvents && countdownEvents.length > 0) {
+      countdownEvents.forEach(ev => {
+        const evDate = new Date(ev.date);
+        if (evDate > new Date()) {
+          scheduleCountdownReminder(ev.name, ev.emoji || '📅', ev.date);
+        }
+      });
+    }
+  }, [countdownEvents?.length]);
 
   // Fonction pour calculer les jours ensemble
   const calculateDaysTogether = useCallback(() => {
@@ -358,6 +489,142 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
+        {/* 🎉 Milestone ou Date Spéciale */}
+        {(todayMilestone || todaySpecial) && (
+          <View style={styles.milestoneCard}>
+            <Text style={styles.milestoneEmoji}>
+              {todaySpecial ? todaySpecial.emoji : '🎉'}
+            </Text>
+            <Text style={styles.milestoneTitle}>
+              {todaySpecial
+                ? `Joyeuse ${todaySpecial.name} ! 💕`
+                : `🎉 ${todayMilestone} jours ensemble !`}
+            </Text>
+            <Text style={styles.milestoneSubtext}>
+              {todaySpecial
+                ? 'Profitez de cette journée spéciale ensemble !'
+                : 'Félicitations ! Un cap magnifique 🏆'}
+            </Text>
+          </View>
+        )}
+
+        {/* ⏳ Countdown prochain événement */}
+        {nextCountdown && (
+          <TouchableOpacity 
+            style={styles.countdownCard}
+            onPress={() => setShowCountdownModal(true)}
+          >
+            <Text style={styles.countdownEmoji}>{nextCountdown.emoji || '📅'}</Text>
+            <View style={styles.countdownInfo}>
+              <Text style={styles.countdownName}>{nextCountdown.name}</Text>
+              <Text style={styles.countdownDays}>
+                dans <Text style={[styles.countdownNumber, { color: theme.accent }]}>{nextCountdown.daysLeft}</Text> jour{nextCountdown.daysLeft > 1 ? 's' : ''}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => deleteCountdownEvent(nextCountdown.id)}>
+              <Text style={{ fontSize: 18 }}>✕</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+
+        {!nextCountdown && (
+          <TouchableOpacity
+            style={styles.addCountdownBtn}
+            onPress={() => setShowCountdownModal(true)}
+          >
+            <Text style={styles.addCountdownText}>+ Ajouter un événement à compter</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 🤔 Tu préfères du jour */}
+        <View style={styles.tuPreferesCard}>
+          <Text style={styles.tuPreferesTitle}>🤔 Tu préfères...</Text>
+          <View style={styles.tuPreferesOptions}>
+            <TouchableOpacity
+              style={[
+                styles.tuPreferesOption,
+                tuPreferesAnswer === 'a' && { backgroundColor: theme.accent, borderColor: theme.accent },
+              ]}
+              onPress={() => setTuPreferesAnswer('a')}
+            >
+              <Text style={[styles.tuPreferesOptionText, tuPreferesAnswer === 'a' && { color: '#fff' }]}>
+                {dailyTuPreferes.a}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.tuPreferesOu}>ou</Text>
+            <TouchableOpacity
+              style={[
+                styles.tuPreferesOption,
+                tuPreferesAnswer === 'b' && { backgroundColor: theme.accent, borderColor: theme.accent },
+              ]}
+              onPress={() => setTuPreferesAnswer('b')}
+            >
+              <Text style={[styles.tuPreferesOptionText, tuPreferesAnswer === 'b' && { color: '#fff' }]}>
+                {dailyTuPreferes.b}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {tuPreferesAnswer && (
+            <Text style={styles.tuPreferesResult}>
+              ✅ Tu as choisi ! Demande à {partner?.name || 'ton partenaire'} son choix 💬
+            </Text>
+          )}
+        </View>
+
+        {/* 🏆 Badges & Niveau */}
+        <View style={styles.badgesSection}>
+          <Text style={styles.badgesSectionTitle}>🏆 Niveau & Badges</Text>
+          <View style={styles.levelRow}>
+            <Text style={styles.levelEmoji}>{levelInfo.rankEmoji}</Text>
+            <View style={styles.levelInfo}>
+              <Text style={styles.levelRank}>Couple {levelInfo.rank}</Text>
+              <Text style={styles.levelDetail}>Niveau {levelInfo.level} • {levelInfo.totalXP} XP</Text>
+            </View>
+          </View>
+          <View style={styles.badgesGrid}>
+            {BADGES_LIST.slice(0, 8).map(badge => {
+              const isUnlocked = unlockedBadges?.some(b => b.id === badge.id);
+              return (
+                <TouchableOpacity
+                  key={badge.id}
+                  style={[styles.badgeItem, !isUnlocked && styles.badgeLocked]}
+                  onPress={() => Alert.alert(
+                    `${badge.emoji} ${badge.name}`,
+                    `${badge.desc}\n\n${isUnlocked ? '✅ Débloqué !' : '🔒 Pas encore débloqué'}`,
+                  )}
+                >
+                  <Text style={[styles.badgeEmoji, !isUnlocked && { opacity: 0.3 }]}>
+                    {badge.emoji}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.badgesCount}>
+            {totalBadges}/{BADGES_LIST.length} badges débloqués
+          </Text>
+        </View>
+
+        {/* 📣 Partager l'app / Parrainage */}
+        <TouchableOpacity
+          style={[styles.referralCard, { borderColor: theme.accent }]}
+          onPress={async () => {
+            try {
+              const code = couple?.id ? couple.id.substring(0, 8).toUpperCase() : '';
+              await Share.share({
+                message: `💕 Rejoins-nous sur HANI, l'app couple ! Relève des défis, chatte et maintiens ta flamme 🔥\n${code ? `Code couple : ${code}\n` : ''}Télécharge HANI maintenant !`,
+              });
+            } catch (e) { console.log(e); }
+          }}
+        >
+          <Text style={styles.referralEmoji}>📣</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.referralTitle}>Invite un couple !</Text>
+            <Text style={styles.referralSubtext}>Partage HANI avec tes amis en couple 💕</Text>
+          </View>
+          <Text style={{ fontSize: 20, color: theme.accent }}>→</Text>
+        </TouchableOpacity>
+
         {/* Daily Quote */}
         <View style={styles.quoteCard}>
           <Text style={styles.quoteIcon}>💭</Text>
@@ -365,6 +632,85 @@ export default function HomeScreen({ navigation }) {
             "L'amour ne se compte pas en jours, mais en moments inoubliables."
           </Text>
         </View>
+
+        {/* Modal Countdown */}
+        <Modal visible={showCountdownModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>📅 Nouvel événement</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Nom (ex: Vacances, Anniversaire...)"
+                value={newEventName}
+                onChangeText={setNewEventName}
+                placeholderTextColor="#999"
+              />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Date (JJ/MM/AAAA)"
+                value={newEventDate}
+                onChangeText={setNewEventDate}
+                placeholderTextColor="#999"
+                keyboardType="numeric"
+              />
+              <View style={styles.emojiRow}>
+                {['🎉', '✈️', '🎂', '💍', '🏖️', '🎄', '💝', '🎓'].map(e => (
+                  <TouchableOpacity
+                    key={e}
+                    style={[
+                      styles.emojiPick,
+                      newEventEmoji === e && { backgroundColor: theme.accent },
+                    ]}
+                    onPress={() => setNewEventEmoji(e)}
+                  >
+                    <Text style={{ fontSize: 24 }}>{e}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setShowCountdownModal(false)}
+                >
+                  <Text style={styles.modalCancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalConfirmBtn, { backgroundColor: theme.accent }]}
+                  onPress={async () => {
+                    if (!newEventName.trim() || !newEventDate.trim()) {
+                      Alert.alert('Erreur', 'Remplis le nom et la date');
+                      return;
+                    }
+                    // Parse date JJ/MM/AAAA
+                    const parts = newEventDate.split('/');
+                    if (parts.length !== 3) {
+                      Alert.alert('Erreur', 'Format de date : JJ/MM/AAAA');
+                      return;
+                    }
+                    const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2]);
+                    const date = new Date(y, m, d);
+                    if (date <= new Date()) {
+                      Alert.alert('Erreur', 'La date doit être dans le futur');
+                      return;
+                    }
+                    await addCountdownEvent({
+                      name: newEventName.trim(),
+                      date: date.toISOString(),
+                      emoji: newEventEmoji,
+                    });
+                    setNewEventName('');
+                    setNewEventDate('');
+                    setNewEventEmoji('🎉');
+                    setShowCountdownModal(false);
+                    Alert.alert('✅', 'Événement ajouté !');
+                  }}
+                >
+                  <Text style={styles.modalConfirmText}>Ajouter</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -657,4 +1003,164 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  // ===== Milestone / Date spéciale =====
+  milestoneCard: {
+    backgroundColor: 'rgba(255,215,0,0.2)',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255,215,0,0.4)',
+  },
+  milestoneEmoji: { fontSize: 50, marginBottom: 8 },
+  milestoneTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
+  milestoneSubtext: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 5, textAlign: 'center' },
+  // ===== Countdown =====
+  countdownCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 20,
+    gap: 12,
+  },
+  countdownEmoji: { fontSize: 36 },
+  countdownInfo: { flex: 1 },
+  countdownName: { fontSize: 16, fontWeight: '700', color: '#333' },
+  countdownDays: { fontSize: 14, color: '#666', marginTop: 2 },
+  countdownNumber: { fontSize: 22, fontWeight: 'bold' },
+  addCountdownBtn: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 15,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    borderStyle: 'dashed',
+  },
+  addCountdownText: { fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+  // ===== Tu Préfères =====
+  tuPreferesCard: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+  },
+  tuPreferesTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 12 },
+  tuPreferesOptions: { gap: 8 },
+  tuPreferesOption: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FAFAFA',
+  },
+  tuPreferesOptionText: { fontSize: 15, color: '#333', textAlign: 'center', fontWeight: '600' },
+  tuPreferesOu: { textAlign: 'center', fontSize: 14, color: '#999', fontWeight: '700', marginVertical: 2 },
+  tuPreferesResult: { fontSize: 13, color: '#666', textAlign: 'center', marginTop: 10 },
+  // ===== Badges =====
+  badgesSection: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+  },
+  badgesSectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 12 },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    gap: 10,
+  },
+  levelEmoji: { fontSize: 36 },
+  levelInfo: { flex: 1 },
+  levelRank: { fontSize: 16, fontWeight: '700', color: '#333' },
+  levelDetail: { fontSize: 13, color: '#666', marginTop: 2 },
+  badgesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  badgeItem: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFF5F7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  badgeLocked: {
+    borderColor: '#E0E0E0',
+    backgroundColor: '#F5F5F5',
+  },
+  badgeEmoji: { fontSize: 24 },
+  badgesCount: { fontSize: 12, color: '#999', textAlign: 'center', marginTop: 10 },
+  // ===== Referral =====
+  referralCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 20,
+    gap: 12,
+    borderWidth: 2,
+  },
+  referralEmoji: { fontSize: 32 },
+  referralTitle: { fontSize: 15, fontWeight: '700', color: '#333' },
+  referralSubtext: { fontSize: 12, color: '#666', marginTop: 2 },
+  // ===== Modal =====
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 16, textAlign: 'center' },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 12,
+  },
+  emojiRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emojiPick: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+  modalButtons: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end' },
+  modalCancelBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12 },
+  modalCancelText: { fontSize: 15, color: '#999', fontWeight: '600' },
+  modalConfirmBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 },
+  modalConfirmText: { fontSize: 15, color: '#fff', fontWeight: '700' },
 });

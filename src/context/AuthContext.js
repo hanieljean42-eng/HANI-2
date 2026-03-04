@@ -230,7 +230,7 @@ export function AuthProvider({ children }) {
 
   const createCouple = async (coupleData) => {
     try {
-      const coupleCode = generateCoupleCode();
+      const coupleCode = await generateCoupleCode();
       const coupleId = 'couple_' + Date.now().toString();
       
       const newCouple = {
@@ -248,7 +248,10 @@ export function AuthProvider({ children }) {
       // Sauvegarder dans la liste des couples (pour la reconnexion)
       const storedCouples = await AsyncStorage.getItem('@registeredCouples');
       let couples = storedCouples ? JSON.parse(storedCouples) : [];
-      couples.push(newCouple);
+      // Éviter les doublons
+      if (!couples.find(c => c.id === coupleId)) {
+        couples.push(newCouple);
+      }
       await AsyncStorage.setItem('@registeredCouples', JSON.stringify(couples));
       
       // Créer sur Firebase si connecté
@@ -415,14 +418,21 @@ export function AuthProvider({ children }) {
         await AsyncStorage.setItem('@coupleId', coupleId);
         console.log('💾 CoupleId sauvegardé:', coupleId);
 
-        // Ajouter à la liste des couples
+        // Ajouter/mettre à jour dans la liste des couples
         const storedCouples = await AsyncStorage.getItem('@registeredCouples');
         let couples = storedCouples ? JSON.parse(storedCouples) : [];
-        // Éviter les doublons
-        if (!couples.find(c => c.id === coupleId)) {
+        const existingIndex = couples.findIndex(c => c.id === coupleId);
+        if (existingIndex >= 0) {
+          // Mettre à jour le couple existant pour inclure les deux membres
+          const existingMembers = couples[existingIndex].members || [];
+          if (!existingMembers.includes(user.id)) {
+            existingMembers.push(user.id);
+          }
+          couples[existingIndex] = { ...couples[existingIndex], ...newCouple, members: existingMembers };
+        } else {
           couples.push(newCouple);
-          await AsyncStorage.setItem('@registeredCouples', JSON.stringify(couples));
         }
+        await AsyncStorage.setItem('@registeredCouples', JSON.stringify(couples));
 
         setCouple(newCouple);
         setPartner(newPartner);
@@ -431,51 +441,50 @@ export function AuthProvider({ children }) {
         return { success: true, synced: true };
       }
 
-      // Mode local (si pas trouvé sur Firebase ou pas de connexion)
-      console.log('⚠️ Mode local - couple non trouvé sur Firebase');
-      const newCouple = {
-        id: Date.now().toString(),
-        code: code,
-        name: partnerData.coupleName || 'Notre Couple',
-        anniversary: partnerData.anniversary,
-        createdAt: new Date().toISOString(),
-        members: [user.id],
-      };
-      
-      const newPartner = {
-        id: Date.now().toString() + '_partner',
-        name: partnerData.partnerName,
-        avatar: partnerData.partnerAvatar || '💕',
-      };
-      
-      await AsyncStorage.setItem('@couple', JSON.stringify(newCouple));
-      await AsyncStorage.setItem('@partner', JSON.stringify(newPartner));
-      await AsyncStorage.setItem(`@partner_${user.id}`, JSON.stringify(newPartner));
-      // Sauvegarder aussi le coupleId séparément pour GameContext
-      await AsyncStorage.setItem('@coupleId', newCouple.id);
-      
-      const storedCouples = await AsyncStorage.getItem('@registeredCouples');
-      let couples = storedCouples ? JSON.parse(storedCouples) : [];
-      couples.push(newCouple);
-      await AsyncStorage.setItem('@registeredCouples', JSON.stringify(couples));
-      
-      setCouple(newCouple);
-      setPartner(newPartner);
-      
-      return { success: true, synced: false };
+      // Ce point ne devrait jamais être atteint (foundCouple est vérifié plus haut)
+      return { success: false, error: 'Erreur inattendue' };
     } catch (error) {
       console.log('❌ Erreur joinCouple:', error.message);
       return { success: false, error: error.message };
     }
   };
 
-  const generateCoupleCode = () => {
+  const generateCoupleCode = async () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = 'LOVE-';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    const maxAttempts = 5;
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      let code = 'LOVE-';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      
+      // Vérifier l'unicité sur Firebase si disponible
+      if (isConfigured && database && isOnline) {
+        try {
+          const couplesRef = ref(database, 'couples');
+          const snapshot = await get(couplesRef);
+          if (snapshot.exists()) {
+            const couples = snapshot.val();
+            const codeExists = Object.values(couples).some(
+              c => c.code?.toUpperCase() === code
+            );
+            if (codeExists) {
+              console.log('⚠️ Code dupliqué, nouvelle tentative...');
+              continue;
+            }
+          }
+        } catch (e) {
+          // En cas d'erreur réseau, on accepte le code tel quel
+          console.log('⚠️ Vérification unicité impossible:', e.message);
+        }
+      }
+      
+      return code;
     }
-    return code;
+    
+    // Fallback : code avec timestamp pour garantir l'unicité
+    return 'LOVE-' + Date.now().toString(36).toUpperCase().slice(-6);
   };
 
   const logout = async () => {

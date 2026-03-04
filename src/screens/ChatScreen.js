@@ -28,6 +28,27 @@ const { width, height } = Dimensions.get('window');
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👍'];
 
+// Palette HANI — romantique & unique
+const HANI = {
+  headerGrad1: '#C44569',
+  headerGrad2: '#FF6B9D',
+  chatBg: '#FFF5F7',
+  bubbleMe1: '#FF6B9D',
+  bubbleMe2: '#C44569',
+  bubbleOther: '#FFFFFF',
+  textMe: '#FFFFFF',
+  textOther: '#3D3D3D',
+  textSecondary: '#A78B9B',
+  heartRead: '#FF6B9D',
+  heartUnread: '#CCAAB5',
+  inputBg: '#FFFFFF',
+  accent: '#FF6B9D',
+  dateChipBg: '#FDE8EF',
+  dateChipText: '#B55A7A',
+  sendBtnGrad1: '#FF6B9D',
+  sendBtnGrad2: '#C44569',
+};
+
 export default function ChatScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, partner } = useAuth();
@@ -41,8 +62,6 @@ export default function ChatScreen({ navigation }) {
     deleteMessage,
   } = useChat();
 
-  // Chat temporarily disabled (feature in development)
-  const chatAvailable = false;
   const { notifyLoveNote } = useNotifyPartner();
   const { addDiaryEntry } = useData();
 
@@ -114,119 +133,70 @@ export default function ChatScreen({ navigation }) {
   }, [messages.length]);
 
   const handleSend = async () => {
-    if (!chatAvailable) {
-      Alert.alert('💬 Chat indisponible', "L'envoi de messages n'est pas disponible pour le moment. Cette fonctionnalité arrivera dans une prochaine version.");
-      return;
-    }
-
     if (!inputText.trim()) return;
-
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
     const text = inputText.trim();
     setInputText('');
-    
     const result = await sendMessage(text, 'text');
-    
     if (result?.success) {
-      // Notifier le partenaire
       await notifyLoveNote(text.substring(0, 50));
     }
   };
 
   const handleImagePick = async () => {
-    if (!chatAvailable) {
-      Alert.alert('💬 Chat indisponible', "L'envoi d'images n'est pas disponible pour le moment.");
-      return;
-    }
-
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.8,
       });
-
       if (!result.canceled && result.assets[0]) {
         await sendMessage(result.assets[0].uri, 'image');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'envoyer l\'image');
+      Alert.alert('Erreur', "Impossible d'envoyer l'image");
     }
   };
 
   // === MESSAGES VOCAUX ===
   const startRecording = async () => {
-    if (!chatAvailable) {
-      Alert.alert('💬 Chat indisponible', "L'envoi de messages vocaux n'est pas disponible pour le moment.");
-      return;
-    }
-
     try {
-      // Demander les permissions
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permission requise', 'L\'accès au microphone est nécessaire pour enregistrer des messages vocaux');
+        Alert.alert('Permission requise', "L'accès au microphone est nécessaire");
         return;
       }
-
-      // Configurer le mode audio
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      // Créer et démarrer l'enregistrement
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       const recording = new Audio.Recording();
       await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       await recording.startAsync();
-      
       recordingRef.current = recording;
       setIsRecording(true);
       setRecordingDuration(0);
-      
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      // Timer pour afficher la durée
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
-      
     } catch (error) {
-      console.log('Erreur enregistrement:', error);
-      Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
+      Alert.alert('Erreur', "Impossible de démarrer l'enregistrement");
     }
   };
 
   const stopRecording = async () => {
     if (!recordingRef.current) return;
-    
     try {
       clearInterval(recordingTimerRef.current);
-      
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
-      
       setIsRecording(false);
       recordingRef.current = null;
-      
       if (uri && recordingDuration >= 1) {
-        // Envoyer le message vocal
         await sendMessage(uri, 'voice', { duration: recordingDuration });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         await notifyLoveNote('🎤 Message vocal');
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
-      
       setRecordingDuration(0);
-      
-      // Remettre le mode audio normal
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
-      
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
     } catch (error) {
       console.log('Erreur arrêt enregistrement:', error);
     }
@@ -234,7 +204,6 @@ export default function ChatScreen({ navigation }) {
 
   const cancelRecording = async () => {
     if (!recordingRef.current) return;
-    
     try {
       clearInterval(recordingTimerRef.current);
       await recordingRef.current.stopAndUnloadAsync();
@@ -242,11 +211,7 @@ export default function ChatScreen({ navigation }) {
       setIsRecording(false);
       setRecordingDuration(0);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
     } catch (error) {
       console.log('Erreur annulation:', error);
     }
@@ -254,13 +219,10 @@ export default function ChatScreen({ navigation }) {
 
   const playAudio = async (messageId, uri) => {
     try {
-      // Arrêter l'audio en cours si différent
       if (soundRef.current && playingAudio !== messageId) {
         await soundRef.current.unloadAsync();
         soundRef.current = null;
       }
-      
-      // Si c'est le même, toggle pause/play
       if (playingAudio === messageId && soundRef.current) {
         const status = await soundRef.current.getStatusAsync();
         if (status.isPlaying) {
@@ -272,8 +234,6 @@ export default function ChatScreen({ navigation }) {
         }
         return;
       }
-      
-      // Charger et jouer le nouveau son
       const { sound } = await Audio.Sound.createAsync(
         { uri },
         { shouldPlay: true },
@@ -281,9 +241,8 @@ export default function ChatScreen({ navigation }) {
           if (status.isLoaded) {
             setAudioProgress(prev => ({
               ...prev,
-              [messageId]: status.positionMillis / status.durationMillis
+              [messageId]: status.positionMillis / status.durationMillis,
             }));
-            
             if (status.didJustFinish) {
               setPlayingAudio(null);
               setAudioProgress(prev => ({ ...prev, [messageId]: 0 }));
@@ -291,13 +250,10 @@ export default function ChatScreen({ navigation }) {
           }
         }
       );
-      
       soundRef.current = sound;
       setPlayingAudio(messageId);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
     } catch (error) {
-      console.log('Erreur lecture audio:', error);
       Alert.alert('Erreur', 'Impossible de lire le message vocal');
     }
   };
@@ -348,126 +304,163 @@ export default function ChatScreen({ navigation }) {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return "Aujourd'hui";
+    if (date.toDateString() === yesterday.toDateString()) return 'Hier';
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
 
-    if (date.toDateString() === today.toDateString()) {
-      return "Aujourd'hui";
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return "Hier";
-    }
-    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  // Coeur lu / non-lu (au lieu des ticks WhatsApp)
+  const renderReadStatus = (item) => {
+    if (item.senderId !== user?.id) return null;
+    const isRead = item.read;
+    return (
+      <Text style={{ fontSize: 10, marginLeft: 4, color: isRead ? HANI.heartRead : HANI.heartUnread }}>
+        {isRead ? '❤️' : '🧡'}
+      </Text>
+    );
+  };
+
+  // Contenu d'une bulle (factorisé pour gradient/view)
+  const renderBubbleContent = (item, isMe) => {
+    const reactions = item.reactions ? Object.values(item.reactions) : [];
+    const voiceColor = isMe ? '#fff' : HANI.accent;
+    const waveActive = isMe ? 'rgba(255,255,255,0.9)' : HANI.accent;
+    const waveInactive = isMe ? 'rgba(255,255,255,0.35)' : '#DCC5CF';
+
+    return (
+      <>
+        {item.type === 'image' ? (
+          <Image source={{ uri: item.content }} style={styles.messageImage} resizeMode="cover" />
+        ) : item.type === 'voice' ? (
+          <TouchableOpacity
+            style={styles.voiceMessage}
+            onPress={() => playAudio(item.id, item.content)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.voiceAvatar, isMe ? styles.voiceAvatarMe : styles.voiceAvatarOther]}>
+              <Text style={{ fontSize: 16 }}>{isMe ? (user?.avatar || '😊') : (partner?.avatar || '💕')}</Text>
+            </View>
+            <View style={styles.voiceContent}>
+              <View style={styles.voicePlayRow}>
+                <Ionicons
+                  name={playingAudio === item.id ? 'pause' : 'play'}
+                  size={24}
+                  color={voiceColor}
+                />
+                <View style={styles.voiceWave}>
+                  {[...Array(20)].map((_, i) => (
+                    <View
+                      key={i}
+                      style={{
+                        width: 3,
+                        height: 4 + Math.sin(i * 0.7) * 10 + Math.random() * 4,
+                        backgroundColor: audioProgress[item.id] > (i / 20) ? waveActive : waveInactive,
+                        borderRadius: 2,
+                        marginHorizontal: 1,
+                      }}
+                    />
+                  ))}
+                </View>
+              </View>
+              <Text style={[styles.voiceDuration, isMe && { color: 'rgba(255,255,255,0.7)' }]}>
+                {formatDuration(item.metadata?.duration || 0)}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
+            {item.content}
+          </Text>
+        )}
+
+        <View style={styles.messageFooter}>
+          <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
+            {formatTime(item.timestamp)}
+          </Text>
+          {renderReadStatus(item)}
+        </View>
+
+        {reactions.length > 0 && (
+          <View style={styles.reactionsContainer}>
+            {reactions.map((emoji, i) => (
+              <Text key={i} style={styles.reactionEmoji}>{emoji}</Text>
+            ))}
+          </View>
+        )}
+      </>
+    );
   };
 
   const renderMessage = ({ item, index }) => {
     if (!item) return null;
-    
     const isMe = item.senderId === user?.id;
-    const showDate = index === 0 || 
+    const showDate = index === 0 ||
       formatDate(item.timestamp) !== formatDate(messages[index - 1]?.timestamp);
-
     const reactions = item.reactions ? Object.values(item.reactions) : [];
 
     return (
       <>
         {showDate && (
           <View style={styles.dateContainer}>
-            <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
+            <View style={styles.dateChip}>
+              <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
+            </View>
           </View>
         )}
-        
+
         <TouchableOpacity
           style={[styles.messageRow, isMe && styles.messageRowMe]}
           onLongPress={() => handleLongPress(item)}
-          delayLongPress={500}
-          activeOpacity={0.8}
+          delayLongPress={400}
+          activeOpacity={0.9}
         >
-          <View style={[styles.messageBubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-            {item.type === 'image' ? (
-              <Image source={{ uri: item.content }} style={styles.messageImage} />
-            ) : item.type === 'voice' ? (
-              <TouchableOpacity 
-                style={styles.voiceMessage}
-                onPress={() => playAudio(item.id, item.content)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.playButton, isMe ? styles.playButtonMe : styles.playButtonOther]}>
-                  <Ionicons 
-                    name={playingAudio === item.id ? 'pause' : 'play'} 
-                    size={20} 
-                    color={isMe ? '#fff' : theme.accent} 
-                  />
-                </View>
-                <View style={styles.voiceWaveContainer}>
-                  <View style={styles.voiceWave}>
-                    {[...Array(15)].map((_, i) => (
-                      <View 
-                        key={i} 
-                        style={[
-                          styles.voiceBar,
-                          { 
-                            height: 6 + Math.sin(i * 0.8) * 8 + Math.random() * 4,
-                            backgroundColor: isMe ? 'rgba(255,255,255,0.7)' : theme.accent + '80',
-                            opacity: audioProgress[item.id] > (i / 15) ? 1 : 0.4
-                          }
-                        ]} 
-                      />
-                    ))}
-                  </View>
-                  <Text style={[styles.voiceDuration, isMe && styles.voiceDurationMe]}>
-                    {formatDuration(item.metadata?.duration || 0)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ) : (
-              <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
-                {item.content}
-              </Text>
-            )}
-            
-            <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
-              {formatTime(item.timestamp)}
-              {isMe && item.read && ' ✓✓'}
-            </Text>
-
-            {reactions.length > 0 && (
-              <View style={styles.reactionsContainer}>
-                {reactions.map((emoji, i) => (
-                  <Text key={i} style={styles.reactionEmoji}>{emoji}</Text>
-                ))}
-              </View>
-            )}
-          </View>
+          {isMe ? (
+            <LinearGradient
+              colors={[HANI.bubbleMe1, HANI.bubbleMe2]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.messageBubble, styles.bubbleMe]}
+            >
+              {renderBubbleContent(item, true)}
+            </LinearGradient>
+          ) : (
+            <View style={[styles.messageBubble, styles.bubbleOther]}>
+              {renderBubbleContent(item, false)}
+            </View>
+          )}
         </TouchableOpacity>
       </>
     );
   };
 
   return (
-    <LinearGradient colors={theme.primary} style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+    <View style={styles.container}>
+      {/* ===== HEADER HANI romantique ===== */}
+      <LinearGradient colors={[HANI.headerGrad1, HANI.headerGrad2]} style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>←</Text>
+          <Ionicons name="chevron-back" size={26} color="#fff" />
         </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerName}>{partner?.name || 'Mon amour'}</Text>
-          {partnerTyping && (
-            <Text style={styles.typingText}>écrit...</Text>
-          )}
-        </View>
+
         <View style={styles.headerAvatar}>
-          <Text style={styles.avatarText}>{partner?.avatar || '💕'}</Text>
+          <Text style={styles.headerAvatarText}>{partner?.avatar || '💕'}</Text>
         </View>
-      </View>
 
-      {/* Chat disabled banner */}
-      {!chatAvailable && (
-        <View style={styles.disabledBanner}>
-          <Text style={styles.disabledBannerText}>💬 Le chat et l'envoi de messages ne sont pas disponibles pour le moment.</Text>
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerName} numberOfLines={1}>
+            {partner?.name || 'Mon amour'}
+          </Text>
+          <Text style={styles.headerStatus}>
+            {partnerTyping ? '💬 écrit...' : '💗 en ligne'}
+          </Text>
         </View>
-      )}
 
-      {/* Messages */}
-      <View style={styles.messagesContainer}>
+        <TouchableOpacity style={styles.headerAction} onPress={handleImagePick}>
+          <Ionicons name="camera-outline" size={22} color="#fff" />
+        </TouchableOpacity>
+      </LinearGradient>
+
+      {/* ===== ZONE DES MESSAGES ===== */}
+      <View style={styles.chatArea}>
         <FlatList
           ref={flatListRef}
           data={messages || []}
@@ -477,82 +470,68 @@ export default function ChatScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyChat}>
-              <Text style={styles.emptyChatEmoji}>💬</Text>
-              <Text style={styles.emptyChatText}>Commencez à discuter !</Text>
-              <Text style={styles.emptyChatHint}>
-                Envoyez un message à {partner?.name || 'votre partenaire'}
+              <Text style={styles.emptyChatEmoji}>💌</Text>
+              <Text style={styles.emptyChatTitle}>Votre espace privé</Text>
+              <Text style={styles.emptyChatText}>
+                Envoyez un premier message à {partner?.name || 'votre partenaire'} 💕
               </Text>
             </View>
           }
         />
       </View>
 
-      {/* Input */}
+      {/* ===== BARRE D'INPUT HANI ===== */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         {isRecording ? (
-          // Interface d'enregistrement vocal
-          <View style={styles.recordingContainer}>
-            <TouchableOpacity style={styles.cancelRecordButton} onPress={cancelRecording}>
-              <Ionicons name="trash-outline" size={24} color="#FF4444" />
+          <View style={styles.recordingBar}>
+            <TouchableOpacity onPress={cancelRecording} style={styles.recordCancelBtn}>
+              <Ionicons name="trash-outline" size={22} color="#EF4444" />
             </TouchableOpacity>
-            
             <View style={styles.recordingInfo}>
               <Animated.View style={[styles.recordingDot, { transform: [{ scale: pulseAnim }] }]} />
               <Text style={styles.recordingTime}>{formatDuration(recordingDuration)}</Text>
-              <Text style={styles.recordingHint}>Enregistrement...</Text>
             </View>
-            
-            <TouchableOpacity style={styles.stopRecordButton} onPress={stopRecording}>
-              <LinearGradient colors={['#FF6B9D', '#C44569']} style={styles.stopRecordGradient}>
-                <Ionicons name="send" size={22} color="#fff" />
+            <TouchableOpacity onPress={stopRecording}>
+              <LinearGradient colors={[HANI.sendBtnGrad1, HANI.sendBtnGrad2]} style={styles.sendBtn}>
+                <Ionicons name="send" size={20} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
-          // Interface normale
-          <View style={styles.inputContainer}>
-            <TouchableOpacity style={styles.attachButton} onPress={handleImagePick}>
-              <Text style={styles.attachText}>📷</Text>
-            </TouchableOpacity>
-            
-            <TextInput
-              style={styles.textInput}
-              value={inputText}
-              onChangeText={(text) => {
-                setInputText(text);
-                setTyping(text.length > 0);
-              }}
-              placeholder="Message..."
-              placeholderTextColor="#999"
-              multiline
-              maxLength={1000}
-            />
-            
+          <View style={styles.inputBar}>
+            <View style={styles.inputRow}>
+              <TouchableOpacity onPress={handleImagePick} style={styles.inputIcon}>
+                <Ionicons name="image-outline" size={23} color={HANI.textSecondary} />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.textInput}
+                value={inputText}
+                onChangeText={(text) => {
+                  setInputText(text);
+                  setTyping(text.length > 0);
+                }}
+                placeholder="Écris un message..."
+                placeholderTextColor="#BBA0AD"
+                multiline
+                maxLength={1000}
+              />
+              <TouchableOpacity onPress={handleImagePick} style={styles.inputIcon}>
+                <Ionicons name="camera-outline" size={22} color={HANI.textSecondary} />
+              </TouchableOpacity>
+            </View>
             {inputText.trim() ? (
-              <TouchableOpacity 
-                style={styles.sendButton}
-                onPress={handleSend}
-              >
-                <LinearGradient
-                  colors={['#FF6B9D', '#C44569']}
-                  style={styles.sendButtonGradient}
-                >
+              <TouchableOpacity onPress={handleSend}>
+                <LinearGradient colors={[HANI.sendBtnGrad1, HANI.sendBtnGrad2]} style={styles.sendBtn}>
                   <Ionicons name="send" size={18} color="#fff" />
                 </LinearGradient>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity 
-                style={styles.micButton}
-                onPress={startRecording}
-              >
-                <LinearGradient
-                  colors={['#FF6B9D', '#C44569']}
-                  style={styles.sendButtonGradient}
-                >
-                  <Ionicons name="mic" size={20} color="#fff" />
+              <TouchableOpacity onPress={startRecording}>
+                <LinearGradient colors={[HANI.sendBtnGrad1, HANI.sendBtnGrad2]} style={styles.sendBtn}>
+                  <Ionicons name="mic" size={22} color="#fff" />
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -560,15 +539,12 @@ export default function ChatScreen({ navigation }) {
         )}
       </KeyboardAvoidingView>
 
-      {/* Reactions Modal */}
+      {/* ===== MODAL RÉACTIONS ===== */}
       {showReactions && (
         <TouchableOpacity
           style={styles.reactionsOverlay}
           activeOpacity={1}
-          onPress={() => {
-            setShowReactions(false);
-            setSelectedMessage(null);
-          }}
+          onPress={() => { setShowReactions(false); setSelectedMessage(null); }}
         >
           <View style={styles.reactionsModal}>
             {REACTION_EMOJIS.map((emoji) => (
@@ -580,7 +556,6 @@ export default function ChatScreen({ navigation }) {
                 <Text style={styles.reactionButtonText}>{emoji}</Text>
               </TouchableOpacity>
             ))}
-            
             {selectedMessage?.senderId === user?.id && (
               <TouchableOpacity
                 style={styles.deleteButton}
@@ -590,343 +565,368 @@ export default function ChatScreen({ navigation }) {
                   setSelectedMessage(null);
                 }}
               >
-                <Text style={styles.deleteButtonText}>🗑️</Text>
+                <Ionicons name="trash-outline" size={20} color="#EF4444" />
               </TouchableOpacity>
             )}
           </View>
         </TouchableOpacity>
       )}
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: HANI.chatBg,
   },
+
+  // ===== HEADER =====
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingHorizontal: 15,
-    paddingBottom: 15,
+    paddingTop: Platform.OS === 'ios' ? 54 : 36,
+    paddingBottom: 12,
+    paddingHorizontal: 8,
   },
   backButton: {
-    padding: 10,
+    padding: 6,
   },
-  backText: {
-    fontSize: 24,
-    color: '#fff',
+  headerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  headerAvatarText: {
+    fontSize: 22,
   },
   headerInfo: {
     flex: 1,
-    marginLeft: 10,
   },
   headerName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#fff',
   },
-  typingText: {
+  headerStatus: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    fontStyle: 'italic',
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 1,
   },
-  headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerAction: {
+    padding: 8,
+    marginLeft: 4,
   },
-  disabledBanner: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    alignItems: 'center',
-  },
-  disabledBannerText: {
-    color: '#fff',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  avatarText: {
-    fontSize: 20,
-  },
-  messagesContainer: {
+
+  // ===== ZONE MESSAGES =====
+  chatArea: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    backgroundColor: HANI.chatBg,
   },
   messagesList: {
-    padding: 15,
-    paddingBottom: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingBottom: 6,
   },
+
+  // Date separator
   dateContainer: {
     alignItems: 'center',
-    marginVertical: 15,
+    marginVertical: 12,
+  },
+  dateChip: {
+    backgroundColor: HANI.dateChipBg,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
   },
   dateText: {
     fontSize: 12,
-    color: '#999',
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-    borderRadius: 10,
+    color: HANI.dateChipText,
+    fontWeight: '600',
   },
+
+  // Bulles de messages
   messageRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 3,
+    paddingHorizontal: 4,
   },
   messageRowMe: {
     justifyContent: 'flex-end',
   },
   messageBubble: {
-    maxWidth: width * 0.75,
-    padding: 12,
+    maxWidth: width * 0.78,
+    minWidth: 80,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 5,
     borderRadius: 18,
+    elevation: 2,
+    shadowColor: '#C44569',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    marginVertical: 1,
   },
   bubbleMe: {
-    backgroundColor: '#FF6B9D',
     borderBottomRightRadius: 4,
+    marginLeft: 50,
   },
   bubbleOther: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: HANI.bubbleOther,
     borderBottomLeftRadius: 4,
+    marginRight: 50,
+    borderWidth: 1,
+    borderColor: '#F5DDE5',
   },
   messageText: {
-    fontSize: 16,
-    color: '#333',
-    lineHeight: 22,
+    fontSize: 15.5,
+    color: HANI.textOther,
+    lineHeight: 21,
   },
   messageTextMe: {
-    color: '#fff',
+    color: HANI.textMe,
   },
   messageImage: {
-    width: 200,
-    height: 200,
+    width: 220,
+    height: 220,
     borderRadius: 12,
+    marginBottom: 4,
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 2,
+    marginBottom: 1,
   },
   messageTime: {
-    fontSize: 10,
-    color: '#999',
-    marginTop: 5,
-    textAlign: 'right',
+    fontSize: 11,
+    color: HANI.textSecondary,
   },
   messageTimeMe: {
     color: 'rgba(255,255,255,0.7)',
   },
+
+  // Réactions
   reactionsContainer: {
     flexDirection: 'row',
-    marginTop: 5,
+    position: 'absolute',
+    bottom: -10,
+    right: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
   },
   reactionEmoji: {
     fontSize: 14,
-    marginRight: 2,
+    marginHorizontal: 1,
   },
+
+  // Chat vide
   emptyChat: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: height * 0.2,
+    paddingTop: height * 0.25,
+    paddingHorizontal: 40,
   },
   emptyChatEmoji: {
-    fontSize: 60,
-    marginBottom: 15,
+    fontSize: 56,
+    marginBottom: 12,
+  },
+  emptyChatTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: HANI.dateChipText,
+    marginBottom: 6,
   },
   emptyChatText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-  },
-  emptyChatHint: {
     fontSize: 14,
-    color: '#666',
+    color: HANI.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  inputContainer: {
+
+  // ===== INPUT BAR =====
+  inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 10,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 10,
-    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 8,
+    backgroundColor: '#FFF',
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#F5DDE5',
+    gap: 8,
   },
-  attachButton: {
-    padding: 10,
+  inputRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#FFF5F7',
+    borderRadius: 24,
+    paddingHorizontal: 6,
+    paddingVertical: Platform.OS === 'ios' ? 6 : 2,
+    borderWidth: 1,
+    borderColor: '#F5DDE5',
   },
-  attachText: {
-    fontSize: 24,
+  inputIcon: {
+    padding: 6,
   },
   textInput: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
     fontSize: 16,
+    color: HANI.textOther,
     maxHeight: 100,
-    color: '#333',
+    paddingHorizontal: 8,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 6,
   },
-  sendButton: {
-    marginLeft: 10,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  sendButtonGradient: {
-    width: 40,
-    height: 40,
+  sendBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#C44569',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  sendText: {
-    fontSize: 20,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  reactionsOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reactionsModal: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 30,
-    padding: 10,
-    gap: 5,
-  },
-  reactionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  reactionButtonText: {
-    fontSize: 22,
-  },
-  deleteButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fee2e2',
-  },
-  deleteButtonText: {
-    fontSize: 20,
-  },
-  // Styles pour messages vocaux
-  voiceMessage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 180,
-    paddingVertical: 5,
-  },
-  playButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  playButtonMe: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  playButtonOther: {
-    backgroundColor: 'rgba(255,107,157,0.2)',
-  },
-  voiceWaveContainer: {
-    flex: 1,
-  },
-  voiceWave: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 24,
-    gap: 2,
-  },
-  voiceBar: {
-    width: 3,
-    borderRadius: 2,
-  },
-  voiceDuration: {
-    fontSize: 11,
-    color: '#666',
-    marginTop: 4,
-  },
-  voiceDurationMe: {
-    color: 'rgba(255,255,255,0.8)',
-  },
-  // Styles pour l'interface d'enregistrement
-  micButton: {
-    marginLeft: 10,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  recordingContainer: {
+
+  // ===== ENREGISTREMENT VOCAL =====
+  recordingBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 15,
-    paddingBottom: Platform.OS === 'ios' ? 35 : 15,
-    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+    backgroundColor: '#FFF',
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#F5DDE5',
   },
-  cancelRecordButton: {
+  recordCancelBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#FEE2E2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   recordingInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
     gap: 10,
   },
   recordingDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#FF4444',
+    backgroundColor: '#EF4444',
   },
   recordingTime: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
+    color: HANI.textOther,
     fontVariant: ['tabular-nums'],
   },
-  recordingHint: {
-    fontSize: 12,
-    color: '#999',
+
+  // ===== MESSAGE VOCAL =====
+  voiceMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 200,
+    paddingVertical: 4,
   },
-  stopRecordButton: {
-    borderRadius: 22,
-    overflow: 'hidden',
-  },
-  stopRecordGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  voiceAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 8,
+  },
+  voiceAvatarMe: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  voiceAvatarOther: {
+    backgroundColor: '#FDE8EF',
+  },
+  voiceContent: {
+    flex: 1,
+  },
+  voicePlayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  voiceWave: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    height: 28,
+  },
+  voiceDuration: {
+    fontSize: 11,
+    color: HANI.textSecondary,
+    marginTop: 2,
+  },
+
+  // ===== MODAL RÉACTIONS =====
+  reactionsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reactionsModal: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    padding: 8,
+    gap: 4,
+    elevation: 8,
+    shadowColor: '#C44569',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  reactionButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F7',
+  },
+  reactionButtonText: {
+    fontSize: 22,
+  },
+  deleteButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
   },
 });

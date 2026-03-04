@@ -244,8 +244,6 @@ export default function GamesScreen() {
     isFirebaseReady,
     pendingGameInvite,
     hasActiveSession,
-    updateCoupleId,
-    listenToGameSession,
     coupleId,
   } = useGame();
 
@@ -289,24 +287,6 @@ export default function GamesScreen() {
   const [gameMode, setGameMode] = useState(null); // 'local' ou 'online'
   const [showInviteModal, setShowInviteModal] = useState(false);
 
-  // ========== ALERTE VERSION - TEST ==========
-  useEffect(() => {
-    Alert.alert(
-      '🚀 VERSION 3.0.0',
-      'Cette popup confirme que vous avez la NOUVELLE version !\n\n✅ Jeux à distance\n✅ 35 Vérités + 39 Actions\n✅ Contenu adulte',
-      [{ text: 'Super !', style: 'default' }]
-    );
-  }, []);
-  // ============================================
-
-  // Synchroniser le coupleId avec le couple de l'AuthContext
-  useEffect(() => {
-    if (couple?.id && couple.id !== coupleId) {
-      console.log('🔄 Synchronisation coupleId:', couple.id);
-      updateCoupleId(couple.id);
-    }
-  }, [couple?.id, coupleId, updateCoupleId]);
-
   // Détecter les invitations de jeu du partenaire
   useEffect(() => {
     if (pendingGameInvite && !activeGame && !showLobby) {
@@ -341,8 +321,6 @@ export default function GamesScreen() {
     
     if (session && !session.error) {
       setGameMode('online');
-      // Démarrer l'écoute Firebase
-      listenToGameSession();
       
       // Envoyer une notification push au partenaire
       const gameTitle = getGameTitle(selectedGameForLobby);
@@ -375,8 +353,6 @@ export default function GamesScreen() {
     
     if (result && !result.error) {
       setGameMode('online');
-      // Démarrer l'écoute Firebase
-      listenToGameSession();
       
       // Vérifier si le jeu peut démarrer immédiatement
       if (result.status === 'ready') {
@@ -962,12 +938,6 @@ export default function GamesScreen() {
         </TouchableOpacity>
       )}
 
-      {/* VERSION BANNER - TRÈS VISIBLE */}
-      <View style={{backgroundColor: '#00AA00', padding: 15, borderRadius: 10, marginBottom: 15, alignItems: 'center'}}>
-        <Text style={{color: '#FFFFFF', fontSize: 20, fontWeight: 'bold'}}>✅ JEUX V2.0.0 ✅</Text>
-        <Text style={{color: '#FFFFFF', fontSize: 14}}>Jeux à distance activés !</Text>
-      </View>
-
       {/* Indicateur de connexion Firebase */}
       <View style={styles.connectionStatus}>
         <Text style={styles.connectionStatusText}>
@@ -1197,7 +1167,7 @@ export default function GamesScreen() {
                 <Text style={styles.passPhoneEmoji}>📱</Text>
                 <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
                 <Text style={styles.passPhoneText}>
-                  {myName} a répondu. Maintenant passe le téléphone à {partnerName} pour qu'il/elle devine.
+                  {myName} a répondu. Maintenant passe le téléphone à {partnerName} pour deviner.
                 </Text>
                 <Text style={styles.passPhoneWarning}>⚠️ {partnerName} ne doit pas voir la réponse !</Text>
                 <TouchableOpacity
@@ -1374,7 +1344,7 @@ export default function GamesScreen() {
               C'est au tour de {partnerName} !
             </Text>
             <Text style={styles.todWaitingHint}>
-              Passe le téléphone à ton partenaire pour qu'il/elle choisisse Action ou Vérité pour toi.
+              Passe le téléphone à ton partenaire pour choisir Action ou Vérité pour toi.
             </Text>
             <TouchableOpacity
               style={styles.todReadyButton}
@@ -1482,7 +1452,7 @@ export default function GamesScreen() {
                   En attente de la réponse de {todAnswerer}...
                 </Text>
                 <Text style={styles.todWaitingResponseHint}>
-                  Passe le téléphone à {todAnswerer} pour qu'il/elle réponde.
+                  Passe le téléphone à {todAnswerer} pour répondre.
                 </Text>
                 <TouchableOpacity
                   style={styles.todPassPhoneButton}
@@ -1667,7 +1637,7 @@ export default function GamesScreen() {
                 <Text style={styles.passPhoneEmoji}>📱</Text>
                 <Text style={styles.passPhoneTitle}>Passe le téléphone !</Text>
                 <Text style={styles.passPhoneText}>
-                  {myName} a fait son choix. Maintenant passe le téléphone à {partnerName} pour qu'il/elle réponde aussi !
+                  {myName} a fait son choix. Maintenant passe le téléphone à {partnerName} pour répondre aussi !
                 </Text>
                 <Text style={styles.passPhoneWarning}>⚠️ {partnerName} ne doit pas voir le choix de {myName} !</Text>
                 <TouchableOpacity

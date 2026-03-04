@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform, AppState } from 'react-native';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, get, onValue, off } from 'firebase/database';
+import { ref, set, onValue, off } from 'firebase/database';
 
 const NotificationContext = createContext({});
 
@@ -92,15 +92,14 @@ export function NotificationProvider({ children }) {
     const tokensRef = ref(database, `couples/${coupleId}/pushTokens`);
     
     const unsubscribe = onValue(tokensRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const tokens = snapshot.val();
-        // Trouver le token du partenaire (pas le nôtre)
-        for (const [id, tokenData] of Object.entries(tokens)) {
-          if (id !== userId && tokenData.token) {
-            setPartnerToken(tokenData.token);
-            console.log('🔔 Token partenaire trouvé');
-            break;
-          }
+      if (!snapshot.exists()) return;
+      const tokens = snapshot.val();
+      // Trouver le token VALIDE du partenaire (pas le nôtre, et uniquement un vrai token Expo)
+      for (const [id, tokenData] of Object.entries(tokens)) {
+        if (id !== userId && tokenData.token && tokenData.token.startsWith('ExponentPushToken')) {
+          setPartnerToken(tokenData.token);
+          console.log('🔔 Token partenaire trouvé');
+          break;
         }
       }
     });
@@ -111,6 +110,9 @@ export function NotificationProvider({ children }) {
   // Sauvegarder le token sur Firebase
   const saveTokenToFirebase = async (token) => {
     try {
+      // Ne sauvegarder que les vrais tokens Expo
+      if (!token || !token.startsWith('ExponentPushToken')) return;
+
       const user = await AsyncStorage.getItem('@user');
       const couple = await AsyncStorage.getItem('@couple');
       
@@ -187,64 +189,49 @@ export function NotificationProvider({ children }) {
       }
 
       try {
-        // Obtenir le token Expo Push avec le bon projectId
-        // Le projectId doit correspondre à celui de app.json/eas.json
-        const projectId = 'b1f00575-c61e-45ee-84ac-b1644dff132f'; // ID du projet EAS
-        const tokenData = await Notifications.getExpoPushTokenAsync({
-          projectId: projectId,
-        });
+        const projectId = 'b1f00575-c61e-45ee-84ac-b1644dff132f';
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
         token = tokenData.data;
         console.log('🔔 Token Push obtenu:', token);
-        
-        // Sauvegarder le token pour persistance
         await AsyncStorage.setItem('@expoPushToken', token);
       } catch (error) {
         console.log('⚠️ Erreur obtention token:', error.message);
-        
-        // Essayer de récupérer un token précédemment sauvegardé
+        // Récupérer un token précédemment sauvegardé
         const savedToken = await AsyncStorage.getItem('@expoPushToken');
         if (savedToken && savedToken.startsWith('ExponentPushToken')) {
           token = savedToken;
-          console.log('🔔 Token Push récupéré du cache:', token);
+          console.log('🔔 Token Push récupéré du cache');
         } else {
-          // En mode développement, générer un token factice
-          token = `dev-token-${Date.now()}`;
-          console.log('⚠️ Mode dev - Token factice généré');
+          console.log('⚠️ Aucun token push disponible');
+          token = null;
         }
       }
     } else {
-      console.log('⚠️ Les notifications push nécessitent un appareil physique');
-      // Token factice pour simulateur
-      token = `simulator-token-${Date.now()}`;
+      console.log('⚠️ Notifications push : appareil physique requis');
+      token = null;
     }
 
     return token;
   }
 
-  // Envoyer une notification au partenaire via Expo Push
+  /**
+   * Envoyer une notification push au partenaire via Expo Push API.
+   * Ne s'auto-envoie JAMAIS de notification locale (pas de fallback trompeur).
+   * Retourne false si le token partenaire n'est pas disponible.
+   */
   const sendPushNotification = async (title, body, data = {}) => {
-    if (!partnerToken) {
-      console.log('⚠️ Pas de token partenaire disponible - envoi local de secours');
-      // Envoyer une notification locale en secours pour confirmation
-      await scheduleLocalNotification(title, body, data, 1);
-      return true;
-    }
-
-    // Vérifier si c'est un vrai token Expo
-    if (!partnerToken.startsWith('ExponentPushToken')) {
-      console.log('⚠️ Token partenaire non valide (mode dev)');
-      // En mode dev, on peut simuler avec une notification locale
-      await scheduleLocalNotification(title, body, data, 1);
-      return true;
+    if (!partnerToken || !partnerToken.startsWith('ExponentPushToken')) {
+      console.log('⚠️ Pas de token partenaire valide — notification non envoyée');
+      return false;
     }
 
     try {
       const message = {
         to: partnerToken,
         sound: 'default',
-        title: title,
-        body: body,
-        data: data,
+        title,
+        body,
+        data,
         priority: 'high',
         channelId: 'love-messages',
       };
@@ -260,12 +247,14 @@ export function NotificationProvider({ children }) {
       });
 
       const result = await response.json();
-      console.log('📤 Notification envoyée:', result);
+      if (result.data?.status === 'error') {
+        console.error('❌ Push API erreur:', result.data.message);
+        return false;
+      }
+      console.log('📤 Notification envoyée au partenaire');
       return true;
     } catch (error) {
       console.error('❌ Erreur envoi notification:', error);
-      // En cas d'erreur réseau, retomber sur une notification locale
-      await scheduleLocalNotification(title, body, data, 1);
       return false;
     }
   };
@@ -339,7 +328,7 @@ export function NotificationProvider({ children }) {
   const notifyNewMemory = async (userName) => {
     await sendPushNotification(
       '📸 Nouveau souvenir !',
-      `${userName} a ajouté un nouveau souvenir. Viens le voir ! 💕`,
+      `${userName} a ajouté un nouveau souvenir, viens voir ! 💕`,
       { type: 'memory' }
     );
   };
@@ -674,11 +663,11 @@ export function NotificationProvider({ children }) {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: '👋 Re-bonjour !',
-          body: `Content de te revoir ${userName} ! Ton amour t'attend 💕`,
+          body: `Content de te revoir ${userName} ! 💕`,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.DEFAULT,
         },
-        trigger: null, // Immédiat
+        trigger: null,
       });
       return true;
     } catch (error) {
@@ -686,6 +675,275 @@ export function NotificationProvider({ children }) {
       return false;
     }
   };
+
+  // ===== NOTIFICATION FLAMME EN DANGER =====
+  // Envoie un push au partenaire quand la flamme risque de se perdre
+  const notifyStreakDanger = async (streakCount, partnerName) => {
+    // Push vers le partenaire
+    await sendPushNotification(
+      '🔥⏳ Flamme en danger !',
+      `Votre flamme de ${streakCount} jour${streakCount > 1 ? 's' : ''} est en danger ! ${partnerName} t'attend 💕`,
+      { type: 'streak_danger', streakCount }
+    );
+  };
+
+  // Notification locale de rappel flamme (programmée pour 20h si pas d'activité)
+  const scheduleStreakReminder = async (streakCount) => {
+    try {
+      // Annuler l'ancien rappel flamme
+      const oldId = await AsyncStorage.getItem('@streakReminderId');
+      if (oldId) {
+        try { await Notifications.cancelScheduledNotificationAsync(oldId); } catch {}
+      }
+
+      const now = new Date();
+      const reminderTime = new Date(now);
+      reminderTime.setHours(20, 0, 0, 0);
+
+      // Si 20h est déjà passé, ne pas programmer
+      if (reminderTime <= now) return;
+
+      const seconds = Math.floor((reminderTime.getTime() - now.getTime()) / 1000);
+      if (seconds <= 0) return;
+
+      const notifId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🔥 N\'oublie pas ta flamme !',
+          body: streakCount > 0
+            ? `Tu as une flamme de ${streakCount} jour${streakCount > 1 ? 's' : ''} ! Envoie un message ou fais un défi pour ne pas la perdre 🔥`
+            : 'Envoie un message ou fais un défi pour commencer une flamme avec ton amour ! 💕',
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds },
+      });
+
+      await AsyncStorage.setItem('@streakReminderId', notifId);
+      console.log('📅 Rappel flamme programmé pour 20h');
+      return notifId;
+    } catch (e) {
+      console.log('⚠️ Erreur rappel flamme:', e.message);
+    }
+  };
+
+  // ===== NOTIFICATION DÉFI DU JOUR (auto-programmée chaque matin) =====
+  const scheduleMorningChallenge = async () => {
+    try {
+      // Annuler l'ancien rappel matin
+      const oldId = await AsyncStorage.getItem('@morningChallengeId');
+      if (oldId) {
+        try { await Notifications.cancelScheduledNotificationAsync(oldId); } catch {}
+      }
+
+      const now = new Date();
+      const morning = new Date(now);
+      morning.setDate(morning.getDate() + 1); // demain
+      morning.setHours(9, 0, 0, 0);
+
+      const seconds = Math.floor((morning.getTime() - now.getTime()) / 1000);
+      if (seconds <= 0) return;
+
+      const messages_morning = [
+        '💕 Votre défi du jour est prêt ! Relevez-le ensemble !',
+        '🔥 Nouveau défi couple ! Montrez que votre amour est plus fort !',
+        '⚡ Un défi vous attend ! Qui le fera en premier ?',
+        '💪 Prêt pour le défi du jour ? Votre flamme vous attend !',
+        '🌟 Bonjour ! Un nouveau défi vous rapproche encore plus !',
+      ];
+      const randomMsg = messages_morning[Math.floor(Math.random() * messages_morning.length)];
+
+      const notifId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '⚡ Défi du jour !',
+          body: randomMsg,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds },
+      });
+
+      await AsyncStorage.setItem('@morningChallengeId', notifId);
+      console.log('📅 Notification défi du matin programmée pour demain 9h');
+      return notifId;
+    } catch (e) {
+      console.log('⚠️ Erreur notif matin:', e.message);
+    }
+  };
+
+  // ===== NOTIFICATION MILESTONE (100 jours, 365 jours, etc.) =====
+  const notifyMilestone = async (dayCount, emoji) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `${emoji} Joli cap !`,
+          body: `Félicitations ! Vous êtes ensemble depuis ${dayCount} jours ! 🎉💕`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: null,
+      });
+      // Aussi push au partenaire
+      await sendPushNotification(
+        `${emoji} ${dayCount} jours ensemble !`,
+        `Vous avez atteint ${dayCount} jours d'amour ! Célébrez ça ! 🎉💕`,
+        { type: 'milestone', dayCount }
+      );
+    } catch (e) {
+      console.log('⚠️ Erreur notif milestone:', e.message);
+    }
+  };
+
+  // ===== NOTIFICATION BADGE DÉBLOQUÉ =====
+  const notifyBadgeUnlocked = async (badgeName, badgeEmoji) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `${badgeEmoji} Nouveau badge !`,
+          body: `Tu as débloqué le badge "${badgeName}" ! Continue comme ça ! 🏆`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds: 1 },
+      });
+    } catch (e) {
+      console.log('⚠️ Erreur notif badge:', e.message);
+    }
+  };
+
+  // ===== NOTIFICATION COUNTDOWN (événement approche) =====
+  const scheduleCountdownReminder = async (eventName, eventEmoji, eventDate) => {
+    try {
+      const target = new Date(eventDate);
+      // Rappel la veille à 10h
+      const reminderDate = new Date(target);
+      reminderDate.setDate(reminderDate.getDate() - 1);
+      reminderDate.setHours(10, 0, 0, 0);
+
+      const now = new Date();
+      if (reminderDate <= now) return;
+
+      const seconds = Math.floor((reminderDate.getTime() - now.getTime()) / 1000);
+      if (seconds <= 0) return;
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `${eventEmoji} Demain c'est le jour !`,
+          body: `"${eventName}" est prévu demain ! Préparez-vous ensemble 💕`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds },
+      });
+      console.log('📅 Rappel countdown programmé pour', eventName);
+    } catch (e) {
+      console.log('⚠️ Erreur notif countdown:', e.message);
+    }
+  };
+
+  // ===== NOTIFICATION JOURNAL PARTAGÉ =====
+  const notifyNewDiaryEntry = async (userName) => {
+    await sendPushNotification(
+      '📓 Nouvelle entrée au journal',
+      `${userName} a écrit dans le journal partagé ! Viens lire 💕`,
+      { type: 'diary' }
+    );
+  };
+
+  // ===== NOTIFICATION NIVEAU SUPÉRIEUR =====
+  const notifyLevelUp = async (newLevel, rankName, rankEmoji) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `${rankEmoji} Niveau ${newLevel} !`,
+          body: `Votre couple est maintenant ${rankName} ! Continuez comme ça 💪💕`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds: 1 },
+      });
+      // Aussi notifier le partenaire
+      await sendPushNotification(
+        `${rankEmoji} Niveau ${newLevel} atteint !`,
+        `Votre couple est maintenant ${rankName} ! Célébrez ensemble 🎉`,
+        { type: 'level_up', level: newLevel }
+      );
+    } catch (e) {
+      console.log('⚠️ Erreur notif level up:', e.message);
+    }
+  };
+
+  // ===== NOTIFICATION RÉTROSPECTIVE MENSUELLE =====
+  const scheduleMonthlyRetroReminder = async () => {
+    try {
+      // Programmée pour le 1er du mois prochain à 11h
+      const now = new Date();
+      const target = new Date(now.getFullYear(), now.getMonth() + 1, 1, 11, 0, 0);
+      const seconds = Math.floor((target.getTime() - now.getTime()) / 1000);
+      if (seconds <= 0) return;
+
+      // Annuler l'ancienne
+      const oldId = await AsyncStorage.getItem('@monthlyRetroId');
+      if (oldId) {
+        try { await Notifications.cancelScheduledNotificationAsync(oldId); } catch {}
+      }
+
+      const notifId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '📊 Votre rétrospective du mois est prête !',
+          body: 'Découvrez vos stats du mois passé ensemble ! 💕',
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds },
+      });
+
+      await AsyncStorage.setItem('@monthlyRetroId', notifId);
+      console.log('📅 Rappel rétrospective mensuelle programmé');
+    } catch (e) {
+      console.log('⚠️ Erreur notif retro:', e.message);
+    }
+  };
+
+  // ===== NOTIFICATION CAPSULE TEMPORELLE PRÊTE =====
+  const scheduleCapsuleReminder = async (capsuleId, openDate, fromName) => {
+    try {
+      const target = new Date(openDate);
+      const now = new Date();
+      if (target <= now) return;
+
+      const seconds = Math.floor((target.getTime() - now.getTime()) / 1000);
+      if (seconds <= 0) return;
+
+      const notifId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💊 Capsule temporelle déverrouillée !',
+          body: `Une capsule de ${fromName} est maintenant ouvrable ! Découvrez-la 💕`,
+          data: { type: 'capsule_open', capsuleId },
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds },
+      });
+
+      // Sauvegarder
+      const capsuleNotifs = await AsyncStorage.getItem('@capsuleNotifications');
+      const notifs = capsuleNotifs ? JSON.parse(capsuleNotifs) : {};
+      notifs[capsuleId] = notifId;
+      await AsyncStorage.setItem('@capsuleNotifications', JSON.stringify(notifs));
+      console.log('📅 Rappel capsule programmé pour', openDate);
+      return notifId;
+    } catch (e) {
+      console.log('⚠️ Erreur notif capsule:', e.message);
+    }
+  };
+
+  // Auto-programmer les notifications au démarrage
+  useEffect(() => {
+    if (notificationsEnabled) {
+      scheduleMorningChallenge();
+      scheduleMonthlyRetroReminder();
+    }
+  }, [notificationsEnabled]);
 
   const value = {
     expoPushToken,
@@ -716,6 +974,18 @@ export function NotificationProvider({ children }) {
     testNotificationDelayed,
     notifyCoupleJoined,
     notifyLoginSuccess,
+    // Engagement (nouvelles)
+    notifyStreakDanger,
+    scheduleStreakReminder,
+    scheduleMorningChallenge,
+    notifyMilestone,
+    notifyBadgeUnlocked,
+    // Nouvelles notifications v5
+    scheduleCountdownReminder,
+    notifyNewDiaryEntry,
+    notifyLevelUp,
+    scheduleMonthlyRetroReminder,
+    scheduleCapsuleReminder,
   };
 
   return (

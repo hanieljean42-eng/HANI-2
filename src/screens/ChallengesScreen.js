@@ -11,6 +11,7 @@ import {
   Animated,
   ActivityIndicator,
   Alert,
+  Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +19,8 @@ import { useData } from '../context/DataContext';
 import { useGame } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
+import { useChat } from '../context/ChatContext';
+import { useNotifications } from '../context/NotificationContext';
 import AnimatedModal from '../components/AnimatedModal';
 
 const { width } = Dimensions.get('window');
@@ -54,7 +57,7 @@ const QUIZ_QUESTIONS = [
   { id: 3, question: "Quelle est la couleur préférée de ton/ta partenaire ?", type: "choice", options: ["Rouge", "Bleu", "Vert", "Violet", "Rose", "Noir"] },
   { id: 4, question: "Quel est le film préféré de ton/ta partenaire ?", type: "open" },
   { id: 5, question: "Qu'est-ce qui fait le plus rire ton/ta partenaire ?", type: "open" },
-  { id: 6, question: "Où ton/ta partenaire aimerait-il/elle voyager ?", type: "open" },
+  { id: 6, question: "Où ton/ta partenaire aimerait voyager ?", type: "open" },
   { id: 7, question: "Quelle est la plus grande peur de ton/ta partenaire ?", type: "open" },
   { id: 8, question: "Quel super-pouvoir ton/ta partenaire voudrait avoir ?", type: "choice", options: ["Voler", "Invisibilité", "Téléportation", "Lire les pensées", "Super force", "Contrôler le temps"] },
 ];
@@ -177,6 +180,7 @@ export default function ChallengesScreen() {
   const { theme } = useTheme();
   const { loveMeter, updateLoveMeter, challenges, addChallenge } = useData();
   const { partner, user } = useAuth();
+  const { messages } = useChat();
   const { notifyChallenge, notifyGame } = useNotifyPartner();
   const { 
     coupleId,
@@ -194,53 +198,169 @@ export default function ChallengesScreen() {
     checkActiveSession,
     getPartnerInfo,
     getMyInfo,
-    listenToGameSession,
     pendingGameInvite,
     hasActiveSession,
   } = useGame();
 
   const [dailyChallenge, setDailyChallenge] = useState(null);
+  const [weeklyChallenge, setWeeklyChallenge] = useState(null);
   const [completedToday, setCompletedToday] = useState([]);
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState(null);
-  const [streak, setStreak] = useState(7);
-  const [totalXP, setTotalXP] = useState(150);
+  const [streak, setStreak] = useState(0);
+  const [totalXP, setTotalXP] = useState(0);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  // Snapchat-style: statut du jour pour chaque partenaire
+  const [myActivityToday, setMyActivityToday] = useState(false);
+  const [partnerActivityToday, setPartnerActivityToday] = useState(false);
+  const [streakInDanger, setStreakInDanger] = useState(false);
   
   // États pour les jeux
   const [activeGame, setActiveGame] = useState(null);
-  const [gamePhase, setGamePhase] = useState('menu'); // menu, setup, waiting, playing, results
+  const [gamePhase, setGamePhase] = useState('menu');
   const [playerName, setPlayerName] = useState('');
   const [myAnswer, setMyAnswer] = useState(null);
+  const [openAnswerText, setOpenAnswerText] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [hasPlayed, setHasPlayed] = useState(false);
   const [scores, setScores] = useState({ me: 0, partner: 0 });
   const [truthOrDare, setTruthOrDare] = useState(null);
   
   const pulseAnim = useState(new Animated.Value(1))[0];
+  const { notifyStreakDanger, scheduleStreakReminder } = useNotifications();
 
-  // Charger les défis complétés aujourd'hui depuis le contexte
+  // Quand le partenaire rejoint pendant la phase d'attente, passer au jeu
+  useEffect(() => {
+    if (partnerOnline && gamePhase === 'waiting') {
+      const timer = setTimeout(() => setGamePhase('playing'), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [partnerOnline, gamePhase]);
+
+  // Fonction utilitaire : obtenir la clé de date "YYYY-MM-DD" pour une Date
+  const getDateKey = (date) => {
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  // Défi du jour : déterministe (même défi toute la journée, même pour les 2 partenaires)
+  useEffect(() => {
+    const today = new Date();
+    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    const dailyIndex = seed % DAILY_CHALLENGES.length;
+    setDailyChallenge(DAILY_CHALLENGES[dailyIndex]);
+
+    // Défi de la semaine : basé sur le numéro de semaine ISO
+    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    const weekNumber = Math.ceil(((today - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+    const weeklyIndex = weekNumber % WEEKLY_CHALLENGES.length;
+    setWeeklyChallenge(WEEKLY_CHALLENGES[weeklyIndex]);
+  }, []);
+
+  // Charger les défis complétés + calculer le streak SNAPCHAT-STYLE + XP
+  // Principe Snapchat : les DEUX partenaires doivent être actifs chaque jour
+  // Activité = compléter un défi OU envoyer un message
   useEffect(() => {
     try {
-      if (challenges && Array.isArray(challenges) && challenges.length > 0) {
-        const today = new Date().toDateString();
-        const todayCompleted = challenges
-          .filter(c => c && c.completedAt && new Date(c.completedAt).toDateString() === today)
-          .map(c => c.challengeId);
-        setCompletedToday(todayCompleted);
-        
-        // Calculer le total XP depuis l'historique
-        const totalFromHistory = challenges.reduce((sum, c) => sum + (c?.xp || 0), 0);
-        setTotalXP(150 + totalFromHistory);
+      if (!challenges || !Array.isArray(challenges)) {
+        setCompletedToday([]);
+        setTotalXP(0);
+        setStreak(0);
+        return;
       }
+
+      const myId = user?.id;
+      const partnerId = partner?.id;
+      const todayKey = getDateKey(new Date());
+
+      // 1. Défis complétés aujourd'hui (pour l'affichage)
+      const todayCompleted = challenges
+        .filter(c => c && c.completedAt && getDateKey(c.completedAt) === todayKey)
+        .map(c => c.challengeId);
+      setCompletedToday(todayCompleted);
+
+      // 2. Total XP
+      const xpTotal = challenges.reduce((sum, c) => sum + (c?.xp || 0), 0);
+      setTotalXP(xpTotal);
+
+      // 3. Construire un map dateKey → { myActivity, partnerActivity }
+      // Combiner défis + messages pour déterminer l'activité de chaque partenaire
+      const activityMap = {};
+
+      // A. Activité via les défis
+      challenges.forEach(c => {
+        if (!c?.completedAt) return;
+        const dk = getDateKey(c.completedAt);
+        if (!activityMap[dk]) activityMap[dk] = { me: false, partner: false };
+        if (c.completedById === myId) activityMap[dk].me = true;
+        else if (c.completedById === partnerId) activityMap[dk].partner = true;
+        else activityMap[dk].me = true; // ancien défi sans ID → compter pour moi
+      });
+
+      // B. Activité via les messages
+      if (messages && Array.isArray(messages)) {
+        messages.forEach(m => {
+          if (!m?.timestamp) return;
+          const dk = getDateKey(m.timestamp);
+          if (!activityMap[dk]) activityMap[dk] = { me: false, partner: false };
+          if (m.senderId === myId) activityMap[dk].me = true;
+          else if (m.senderId === partnerId) activityMap[dk].partner = true;
+        });
+      }
+
+      // 4. Statut du jour (pour l'affichage Snapchat)
+      const todayActivity = activityMap[todayKey] || { me: false, partner: false };
+      setMyActivityToday(todayActivity.me);
+      setPartnerActivityToday(todayActivity.partner);
+
+      // 5. Calculer le streak Snapchat : jours consécutifs où LES DEUX ont été actifs
+      let streakCount = 0;
+      const now = new Date();
+      let checkDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      // Aujourd'hui n'est pas encore fini → on ne l'exige pas pour le streak
+      // On commence par hier
+      checkDate.setDate(checkDate.getDate() - 1);
+
+      // Compter les jours consécutifs passés où les deux étaient actifs
+      while (true) {
+        const dk = getDateKey(checkDate);
+        const day = activityMap[dk];
+        if (day && day.me && day.partner) {
+          streakCount++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+
+      // Si les deux sont actifs aujourd'hui, ajouter +1 au streak
+      if (todayActivity.me && todayActivity.partner) {
+        streakCount++;
+      }
+
+      setStreak(streakCount);
+
+      // 6. Streak en danger ? = hier les deux étaient actifs, mais aujourd'hui un des deux manque
+      const yesterdayKey = getDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+      const yesterdayActivity = activityMap[yesterdayKey];
+      const hadStreakYesterday = yesterdayActivity && yesterdayActivity.me && yesterdayActivity.partner;
+      const bothActiveToday = todayActivity.me && todayActivity.partner;
+      const isDanger = hadStreakYesterday && !bothActiveToday && streakCount > 0;
+      setStreakInDanger(isDanger);
+
+      // Programmer les notifications de flamme
+      if (streakCount > 0) {
+        scheduleStreakReminder(streakCount);
+      }
+      if (isDanger && partner?.name) {
+        notifyStreakDanger(streakCount, partner.name);
+      }
+
     } catch (error) {
       console.log('Erreur chargement défis:', error);
     }
-  }, [challenges]);
-
-  useEffect(() => {
-    const randomIndex = Math.floor(Math.random() * DAILY_CHALLENGES.length);
-    setDailyChallenge(DAILY_CHALLENGES[randomIndex]);
-  }, []);
+  }, [challenges, messages, user?.id, partner?.id]);
 
   // Animation de pulsation pour l'attente
   useEffect(() => {
@@ -275,8 +395,8 @@ export default function ChallengesScreen() {
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCompletedToday([...completedToday, challenge.id]);
-    setTotalXP(totalXP + challenge.xp);
-    updateLoveMeter(loveMeter + challenge.xp / 5);
+    // XP sera recalculé automatiquement via useEffect quand challenges change
+    updateLoveMeter(Math.min(100, loveMeter + Math.round(challenge.xp / 5)));
     
     // Sauvegarder le défi complété dans DataContext (Firebase)
     await addChallenge({
@@ -350,24 +470,34 @@ export default function ChallengesScreen() {
       // Envoyer notification au partenaire pour l'inviter
       const game = COUPLE_GAMES.find(g => g.type === activeGame);
       if (game) {
-        await notifyGame(game.name);
+        await notifyGame(game.title);
       }
     }
   };
 
   const closeGame = async () => {
     await endGameSession();
+    
+    // Enregistrer le jeu comme un défi complété pour le streak (seulement si vraiment joué)
+    const game = COUPLE_GAMES.find(g => g.type === activeGame);
+    if (game && hasPlayed) {
+      await addChallenge({
+        challengeId: game.id,
+        title: game.title,
+        icon: game.icon,
+        desc: game.desc,
+        xp: game.xp,
+        completedBy: user?.name || 'Moi',
+        completedById: user?.id,
+      });
+      updateLoveMeter(Math.min(100, loveMeter + Math.round(game.xp / 5)));
+    }
+    
+    setHasPlayed(false);
     setActiveGame(null);
     setGamePhase('menu');
     setMyAnswer(null);
     setShowResults(false);
-    
-    // Donner XP
-    const game = COUPLE_GAMES.find(g => g.type === activeGame);
-    if (game) {
-      setTotalXP(totalXP + game.xp);
-      updateLoveMeter(loveMeter + game.xp / 5);
-    }
   };
 
   const handleSubmitAnswer = async (answer) => {
@@ -430,11 +560,6 @@ export default function ChallengesScreen() {
   // Écran d'attente du partenaire
   const renderWaitingScreen = () => {
     const game = COUPLE_GAMES.find(g => g.type === activeGame);
-    
-    // Si le partenaire est en ligne, passer au jeu
-    if (partnerOnline && gamePhase === 'waiting') {
-      setTimeout(() => setGamePhase('playing'), 500);
-    }
     
     return (
       <View style={styles.gameFullScreen}>
@@ -531,7 +656,7 @@ export default function ChallengesScreen() {
                     <TouchableOpacity 
                       key={`quiz-opt-${idx}`}
                       style={styles.choiceOption}
-                      onPress={() => handleSubmitAnswer(opt)}
+                      onPress={() => { handleSubmitAnswer(opt); setHasPlayed(true); }}
                     >
                       <Text style={styles.choiceOptionText}>{opt}</Text>
                     </TouchableOpacity>
@@ -543,12 +668,12 @@ export default function ChallengesScreen() {
                     style={styles.openAnswerInput}
                     placeholder="Ta réponse..."
                     placeholderTextColor="#999"
-                    value={myAnswer || ''}
-                    onChangeText={setMyAnswer}
+                    value={openAnswerText}
+                    onChangeText={setOpenAnswerText}
                   />
                   <TouchableOpacity 
                     style={styles.submitAnswerBtn}
-                    onPress={() => handleSubmitAnswer(myAnswer)}
+                    onPress={() => { handleSubmitAnswer(openAnswerText); setOpenAnswerText(''); setHasPlayed(true); }}
                   >
                     <Text style={styles.submitAnswerText}>Valider ✓</Text>
                   </TouchableOpacity>
@@ -1000,10 +1125,74 @@ export default function ChallengesScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>⚡ Défis</Text>
-          <View style={[styles.streakBadge, { backgroundColor: theme.card }]}> 
-            <Text style={styles.streakIcon}>🔥</Text>
-            <Text style={[styles.streakText, { color: theme.text }]}>{streak} jours</Text>
+        </View>
+
+        {/* 🔥 Flammes Snapchat-style */}
+        <View style={[styles.streakCard, { backgroundColor: theme.card }]}>
+          <View style={styles.streakMainRow}>
+            <Text style={styles.streakFireIcon}>
+              {streak >= 100 ? '💯' : streak > 0 ? '🔥' : '❄️'}
+            </Text>
+            <View style={styles.streakInfo}>
+              <Text style={[styles.streakNumber, { color: theme.accent }]}>
+                {streak}
+              </Text>
+              <Text style={[styles.streakLabel, { color: theme.text }]}>
+                {streak > 1 ? 'jours de flamme' : streak === 1 ? 'jour de flamme' : 'Pas de série'}
+              </Text>
+            </View>
+            {streakInDanger && (
+              <View style={styles.streakDangerBadge}>
+                <Text style={styles.streakDangerIcon}>⏳</Text>
+                <Text style={styles.streakDangerText}>En danger !</Text>
+              </View>
+            )}
           </View>
+
+          {/* Statut du jour pour chaque partenaire */}
+          <View style={styles.streakStatusRow}>
+            <View style={styles.streakPartnerStatus}>
+              <Text style={styles.streakPartnerEmoji}>{user?.avatar || '😊'}</Text>
+              <Text style={[styles.streakPartnerName, { color: theme.text }]}>Toi</Text>
+              <Text style={styles.streakCheckIcon}>{myActivityToday ? '✅' : '⬜'}</Text>
+            </View>
+            <View style={styles.streakDivider}>
+              <Text style={{ fontSize: 16 }}>🔥</Text>
+            </View>
+            <View style={styles.streakPartnerStatus}>
+              <Text style={styles.streakPartnerEmoji}>{partner?.avatar || '💕'}</Text>
+              <Text style={[styles.streakPartnerName, { color: theme.text }]} numberOfLines={1}>
+                {partner?.name || 'Partenaire'}
+              </Text>
+              <Text style={styles.streakCheckIcon}>{partnerActivityToday ? '✅' : '⬜'}</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.streakHint, { color: theme.text }]}>
+            {myActivityToday && partnerActivityToday
+              ? '🎉 Vous êtes tous les deux actifs aujourd\'hui !'
+              : !myActivityToday && !partnerActivityToday
+              ? 'Complétez un défi ou envoyez un message pour maintenir la flamme !'
+              : !myActivityToday
+              ? '👆 Complète un défi ou envoie un message pour ta part !'
+              : `⏳ En attente de ${partner?.name || 'ton partenaire'}...`}
+          </Text>
+
+          {/* Bouton Partager la flamme */}
+          {streak > 0 && (
+            <TouchableOpacity
+              style={[styles.shareStreakBtn, { backgroundColor: theme.accent }]}
+              onPress={async () => {
+                try {
+                  await Share.share({
+                    message: `🔥 ${streak} jour${streak > 1 ? 's' : ''} de flamme avec mon amour sur HANI ! 💕\nNotre flamme brûle fort ! Téléchargez HANI pour défier votre couple aussi 🏆`,
+                  });
+                } catch (e) { console.log(e); }
+              }}
+            >
+              <Text style={styles.shareStreakBtnText}>📤 Partager notre flamme</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* XP Progress */}
@@ -1015,12 +1204,14 @@ export default function ChallengesScreen() {
           <View style={styles.xpBar}>
             <LinearGradient
               colors={[theme.secondary, theme.accent]}
-              style={[styles.xpFill, { width: `${(totalXP % 100)}%` }]}
+              style={[styles.xpFill, { width: `${Math.max(2, totalXP % 100)}%` }]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             />
           </View>
-          <Text style={[styles.xpLabel, { color: theme.text } ]}>Niveau {Math.floor(totalXP / 100) + 1} • {100 - (totalXP % 100)} XP pour le prochain niveau</Text>
+          <Text style={[styles.xpLabel, { color: theme.text } ]}>
+            Niveau {Math.floor(totalXP / 100) + 1} • {totalXP > 0 ? `${100 - (totalXP % 100)} XP pour le prochain` : 'Complétez un défi pour commencer !'}
+          </Text>
         </View>
 
         {/* Daily Challenge */}
@@ -1264,25 +1455,27 @@ export default function ChallengesScreen() {
           ))}
         </View>
 
-        {/* Weekly Challenges */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>📅 Défis de la Semaine</Text>
-        {WEEKLY_CHALLENGES.slice(0, 2).map((challenge) => (
+        {/* Weekly Challenge */}
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>📅 Défi de la Semaine</Text>
+        {weeklyChallenge && (
           <TouchableOpacity
-            key={challenge.id}
+            key={weeklyChallenge.id}
             style={styles.weeklyCard}
-            onPress={() => openChallenge(challenge)}
+            onPress={() => openChallenge(weeklyChallenge)}
+            disabled={isCompleted(weeklyChallenge.id)}
           >
-            <Text style={styles.weeklyIcon}>{challenge.icon}</Text>
+            <Text style={styles.weeklyIcon}>{weeklyChallenge.icon}</Text>
             <View style={styles.weeklyContent}>
-              <Text style={[styles.weeklyTitle, { color: theme.text }]}>{challenge.title}</Text>
-              <Text style={[styles.weeklyDesc, { color: theme.text }]}>{challenge.desc}</Text>
+              <Text style={[styles.weeklyTitle, { color: theme.text }]}>{weeklyChallenge.title}</Text>
+              <Text style={[styles.weeklyDesc, { color: theme.text }]}>{weeklyChallenge.desc}</Text>
             </View>
             <View style={styles.weeklyMeta}>
-              <Text style={[styles.weeklyXP, { color: theme.accent }]}>+{challenge.xp} XP</Text>
-              <Text style={[styles.weeklyDuration, { color: theme.text }]}>{challenge.duration}</Text>
+              <Text style={[styles.weeklyXP, { color: theme.accent }]}>+{weeklyChallenge.xp} XP</Text>
+              <Text style={[styles.weeklyDuration, { color: theme.text }]}>{weeklyChallenge.duration}</Text>
+              {isCompleted(weeklyChallenge.id) && <Text>✅</Text>}
             </View>
           </TouchableOpacity>
-        ))}
+        )}
 
         {/* Historique des défis */}
         <View style={styles.historySection}>
@@ -1434,21 +1627,96 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-  streakBadge: {
+  streakCard: {
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 20,
+  },
+  streakMainRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
+    marginBottom: 14,
   },
-  streakIcon: {
-    fontSize: 18,
-    marginRight: 5,
+  streakFireIcon: {
+    fontSize: 44,
+    marginRight: 14,
   },
-  streakText: {
-    color: '#fff',
+  streakInfo: {
+    flex: 1,
+  },
+  streakNumber: {
+    fontSize: 36,
     fontWeight: 'bold',
+    lineHeight: 40,
+  },
+  streakLabel: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  streakDangerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+  streakDangerIcon: {
+    fontSize: 16,
+  },
+  streakDangerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  streakStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  streakPartnerStatus: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  streakPartnerEmoji: {
+    fontSize: 28,
+  },
+  streakPartnerName: {
+    fontSize: 12,
+    fontWeight: '600',
+    maxWidth: 90,
+  },
+  streakCheckIcon: {
+    fontSize: 18,
+  },
+  streakDivider: {
+    width: 40,
+    alignItems: 'center',
+  },
+  streakHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    opacity: 0.6,
+    lineHeight: 16,
+  },
+  shareStreakBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignSelf: 'center',
+  },
+  shareStreakBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   xpCard: {
     backgroundColor: 'rgba(255,255,255,0.95)',

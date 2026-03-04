@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Animated,
+  Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -17,6 +18,9 @@ import { useChat } from '../context/ChatContext';
 
 const { width, height } = Dimensions.get('window');
 
+const MONTH_NAMES = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
 export default function RetrospectiveScreen({ navigation }) {
   const { theme } = useTheme();
   const { memories, challenges, bucketList, loveNotes, sharedDiary } = useData();
@@ -26,35 +30,43 @@ export default function RetrospectiveScreen({ navigation }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [fadeAnim] = useState(new Animated.Value(1));
   const [retrospective, setRetrospective] = useState(null);
+  const [mode, setMode] = useState('year'); // 'year' ou 'month'
 
   useEffect(() => {
     generateRetrospective();
-  }, []);
+  }, [mode]);
 
   const generateRetrospective = () => {
     const now = new Date();
     const thisYear = now.getFullYear();
+    const thisMonth = now.getMonth(); // 0-indexed
     
-    // Filtrer les données de cette année
-    const thisYearMemories = memories?.filter(m => {
+    // En mode mois, on regarde le mois dernier
+    const targetMonth = mode === 'month' ? (thisMonth === 0 ? 11 : thisMonth - 1) : null;
+    const targetMonthYear = mode === 'month' ? (thisMonth === 0 ? thisYear - 1 : thisYear) : thisYear;
+
+    const isInPeriod = (dateStr) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      if (mode === 'month') {
+        return d.getMonth() === targetMonth && d.getFullYear() === targetMonthYear;
+      }
+      return d.getFullYear() === thisYear;
+    };
+
+    const isMemoryInPeriod = (m) => {
       const parts = m.date?.split('/');
-      return parts && parts[2] === thisYear.toString();
-    }) || [];
-
-    const thisYearChallenges = challenges?.filter(c => {
-      const date = new Date(c.completedAt || c.createdAt);
-      return date.getFullYear() === thisYear;
-    }) || [];
-
-    const thisYearMessages = messages?.filter(m => {
-      const date = new Date(m.timestamp);
-      return date.getFullYear() === thisYear;
-    }) || [];
-
-    const thisYearDiary = sharedDiary?.filter(d => {
-      const date = new Date(d.createdAt);
-      return date.getFullYear() === thisYear;
-    }) || [];
+      if (!parts || parts.length !== 3) return false;
+      const memMonth = parseInt(parts[1], 10) - 1;
+      const memYear = parseInt(parts[2], 10);
+      if (mode === 'month') return memMonth === targetMonth && memYear === targetMonthYear;
+      return memYear === thisYear;
+    };
+    
+    const filteredMemories = memories?.filter(isMemoryInPeriod) || [];
+    const filteredChallenges = challenges?.filter(c => isInPeriod(c.completedAt || c.createdAt)) || [];
+    const filteredMessages = messages?.filter(m => isInPeriod(m.timestamp)) || [];
+    const filteredDiary = sharedDiary?.filter(d => isInPeriod(d.createdAt)) || [];
 
     // Calcul des jours ensemble
     let daysTogether = 0;
@@ -66,71 +78,55 @@ export default function RetrospectiveScreen({ navigation }) {
       }
     }
 
-    // Trouver le mois le plus actif
+    // Trouver le mois le plus actif (seulement en mode annuel)
     const monthCounts = {};
-    thisYearMemories.forEach(m => {
+    filteredMemories.forEach(m => {
       const month = m.date?.substring(3, 5);
-      if (month) {
-        monthCounts[month] = (monthCounts[month] || 0) + 1;
-      }
+      if (month) monthCounts[month] = (monthCounts[month] || 0) + 1;
     });
     
-    const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
-                        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
     let topMonth = '';
     let topMonthCount = 0;
     Object.entries(monthCounts).forEach(([month, count]) => {
       if (count > topMonthCount) {
         topMonthCount = count;
-        topMonth = monthNames[parseInt(month)] || month;
+        topMonth = MONTH_NAMES[parseInt(month)] || month;
       }
     });
 
-    // Compter les défis complétés
-    const completedChallenges = thisYearChallenges.filter(c => c.completed).length;
+    const completedChallenges = filteredChallenges.filter(c => c.completed).length;
 
-    // Emoji le plus utilisé dans les messages
+    // Emoji le plus utilisé
     const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu;
     const emojiCounts = {};
-    thisYearMessages.forEach(m => {
+    filteredMessages.forEach(m => {
       const emojis = m.content?.match(emojiRegex) || [];
-      emojis.forEach(emoji => {
-        emojiCounts[emoji] = (emojiCounts[emoji] || 0) + 1;
-      });
+      emojis.forEach(emoji => { emojiCounts[emoji] = (emojiCounts[emoji] || 0) + 1; });
     });
-    
-    let topEmoji = '💕';
-    let topEmojiCount = 0;
+    let topEmoji = '💕', topEmojiCount = 0;
     Object.entries(emojiCounts).forEach(([emoji, count]) => {
-      if (count > topEmojiCount) {
-        topEmojiCount = count;
-        topEmoji = emoji;
-      }
+      if (count > topEmojiCount) { topEmojiCount = count; topEmoji = emoji; }
     });
 
-    // Humeur la plus fréquente dans le journal
+    // Humeur dominante
     const moodCounts = {};
-    thisYearDiary.forEach(d => {
-      if (d.mood) {
-        moodCounts[d.mood] = (moodCounts[d.mood] || 0) + 1;
-      }
-    });
-    
-    let topMood = '😊';
-    let topMoodCount = 0;
+    filteredDiary.forEach(d => { if (d.mood) moodCounts[d.mood] = (moodCounts[d.mood] || 0) + 1; });
+    let topMood = '😊', topMoodCount = 0;
     Object.entries(moodCounts).forEach(([mood, count]) => {
-      if (count > topMoodCount) {
-        topMoodCount = count;
-        topMood = mood;
-      }
+      if (count > topMoodCount) { topMoodCount = count; topMood = mood; }
     });
+
+    const periodLabel = mode === 'month' 
+      ? MONTH_NAMES[targetMonth + 1] + ' ' + targetMonthYear
+      : thisYear.toString();
 
     setRetrospective({
       year: thisYear,
+      periodLabel,
       daysTogether,
-      totalMemories: thisYearMemories.length,
-      totalMessages: thisYearMessages.length,
-      totalDiary: thisYearDiary.length,
+      totalMemories: filteredMemories.length,
+      totalMessages: filteredMessages.length,
+      totalDiary: filteredDiary.length,
       completedChallenges,
       completedBucket: bucketList?.filter(b => b.completed).length || 0,
       topMonth,
@@ -140,13 +136,30 @@ export default function RetrospectiveScreen({ navigation }) {
       topMood,
       topMoodCount,
     });
+    setCurrentSlide(0);
+  };
+
+  const isMonthly = mode === 'month';
+  const periodTitle = retrospective?.periodLabel || '';
+
+  const shareRetrospective = async () => {
+    if (!retrospective) return;
+    const label = isMonthly ? `du mois de ${periodTitle}` : `de ${periodTitle}`;
+    const text = `💕 Notre rétrospective ${label} sur HANI !\n\n` +
+      `📸 ${retrospective.totalMemories} souvenirs\n` +
+      `💬 ${retrospective.totalMessages} messages\n` +
+      `🏆 ${retrospective.completedChallenges} défis relevés\n` +
+      `${retrospective.topEmoji} Emoji préféré (${retrospective.topEmojiCount}x)\n` +
+      `${retrospective.topMood} Humeur dominante\n\n` +
+      `Téléchargez HANI pour votre couple ! 💕`;
+    try { await Share.share({ message: text }); } catch (_) {}
   };
 
   const slides = retrospective ? [
     {
       emoji: '✨',
-      title: `Votre ${retrospective.year}`,
-      subtitle: 'Une année d\'amour',
+      title: isMonthly ? periodTitle : `Votre ${periodTitle}`,
+      subtitle: isMonthly ? 'Votre mois en couple' : 'Une année d\'amour',
       gradient: ['#667eea', '#764ba2'],
     },
     {
@@ -158,13 +171,13 @@ export default function RetrospectiveScreen({ navigation }) {
     {
       emoji: '📸',
       title: `${retrospective.totalMemories} souvenirs`,
-      subtitle: 'Capturés ensemble',
+      subtitle: isMonthly ? 'Ce mois-ci' : 'Capturés ensemble',
       gradient: ['#11998e', '#38ef7d'],
     },
     {
       emoji: '💬',
       title: `${retrospective.totalMessages} messages`,
-      subtitle: 'Échangés avec amour',
+      subtitle: isMonthly ? 'Ce mois-ci' : 'Échangés avec amour',
       gradient: ['#f093fb', '#f5576c'],
     },
     {
@@ -188,7 +201,9 @@ export default function RetrospectiveScreen({ navigation }) {
     {
       emoji: '🎉',
       title: 'Bravo !',
-      subtitle: `Une belle année ${retrospective.year} ensemble 💕`,
+      subtitle: isMonthly 
+        ? `Un beau mois de ${periodTitle} ensemble 💕`
+        : `Une belle année ${periodTitle} ensemble 💕`,
       gradient: ['#FF6B9D', '#8B5CF6'],
     },
   ] : [];
@@ -252,6 +267,22 @@ export default function RetrospectiveScreen({ navigation }) {
         <Text style={styles.closeText}>✕</Text>
       </TouchableOpacity>
 
+      {/* Mode toggle */}
+      <View style={styles.modeToggle}>
+        <TouchableOpacity
+          style={[styles.modeBtn, mode === 'year' && styles.modeBtnActive]}
+          onPress={() => { setMode('year'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+        >
+          <Text style={[styles.modeBtnText, mode === 'year' && styles.modeBtnTextActive]}>📅 Année</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeBtn, mode === 'month' && styles.modeBtnActive]}
+          onPress={() => { setMode('month'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+        >
+          <Text style={[styles.modeBtnText, mode === 'month' && styles.modeBtnTextActive]}>🗓️ Mois</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Progress dots */}
       <View style={styles.progressDots}>
         {slides.map((_, index) => (
@@ -295,12 +326,20 @@ export default function RetrospectiveScreen({ navigation }) {
             <Text style={styles.navButtonText}>→</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            style={styles.finishButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.finishButtonText}>Terminer 💕</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={shareRetrospective}
+            >
+              <Text style={styles.shareButtonText}>Partager 📤</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.finishButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.finishButtonText}>Terminer 💕</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </LinearGradient>
@@ -412,5 +451,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#667eea',
+  },
+  modeToggle: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    padding: 3,
+    zIndex: 10,
+  },
+  modeBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 17,
+  },
+  modeBtnActive: {
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  modeBtnText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+  },
+  modeBtnTextActive: {
+    color: '#fff',
+  },
+  shareButton: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: 25,
+  },
+  shareButtonText: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });

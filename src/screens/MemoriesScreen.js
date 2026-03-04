@@ -606,7 +606,7 @@ export default function MemoriesScreen() {
       setShowAddModal(false);
       Alert.alert(
         '💌 Lettre programmée !', 
-        `Votre lettre sera livrée à votre partenaire le ${formatDateTime(isoDate)}.\n\nIl/Elle recevra une notification le jour et l'heure programmés !`
+        `Votre lettre sera livrée à votre partenaire le ${formatDateTime(isoDate)}.\n\nUne notification sera envoyée le jour et l'heure programmés !`
       );
     } catch (error) {
       console.error('Erreur ajout lettre:', error);

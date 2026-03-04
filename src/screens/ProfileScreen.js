@@ -525,7 +525,7 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.waitingPartnerCard}>
           <Text style={styles.waitingEmoji}>⏳</Text>
           <Text style={styles.waitingTitle}>En attente de votre partenaire</Text>
-          <Text style={styles.waitingDesc}>Partagez votre code couple pour qu'il/elle vous rejoigne</Text>
+          <Text style={styles.waitingDesc}>Partagez votre code couple pour être rejoint(e)</Text>
         </View>
       )}
 

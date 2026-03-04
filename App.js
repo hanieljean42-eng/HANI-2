@@ -9,7 +9,6 @@ import { NotificationProvider } from './src/context/NotificationContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { SecurityProvider } from './src/context/SecurityContext';
 import { ChatProvider } from './src/context/ChatContext';
-import { SyncProvider } from './src/context/SyncContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, View, Text } from 'react-native';
 
@@ -133,7 +132,6 @@ export default function App() {
       <ErrorBoundary>
         <ThemeProvider>
           <AuthProvider>
-            <SyncProvider>
               <NotificationProvider>
                 <DataProvider>
                   <SecurityProvider>
@@ -148,7 +146,6 @@ export default function App() {
                   </SecurityProvider>
                 </DataProvider>
               </NotificationProvider>
-            </SyncProvider>
           </AuthProvider>
         </ThemeProvider>
       </ErrorBoundary>

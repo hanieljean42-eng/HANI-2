@@ -46,7 +46,7 @@ export default function JoinCoupleScreen() {
       await notifyCoupleJoined(formData.partnerName || 'ton partenaire');
       Alert.alert(
         '✅ Espace créé !',
-        `Votre code couple est:\n\n${result.code}\n\nPartagez ce code avec ${formData.partnerName || 'votre partenaire'} pour qu'il/elle puisse vous rejoindre.\n\n📱 Les données seront synchronisées automatiquement dès que votre partenaire rejoindra !`,
+        `Votre code couple est:\n\n${result.code}\n\nPartagez ce code avec ${formData.partnerName || 'votre partenaire'} pour rejoindre votre espace couple.\n\n📱 Les données seront synchronisées automatiquement dès la connexion !`,
         [{ text: 'Super !' }]
       );
     } else {
@@ -78,7 +78,7 @@ export default function JoinCoupleScreen() {
       } else {
         Alert.alert(
           '✅ Code accepté !',
-          'Votre partenaire sera notifié(e) quand il/elle se connectera.\n\nLes données se synchroniseront automatiquement.',
+          'Votre partenaire sera notifié(e) à la prochaine connexion.\n\nLes données se synchroniseront automatiquement.',
           [{ text: 'OK' }]
         );
       }
@@ -245,7 +245,7 @@ export default function JoinCoupleScreen() {
               <Text style={styles.codeLabel}>Code de votre couple :</Text>
               <Text style={styles.codeText}>{generatedCode}</Text>
               <Text style={styles.codeHint}>
-                Partagez ce code avec votre partenaire pour qu'il/elle puisse vous rejoindre !
+                Partagez ce code avec votre partenaire pour rejoindre votre espace couple !
               </Text>
             </View>
           ) : null}

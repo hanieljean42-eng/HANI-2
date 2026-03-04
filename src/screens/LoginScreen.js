@@ -142,7 +142,7 @@ export default function LoginScreen({ navigation }) {
           {/* Form */}
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputIcon}>�</Text>
+              <Text style={styles.inputIcon}>👤</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Ton prénom"
