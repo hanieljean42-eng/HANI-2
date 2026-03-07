@@ -1,5 +1,37 @@
+# Dependencies
+node_modules/
+
 # Ignore local cache directories that cause permission issues
 .expo/
 .expo-shared/
 android/
 ios/
+
+# Build artifacts
+dist/
+web-build/
+*.apk
+
+# Git
+.git/
+
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+
+# Secrets
+*.pem
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+h-couple-firebase-adminsdk*.json
+*-adminsdk*.json
+
+# Build log
+build_log.txt

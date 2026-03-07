@@ -6,6 +6,7 @@ import {
   ScrollView,
   Dimensions,
   TouchableOpacity,
+  Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
@@ -241,6 +242,20 @@ export default function StatsScreen({ navigation }) {
           )}
         </View>
 
+        {/* Bouton Partager les stats */}
+        <TouchableOpacity
+          style={[styles.shareStatsBtn, { backgroundColor: theme.accent }]}
+          onPress={async () => {
+            try {
+              await Share.share({
+                message: `💕 Nos stats couple sur HANI :\n📆 ${stats.daysTogether || 0} jours ensemble\n💬 ${stats.totalMessages || 0} messages\n🎯 ${stats.completedChallenges || 0} défis complétés\n📸 ${stats.totalMemories || 0} souvenirs\n❤️ Love Meter : ${stats.loveMeter || 0}%\n\nTéléchargez HANI pour vivre l'amour autrement ! 🔥`,
+              });
+            } catch (e) { console.log(e); }
+          }}
+        >
+          <Text style={styles.shareStatsBtnText}>📤 Partager nos stats</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 50 }} />
       </ScrollView>
     </LinearGradient>
@@ -411,5 +426,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 12,
     lineHeight: 22,
+  },
+  shareStatsBtn: {
+    marginTop: 15,
+    paddingVertical: 14,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    alignSelf: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  shareStatsBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
