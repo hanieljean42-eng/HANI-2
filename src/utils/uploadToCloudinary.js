@@ -102,26 +102,11 @@ export const uploadAudioToCloudinary = async (file) => {
   }
 };
 
+// ⚠️ SÉCURITÉ : La suppression d'assets Cloudinary nécessite une signature
+// serveur (api_secret). Ne jamais envoyer api_secret depuis le code client.
+// Pour implémenter la suppression, créer une Cloud Function Firebase qui
+// signe la requête côté serveur.
 export const deleteFromCloudinary = async (publicId) => {
-  try {
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/destroy`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          public_id: publicId,
-          api_key: CLOUDINARY_CONFIG.apiKey,
-          api_secret: CLOUDINARY_CONFIG.apiSecret
-        })
-      }
-    );
-
-    return await response.json();
-  } catch (error) {
-    console.error('Delete error:', error);
-    throw error;
-  }
+  console.warn('⚠️ deleteFromCloudinary désactivé - la suppression doit être traitée côté serveur.');
+  return { result: 'not_implemented' };
 };

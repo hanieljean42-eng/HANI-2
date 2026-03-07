@@ -1,14 +1,7 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
-import { getStorage } from 'firebase/storage';
-
-// ⚠️ IMPORTANT: Pour activer le mode temps réel, créez un projet Firebase gratuit:
-// 1. Allez sur https://console.firebase.google.com/
-// 2. Créez un nouveau projet
-// 3. Activez "Realtime Database" 
-// 4. Activez "Storage" pour les médias
-// 5. Copiez vos clés de configuration ci-dessous
-// 6. Réglez les règles de sécurité sur "test mode" pour commencer
+import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAPv_oeczlvXMvY_77UgHDuMtYXm6L07XQ",
@@ -21,28 +14,38 @@ const firebaseConfig = {
   measurementId: "G-ZG0BXRWMTC"
 };
 
-// Initialiser Firebase
 let app = null;
 let database = null;
-let storage = null;
+let auth = null;
+let isConfigured = false;
+let firebaseError = null;
 
-// Vérifier si les clés sont configurées
-const isConfigured = !firebaseConfig.apiKey.includes('Example');
+try {
+  // 1. Initialiser l'app Firebase (éviter double init)
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-if (isConfigured) {
+  // 2. Initialiser la base de données
+  database = getDatabase(app);
+
+  // 3. Initialiser l'authentification avec persistance AsyncStorage
   try {
-    app = initializeApp(firebaseConfig);
-    database = getDatabase(app);
-    storage = getStorage(app);
-    console.log('✅ Firebase connecté avec succès !');
-    console.log('✅ Firebase Storage activé !');
-  } catch (error) {
-    console.log('❌ Erreur Firebase:', error.message);
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (authError) {
+    // Si déjà initialisé (double chargement module), récupérer l'instance existante
+    console.warn('⚠️ initializeAuth error, fallback getAuth:', authError.message);
+    auth = getAuth(app);
   }
-} else {
-  console.log('⚠️ Firebase non configuré - Les jeux fonctionneront en mode local uniquement');
-  console.log('📖 Pour activer le mode multijoueur à distance, configurez Firebase dans src/config/firebase.js');
+
+  isConfigured = true;
+  console.log('✅ Firebase connecté — auth:', !!auth, 'db:', !!database);
+} catch (error) {
+  firebaseError = error.message || 'Erreur inconnue Firebase';
+  console.error('❌ Firebase init FAILED:', error);
 }
 
-export { app, database, storage, isConfigured };
+export { app, database, auth, isConfigured, firebaseError };
+
+export const GOOGLE_WEB_CLIENT_ID = '692477466695-nbk8ke52kf2jta63vsee32n64o92apec.apps.googleusercontent.com';
 

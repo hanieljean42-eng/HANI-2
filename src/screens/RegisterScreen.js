@@ -47,13 +47,15 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    // Valider l'email (si fourni)
-    if (formData.email && formData.email.trim()) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        Alert.alert('Erreur', 'Veuillez entrer un email valide');
-        return;
-      }
+    // Valider l'email (maintenant obligatoire - nécessaire pour Firebase Auth)
+    if (!formData.email || !formData.email.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer votre adresse email');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      Alert.alert('Erreur', 'Veuillez entrer un email valide');
+      return;
     }
     
     // Construire la date de naissance si fournie
@@ -158,6 +160,20 @@ export default function RegisterScreen({ navigation }) {
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 value={formData.name}
                 onChangeText={(text) => setFormData({ ...formData, name: text })}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputIcon}>📧</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ton adresse email"
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={formData.email}
+                onChangeText={(text) => setFormData({ ...formData, email: text })}
               />
             </View>
 
@@ -396,6 +412,47 @@ const styles = StyleSheet.create({
   loginLinkBold: {
     fontWeight: 'bold',
     color: '#fff',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  dividerText: {
+    color: 'rgba(255,255,255,0.75)',
+    marginHorizontal: 12,
+    fontSize: 14,
+  },
+  googleButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 15,
+    borderRadius: 30,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    marginBottom: 20,
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  googleButtonText: {
+    color: '#444',
+    fontSize: 16,
+    fontWeight: '600',
   },
   birthdaySection: {
     marginBottom: 15,

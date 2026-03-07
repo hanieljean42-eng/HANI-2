@@ -1,10 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { auth, database, isConfigured, firebaseError } from '../config/firebase';
 
 const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigation }) {
+  const fbStatus = isConfigured && auth ? '✅ Firebase OK' : `❌ Firebase: ${firebaseError || 'auth=' + String(!!auth) + ' db=' + String(!!database) + ' cfg=' + String(isConfigured)}`;
+
   return (
     <LinearGradient
       colors={['#FF6B9D', '#C44569', '#8B5CF6']}
@@ -58,6 +61,8 @@ export default function WelcomeScreen({ navigation }) {
 
         {/* Footer */}
         <Text style={styles.footer}>Créé avec ❤️ par Djeble Haniel Henoc</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 4 }}>v2.1 — Build 7 mars 2026</Text>
+        <Text style={{ color: isConfigured && auth ? 'rgba(100,255,100,0.7)' : 'rgba(255,100,100,0.9)', fontSize: 10, marginTop: 2 }}>{fbStatus}</Text>
       </View>
     </LinearGradient>
   );

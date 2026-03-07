@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { hashPin, verifyPin as verifyPinHash } from '../utils/encryption';
 
 const SecurityContext = createContext({});
 
@@ -52,8 +53,9 @@ export function SecurityProvider({ children }) {
 
   const setupPin = async (newPin) => {
     try {
-      await AsyncStorage.setItem('@pinCode', newPin);
-      setPinCode(newPin);
+      const hashedPin = hashPin(newPin);
+      await AsyncStorage.setItem('@pinCode', hashedPin);
+      setPinCode(hashedPin);
       setIsSecretModeEnabled(true);
       return { success: true };
     } catch (error) {
@@ -74,8 +76,16 @@ export function SecurityProvider({ children }) {
   };
 
   const verifyPin = (inputPin) => {
-    if (inputPin === pinCode) {
+    // Supporte le hash PBKDF2 (nouveau format) ET l'ancien PIN en clair (migration)
+    const match = verifyPinHash(inputPin, pinCode);
+    if (match) {
       setIsUnlocked(true);
+      // Migrer silencieusement l'ancien PIN en clair vers le hash sécurisé
+      if (!pinCode?.startsWith('p2:')) {
+        const hashed = hashPin(inputPin);
+        AsyncStorage.setItem('@pinCode', hashed).catch(() => {});
+        setPinCode(hashed);
+      }
       return true;
     }
     return false;

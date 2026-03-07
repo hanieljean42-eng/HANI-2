@@ -14,6 +14,9 @@ export function ChatProvider({ children }) {
   const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [partnerRecording, setPartnerRecording] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [activeCall, setActiveCall] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   
   const typingTimeoutRef = useRef(null);
@@ -70,11 +73,40 @@ export function ChatProvider({ children }) {
       }
     });
 
-    listenerRef.current = { messagesListener, typingListener };
+    // Écouter le statut d'enregistrement vocal
+    const recordingRef = ref(database, `couples/${couple.id}/chat/recording`);
+    const recordingListener = onValue(recordingRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        setPartnerRecording(partner?.id ? data[partner.id] === true : false);
+      } else {
+        setPartnerRecording(false);
+      }
+    });
+
+    // Écouter les appels actifs
+    const callActiveRef = ref(database, `couples/${couple.id}/calls/active`);
+    const callListener = onValue(callActiveRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const callData = snapshot.val();
+        if (callData.callerId !== user.id && callData.status === 'ringing') {
+          setIncomingCall(callData);
+        } else if (callData.status === 'ended') {
+          setIncomingCall(null);
+          setActiveCall(null);
+        }
+      } else {
+        setIncomingCall(null);
+      }
+    });
+
+    listenerRef.current = { messagesListener, typingListener, recordingListener, callListener };
 
     return () => {
       off(messagesRef);
       off(typingRef);
+      off(recordingRef);
+      off(callActiveRef);
     };
   }, [couple?.id, user?.id, partner?.id]);
 
@@ -209,6 +241,81 @@ export function ChatProvider({ children }) {
     }
   };
 
+  // Signaler que l'utilisateur enregistre un vocal
+  const setVoiceRecording = async (recording) => {
+    if (!couple?.id || !user?.id || !isConfigured || !database) return;
+    try {
+      const recRef = ref(database, `couples/${couple.id}/chat/recording/${user.id}`);
+      await set(recRef, recording ? true : null);
+    } catch (error) {
+      console.log('Erreur recording status:', error);
+    }
+  };
+
+  // Lancer un appel (audio ou vidéo)
+  const initiateCall = async (type) => {
+    if (!couple?.id || !user?.id || !isConfigured || !database) return null;
+    const roomId = `HANI2${couple.id.replace(/-/g, '')}${Date.now()}`;
+    const callData = {
+      callerId: user.id,
+      callerName: user.name,
+      type,
+      roomId,
+      status: 'ringing',
+      timestamp: new Date().toISOString(),
+    };
+    try {
+      const callRef = ref(database, `couples/${couple.id}/calls/active`);
+      await set(callRef, callData);
+      setActiveCall(callData);
+      return roomId;
+    } catch (error) {
+      console.log('Erreur initiation appel:', error);
+      return null;
+    }
+  };
+
+  // Accepter un appel entrant
+  const acceptCall = async () => {
+    if (!couple?.id || !incomingCall) return null;
+    try {
+      const statusRef = ref(database, `couples/${couple.id}/calls/active/status`);
+      await set(statusRef, 'accepted');
+      const roomId = incomingCall.roomId;
+      setActiveCall(incomingCall);
+      setIncomingCall(null);
+      return roomId;
+    } catch (error) {
+      console.log('Erreur acceptation appel:', error);
+      return null;
+    }
+  };
+
+  // Rejeter un appel entrant
+  const rejectCall = async () => {
+    if (!couple?.id) return;
+    try {
+      const callRef = ref(database, `couples/${couple.id}/calls/active`);
+      await set(callRef, null);
+      setIncomingCall(null);
+    } catch (error) {
+      console.log('Erreur rejet appel:', error);
+    }
+  };
+
+  // Terminer un appel
+  const endCall = async () => {
+    if (!couple?.id) return;
+    try {
+      const callRef = ref(database, `couples/${couple.id}/calls/active`);
+      await set(callRef, null);
+      setActiveCall(null);
+      setIncomingCall(null);
+    } catch (error) {
+      console.log('Erreur fin appel:', error);
+    }
+  };
+
   // Supprimer un message
   const deleteMessage = async (messageId) => {
     if (!couple?.id || !isConfigured || !database) return;
@@ -230,11 +337,19 @@ export function ChatProvider({ children }) {
     unreadCount,
     isTyping,
     partnerTyping,
+    partnerRecording,
+    incomingCall,
+    activeCall,
     sendMessage,
     markAsRead,
     addReaction,
     setTyping,
+    setVoiceRecording,
     deleteMessage,
+    initiateCall,
+    acceptCall,
+    rejectCall,
+    endCall,
   };
 
   return (

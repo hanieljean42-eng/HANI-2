@@ -470,6 +470,7 @@ export default function ProfileScreen({ navigation }) {
     await updateUser({ avatar });
     setShowAvatarModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await notifyPhotoChanged('avatar');
   };
 
   // Modifier le nom du partenaire

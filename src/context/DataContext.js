@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, off } from 'firebase/database';
+import { ref, set, get, onValue, off } from 'firebase/database';
 import { useAuth } from './AuthContext';
 import { encryptLoveNote, decryptLoveNote } from '../utils/encryption';
 
@@ -850,74 +850,62 @@ export function DataProvider({ children }) {
   };
 
   // 🔥 FLAMMES/STREAKS: Enregistrer une interaction du joueur actuel
-  // La flamme s'allume UNIQUEMENT quand les DEUX partenaires ont discuté le même jour
-  // (l'un envoie un message ET l'autre répond)
-  // La flamme s'éteint si 24h passent sans échange bidirectionnel
+  // Chaque partenaire écrit UNIQUEMENT son propre flag sur son chemin Firebase unique
+  // → Pas de race condition : les deux peuvent écrire en même temps sans s'écraser
+  // La flamme s'allume quand les DEUX partenaires ont interagi le même jour
   const recordInteraction = async () => {
-    const today = new Date().toISOString().split('T')[0]; // "2026-02-10"
-    
-    if (!couple?.id || !user?.id) return;
+    const today = new Date().toISOString().split('T')[0]; // ex: "2026-02-10"
+
+    if (!couple?.id || !user?.id || !isConfigured || !database) return;
 
     try {
-      let currentStreak = { ...streak };
-      
-      // Initialiser le tracking des interactions par jour
-      if (!currentStreak.todayInteractions) {
-        currentStreak.todayInteractions = {};
-      }
-      
-      // Si c'est un nouveau jour, reset les interactions du jour
-      if (currentStreak.interactionDate !== today) {
-        currentStreak.todayInteractions = {};
-        currentStreak.interactionDate = today;
-      }
-      
-      // Marquer que CE joueur a écrit aujourd'hui
-      currentStreak.todayInteractions[user.id] = true;
-      
-      // Vérifier si les DEUX partenaires ont écrit aujourd'hui
-      const interactionCount = Object.keys(currentStreak.todayInteractions).length;
-      const bothTalked = interactionCount >= 2;
-      
-      if (bothTalked && currentStreak.lastDate !== today) {
-        // 🔥 Les deux ont parlé ! Le streak compte pour aujourd'hui
-        const lastDate = currentStreak.lastDate;
-        
-        if (lastDate) {
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayStr = yesterday.toISOString().split('T')[0];
-          
-          if (lastDate === yesterdayStr) {
-            // Jour consécutif → augmenter le streak
-            currentStreak.count = (currentStreak.count || 0) + 1;
-          } else {
-            // Série cassée → reset à 1
-            currentStreak.count = 1;
-          }
-        } else {
-          // Premier jour → streak = 1
-          currentStreak.count = 1;
+      // ÉTAPE 1: Écrire UNIQUEMENT le flag de ce joueur sur son propre chemin
+      // (pas d'écrasement des données de l'autre partenaire)
+      const myFlagRef = ref(database, `couples/${couple.id}/data/streak/todayInteractions/${user.id}`);
+      await set(myFlagRef, today);
+
+      // ÉTAPE 2: Lire l'état frais depuis Firebase (fusion des deux partenaires)
+      const streakRef = ref(database, `couples/${couple.id}/data/streak`);
+      const snapshot = await get(streakRef);
+      const current = snapshot.exists() ? snapshot.val() : { count: 0, lastDate: null, bestStreak: 0 };
+
+      // ÉTAPE 3: Vérifier si les DEUX partenaires ont interagi AUJOURD'HUI
+      const todayInteractions = current.todayInteractions || {};
+      const bothTalked = Object.values(todayInteractions).filter(d => d === today).length >= 2;
+
+      if (bothTalked && current.lastDate !== today) {
+        // 🔥 Les deux ont parlé ! Calculer le nouveau streak
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        let newCount = 1;
+        if (current.lastDate === yesterdayStr) {
+          // Jour consécutif → incrémenter
+          newCount = (current.count || 0) + 1;
         }
-        
-        currentStreak.lastDate = today;
-        
-        // Mettre à jour le meilleur streak
-        if (currentStreak.count > (currentStreak.bestStreak || 0)) {
-          currentStreak.bestStreak = currentStreak.count;
-        }
-        
-        console.log(`🔥 Streak activé ! Les deux ont parlé : ${currentStreak.count} jours !`);
-      }
-      
-      // Sauvegarder même si un seul a parlé (pour tracker les interactions partielles)
-      setStreak(currentStreak);
-      await AsyncStorage.setItem('@streak', JSON.stringify(currentStreak));
-      
-      // Sync Firebase
-      if (isConfigured && database) {
-        const streakRef = ref(database, `couples/${couple.id}/data/streak`);
-        await set(streakRef, currentStreak);
+        // Sinon série cassée → reset à 1
+
+        const newStreak = {
+          ...current,
+          count: newCount,
+          lastDate: today,
+          bestStreak: Math.max(newCount, current.bestStreak || 0),
+          todayInteractions: todayInteractions,
+        };
+
+        await set(streakRef, newStreak);
+        setStreak(newStreak);
+        await AsyncStorage.setItem('@streak', JSON.stringify(newStreak));
+        console.log(`🔥 Streak activé ! Les deux ont parlé : ${newCount} jours !`);
+      } else {
+        // Un seul a parlé ou déjà compté aujourd'hui — mettre à jour le state local
+        const updated = {
+          ...current,
+          todayInteractions: { ...todayInteractions, [user.id]: today },
+        };
+        setStreak(updated);
+        await AsyncStorage.setItem('@streak', JSON.stringify(updated));
       }
     } catch (e) {
       console.log('⚠️ Erreur streak:', e.message);

@@ -145,6 +145,11 @@ export default function WidgetsScreen({ navigation }) {
     };
     setTodayMood(moodData);
     await AsyncStorage.setItem('@todayMood', JSON.stringify(moodData));
+    // Notifier le partenaire de l'humeur du jour
+    const moodLabel = moods.find(m => m.id === mood);
+    if (moodLabel && partner?.name) {
+      await notifyLoveNote(`${user?.name || 'Moi'} est ${moodLabel.emoji} ${moodLabel.label} aujourd'hui`);
+    }
   };
 
   const moods = [

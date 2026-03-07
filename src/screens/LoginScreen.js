@@ -12,108 +12,59 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 
 export default function LoginScreen({ navigation }) {
-  const { login } = useAuth();
+  const { login, sendPasswordReset } = useAuth();
   const { notifyLoginSuccess } = useNotifications();
-  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotName, setForgotName] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [registeredUsers, setRegisteredUsers] = useState([]);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async () => {
-    if (!name || !password) {
+    if (!email.trim() || !password) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
 
     setLoading(true);
-    const result = await login(name.trim(), password);
+    const result = await login(email.trim(), password);
     setLoading(false);
 
     if (result.success) {
-      // ✅ Notification de bienvenue après connexion réussie
-      await notifyLoginSuccess(name.trim());
+      await notifyLoginSuccess(result.name || email.trim());
     } else {
-      // Afficher plus de détails pour aider l'utilisateur
       Alert.alert(
-        'Erreur de connexion', 
-        result.error + '\n\nVérifiez que:\n• Le prénom est exactement comme à l\'inscription\n• Le mot de passe est correct',
+        'Erreur de connexion',
+        result.error,
         [
           { text: 'Réessayer', style: 'cancel' },
-          { text: 'Mot de passe oublié', onPress: () => handleForgotPassword() }
+          { text: 'Mot de passe oublié', onPress: () => setShowForgotModal(true) },
         ]
       );
     }
   };
 
-  const handleForgotPassword = async () => {
-    // Charger les utilisateurs enregistrés
-    try {
-      const stored = await AsyncStorage.getItem('@registeredUsers');
-      if (stored) {
-        setRegisteredUsers(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.log('Erreur chargement users:', e);
-    }
+  const handleForgotPassword = () => {
     setShowForgotModal(true);
   };
 
-  const handleResetPassword = async () => {
-    if (!forgotName.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer votre prénom');
+  const handlePasswordReset = async () => {
+    if (!forgotEmail.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer votre adresse email');
       return;
     }
-    if (!newPassword || newPassword.length < 6) {
-      Alert.alert('Erreur', 'Le nouveau mot de passe doit avoir au moins 6 caractères');
-      return;
-    }
-    if (newPassword !== confirmNewPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
-      return;
-    }
-
-    try {
-      const stored = await AsyncStorage.getItem('@registeredUsers');
-      if (stored) {
-        let users = JSON.parse(stored);
-        const userIndex = users.findIndex(u => 
-          u.name.toLowerCase().trim() === forgotName.toLowerCase().trim()
-        );
-        
-        if (userIndex >= 0) {
-          // Mettre à jour le mot de passe
-          users[userIndex].password = newPassword;
-          await AsyncStorage.setItem('@registeredUsers', JSON.stringify(users));
-          
-          Alert.alert(
-            '✅ Succès', 
-            'Votre mot de passe a été réinitialisé !\n\nVous pouvez maintenant vous connecter.',
-            [{ text: 'OK', onPress: () => {
-              setShowForgotModal(false);
-              setName(forgotName);
-              setPassword('');
-              setForgotName('');
-              setNewPassword('');
-              setConfirmNewPassword('');
-            }}]
-          );
-        } else {
-          Alert.alert('Erreur', 'Aucun compte trouvé avec ce prénom.\n\nComptes existants: ' + users.map(u => u.name).join(', '));
-        }
-      } else {
-        Alert.alert('Erreur', 'Aucun compte enregistré sur cet appareil.');
-      }
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible de réinitialiser le mot de passe: ' + error.message);
+    setLoading(true);
+    const result = await sendPasswordReset(forgotEmail.trim());
+    setLoading(false);
+    if (result.success) {
+      setResetSent(true);
+    } else {
+      Alert.alert('Erreur', result.error);
     }
   };
 
@@ -147,14 +98,16 @@ export default function LoginScreen({ navigation }) {
           {/* Form */}
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputIcon}>�</Text>
+              <Text style={styles.inputIcon}>📧</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ton prénom"
+                placeholder="Ton adresse email"
                 placeholderTextColor="rgba(255,255,255,0.6)"
-                autoCapitalize="words"
-                value={name}
-                onChangeText={setName}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
               />
             </View>
 
@@ -175,7 +128,7 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Modal Mot de passe oublié */}
+          {/* Modal Mot de passe oublié - Réinitialisation par email Firebase */}
           <Modal
             visible={showForgotModal}
             transparent
@@ -184,70 +137,52 @@ export default function LoginScreen({ navigation }) {
           >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>🔐 Réinitialiser le mot de passe</Text>
-                
-                {registeredUsers.length > 0 && (
-                  <View style={styles.usersHint}>
-                    <Text style={styles.usersHintText}>Comptes sur cet appareil:</Text>
-                    {registeredUsers.map((u, i) => (
-                      <TouchableOpacity 
-                        key={i} 
-                        style={styles.userChip}
-                        onPress={() => setForgotName(u.name)}
+                {resetSent ? (
+                  <>
+                    <Text style={styles.modalTitle}>✅ Email envoyé !</Text>
+                    <Text style={{ textAlign: 'center', color: '#555', marginVertical: 12, lineHeight: 20 }}>
+                      Vérifiez votre boîte mail{' '}({forgotEmail}){' '}et cliquez sur le lien pour réinitialiser votre mot de passe.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.modalConfirmBtn}
+                      onPress={() => { setShowForgotModal(false); setForgotEmail(''); setResetSent(false); }}
+                    >
+                      <Text style={styles.modalConfirmText}>Fermer</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.modalTitle}>🔐 Mot de passe oublié</Text>
+                    <Text style={{ textAlign: 'center', color: '#666', marginBottom: 12, fontSize: 13 }}>
+                      Un lien de réinitialisation vous sera envoyé par email.
+                    </Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Votre adresse email"
+                      placeholderTextColor="#999"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={forgotEmail}
+                      onChangeText={setForgotEmail}
+                    />
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        style={styles.modalCancelBtn}
+                        onPress={() => { setShowForgotModal(false); setForgotEmail(''); }}
                       >
-                        <Text style={styles.userChipText}>{u.avatar || '👤'} {u.name}</Text>
+                        <Text style={styles.modalCancelText}>Annuler</Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
+                      <TouchableOpacity
+                        style={[styles.modalConfirmBtn, loading && { opacity: 0.6 }]}
+                        onPress={handlePasswordReset}
+                        disabled={loading}
+                      >
+                        <Text style={styles.modalConfirmText}>{loading ? 'Envoi...' : 'Envoyer'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
                 )}
-                
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Votre prénom"
-                  placeholderTextColor="#999"
-                  value={forgotName}
-                  onChangeText={setForgotName}
-                  autoCapitalize="words"
-                />
-                
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Nouveau mot de passe"
-                  placeholderTextColor="#999"
-                  secureTextEntry
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                />
-                
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Confirmer le mot de passe"
-                  placeholderTextColor="#999"
-                  secureTextEntry
-                  value={confirmNewPassword}
-                  onChangeText={setConfirmNewPassword}
-                />
-                
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity 
-                    style={styles.modalCancelBtn}
-                    onPress={() => {
-                      setShowForgotModal(false);
-                      setForgotName('');
-                      setNewPassword('');
-                      setConfirmNewPassword('');
-                    }}
-                  >
-                    <Text style={styles.modalCancelText}>Annuler</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.modalConfirmBtn}
-                    onPress={handleResetPassword}
-                  >
-                    <Text style={styles.modalConfirmText}>Réinitialiser</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             </View>
           </Modal>
@@ -391,6 +326,47 @@ const styles = StyleSheet.create({
   registerLinkBold: {
     fontWeight: 'bold',
     color: '#fff',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  dividerText: {
+    color: 'rgba(255,255,255,0.75)',
+    marginHorizontal: 12,
+    fontSize: 14,
+  },
+  googleButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 15,
+    borderRadius: 30,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    marginBottom: 20,
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  googleButtonText: {
+    color: '#444',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

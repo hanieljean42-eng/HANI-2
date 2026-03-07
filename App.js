@@ -137,7 +137,7 @@ function AppNavigator() {
             component={GuideScreen} 
             options={{ 
               animation: 'slide_from_right',
-              presentation: 'card'
+              presentation: 'card',
             }} 
           />
         </Stack.Group>

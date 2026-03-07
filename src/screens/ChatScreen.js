@@ -28,6 +28,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useData } from '../context/DataContext';
 import { uploadToCloudinary, uploadAudioToCloudinary } from '../utils/uploadToCloudinary';
+import * as WebBrowser from 'expo-web-browser';
 
 const { width, height } = Dimensions.get('window');
 
@@ -103,13 +104,21 @@ export default function ChatScreen({ navigation }) {
     markAsRead, 
     addReaction, 
     partnerTyping,
+    partnerRecording,
     setTyping,
     deleteMessage,
+    incomingCall,
+    activeCall,
+    initiateCall,
+    acceptCall,
+    rejectCall,
+    endCall,
+    setVoiceRecording,
   } = useChat();
 
   // Chat is now available
   const chatAvailable = true;
-  const { notifyLoveNote, notifyNoteRead } = useNotifyPartner();
+  const { notifyLoveNote, notifyNoteRead, notifyCall } = useNotifyPartner();
   const { addDiaryEntry, recordInteraction, streak } = useData();
 
   const [inputText, setInputText] = useState('');
@@ -203,6 +212,49 @@ export default function ChatScreen({ navigation }) {
     );
     return () => keyboardShow.remove();
   }, []);
+
+  // Statut affiché sous le prénom du partenaire
+  const getPartnerStatus = () => {
+    if (partnerTyping) return { text: 'écrit...', color: 'rgba(255,255,255,0.85)', italic: true };
+    if (partnerRecording) return { text: '🎤 enregistre un vocal...', color: 'rgba(255,255,255,0.85)', italic: true };
+    if (partner?.isOnline) return { text: '🟢 En ligne', color: '#7FFF7F', italic: false };
+    if (partner?.lastSeen) {
+      const lastSeen = new Date(partner.lastSeen);
+      const now = new Date();
+      const diffMins = Math.floor((now - lastSeen) / 60000);
+      if (diffMins < 1) return { text: 'Vu il y a quelques secondes', color: 'rgba(255,255,255,0.6)', italic: false };
+      if (diffMins < 60) return { text: `Vu il y a ${diffMins} min`, color: 'rgba(255,255,255,0.6)', italic: false };
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return { text: `Vu à ${lastSeen.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`, color: 'rgba(255,255,255,0.6)', italic: false };
+      return { text: `Vu le ${lastSeen.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`, color: 'rgba(255,255,255,0.6)', italic: false };
+    }
+    return null;
+  };
+
+  // Lancer un appel (ouvre une salle Jitsi sécurisée)
+  const handleCall = async (type) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    const roomId = await initiateCall(type);
+    if (!roomId) {
+      Alert.alert('Erreur', "Impossible de lancer l'appel. Vérifiez votre connexion.");
+      return;
+    }
+    await notifyCall(type);
+    const jitsiUrl = `https://meet.jit.si/${roomId}`;
+    await WebBrowser.openBrowserAsync(jitsiUrl);
+    await endCall();
+  };
+
+  // Accepter un appel entrant
+  const handleAcceptCall = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const roomId = await acceptCall();
+    if (roomId) {
+      const jitsiUrl = `https://meet.jit.si/${roomId}`;
+      await WebBrowser.openBrowserAsync(jitsiUrl);
+      await endCall();
+    }
+  };
 
   const handleSend = async () => {
     if (!chatAvailable) {
@@ -303,6 +355,7 @@ export default function ChatScreen({ navigation }) {
       recordingRef.current = recording;
       setIsRecording(true);
       setRecordingDuration(0);
+      setVoiceRecording(true); // Signaler au partenaire qu'on enregistre
       
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       
@@ -333,6 +386,7 @@ export default function ChatScreen({ navigation }) {
         : recordingDuration;
       
       setIsRecording(false);
+      setVoiceRecording(false); // Arrêter l'indicateur partenaire
       recordingRef.current = null;
       
       if (uri && actualDuration >= 1) {
@@ -379,6 +433,7 @@ export default function ChatScreen({ navigation }) {
       await recordingRef.current.stopAndUnloadAsync();
       recordingRef.current = null;
       setIsRecording(false);
+      setVoiceRecording(false); // Arrêter l'indicateur partenaire
       setRecordingDuration(0);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
@@ -614,10 +669,22 @@ export default function ChatScreen({ navigation }) {
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>{partner?.name || 'Mon amour'}</Text>
-          {partnerTyping && (
-            <Text style={styles.typingText}>écrit...</Text>
-          )}
+          {(() => {
+            const status = getPartnerStatus();
+            return status ? (
+              <Text style={[styles.typingText, { color: status.color, fontStyle: status.italic ? 'italic' : 'normal' }]}>
+                {status.text}
+              </Text>
+            ) : null;
+          })()}
         </View>
+        {/* Boutons appel vocal et vidéo */}
+        <TouchableOpacity style={styles.callButton} onPress={() => handleCall('audio')}>
+          <Ionicons name="call-outline" size={22} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.callButton} onPress={() => handleCall('video')}>
+          <Ionicons name="videocam-outline" size={22} color="#fff" />
+        </TouchableOpacity>
         {/* 🔥 Flamme / Streak */}
         {(() => {
           const level = getStreakLevel(streak?.count || 0);
@@ -782,6 +849,29 @@ export default function ChatScreen({ navigation }) {
           )}
         </View>
       </Modal>
+
+      {/* Appel entrant */}
+      {incomingCall && (
+        <View style={styles.incomingCallOverlay}>
+          <LinearGradient colors={['rgba(20,0,40,0.97)', 'rgba(0,0,20,0.97)']} style={styles.incomingCallCard}>
+            <Text style={styles.incomingCallEmoji}>
+              {incomingCall.type === 'video' ? '🎥' : '📞'}
+            </Text>
+            <Text style={styles.incomingCallName}>{incomingCall.callerName}</Text>
+            <Text style={styles.incomingCallType}>
+              {incomingCall.type === 'video' ? 'Appel vidéo entrant' : 'Appel vocal entrant'}
+            </Text>
+            <View style={styles.incomingCallButtons}>
+              <TouchableOpacity style={styles.rejectCallButton} onPress={rejectCall}>
+                <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.acceptCallButton} onPress={handleAcceptCall}>
+                <Ionicons name="call" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
+      )}
 
       {/* Reactions Modal */}
       {showReactions && (
@@ -1282,6 +1372,66 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Boutons d'appel dans le header
+  callButton: {
+    padding: 7,
+    marginHorizontal: 1,
+  },
+  // Modal appel entrant
+  incomingCallOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    zIndex: 1000,
+  },
+  incomingCallCard: {
+    width: width * 0.82,
+    borderRadius: 28,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  incomingCallEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  incomingCallName: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  incomingCallType: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.75)',
+    marginBottom: 36,
+  },
+  incomingCallButtons: {
+    flexDirection: 'row',
+    gap: 50,
+  },
+  rejectCallButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  acceptCallButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#34C759',
     justifyContent: 'center',
     alignItems: 'center',
   },

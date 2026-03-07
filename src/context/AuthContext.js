@@ -1,8 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, update, get, serverTimestamp, off } from 'firebase/database';
+import { auth, database, isConfigured, firebaseError } from '../config/firebase';
+import { ref, set, onValue, update, get, off } from 'firebase/database';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  deleteUser as deleteFirebaseUser,
+  sendPasswordResetEmail,
+  onAuthStateChanged,
+  updateProfile,
+  signInWithCredential,
+  GoogleAuthProvider,
+} from 'firebase/auth';
+import { sanitizeFirebasePath } from '../utils/encryption';
 
 const AuthContext = createContext({});
 
@@ -24,8 +36,36 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
+  // 🔐 Firebase Authentication — session sécurisée et persistante gratuitement
   useEffect(() => {
-    loadStoredData();
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          const storedUser   = await AsyncStorage.getItem('@user').catch(() => null);
+          const storedCouple = await AsyncStorage.getItem('@couple').catch(() => null);
+          const storedPartner= await AsyncStorage.getItem('@partner').catch(() => null);
+          setUser(storedUser
+            ? JSON.parse(storedUser)
+            : { id: firebaseUser.uid, name: firebaseUser.displayName || 'Utilisateur', email: firebaseUser.email, avatar: '😊' }
+          );
+          if (storedCouple)  setCouple(JSON.parse(storedCouple));
+          if (storedPartner) setPartner(JSON.parse(storedPartner));
+        } else {
+          setUser(null);
+          setCouple(null);
+          setPartner(null);
+        }
+      } catch (e) {
+        console.warn('⚠️ Restauration session:', e.message);
+      } finally {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // Référence stable pour éviter les re-renders
@@ -80,6 +120,7 @@ export function AuthProvider({ children }) {
               email: partnerData.email,
               gender: partnerData.gender || '',
               isOnline: partnerData.isOnline || false,
+              lastSeen: partnerData.lastSeen || null,
             };
             setPartner(newPartner);
             AsyncStorage.setItem('@partner', JSON.stringify(newPartner));
@@ -96,10 +137,12 @@ export function AuthProvider({ children }) {
 
     return () => {
       console.log('🔕 Arrêt écoute Firebase');
-      // Marquer offline quand on quitte
+      // Marquer offline + enregistrer lastSeen quand on quitte
       if (couple?.id && user?.id) {
         const offlineRef = ref(database, `couples/${couple.id}/members/${user.id}/isOnline`);
         set(offlineRef, false).catch(() => {});
+        const lastSeenRef = ref(database, `couples/${couple.id}/members/${user.id}/lastSeen`);
+        set(lastSeenRef, new Date().toISOString()).catch(() => {});
       }
       off(coupleRef);
       coupleIdRef.current = null;
@@ -107,127 +150,75 @@ export function AuthProvider({ children }) {
     };
   }, [couple?.id, user?.id]);
 
-  const loadStoredData = async () => {
-    try {
-      const storedUser = await AsyncStorage.getItem('@user');
-      const storedCouple = await AsyncStorage.getItem('@couple');
-      const storedPartner = await AsyncStorage.getItem('@partner');
-      
-      if (storedUser) setUser(JSON.parse(storedUser));
-      if (storedCouple) setCouple(JSON.parse(storedCouple));
-      if (storedPartner) setPartner(JSON.parse(storedPartner));
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
+  // Traduction des codes d'erreur Firebase Auth en messages utilisateur
+  const _authError = (code) => {
+    switch (code) {
+      case 'auth/email-already-in-use':   return 'Cet email est déjà utilisé par un autre compte.';
+      case 'auth/invalid-email':          return 'Adresse email invalide.';
+      case 'auth/weak-password':          return 'Mot de passe trop faible (minimum 6 caractères).';
+      case 'auth/user-not-found':         return 'Aucun compte trouvé avec cet email.';
+      case 'auth/wrong-password':         return 'Mot de passe incorrect.';
+      case 'auth/invalid-credential':     return 'Email ou mot de passe incorrect.';
+      case 'auth/too-many-requests':      return 'Trop de tentatives. Réessayez plus tard.';
+      case 'auth/network-request-failed': return 'Erreur réseau. Vérifiez votre connexion.';
+      case 'auth/requires-recent-login':  return 'Reconnectez-vous pour effectuer cette action.';
+      default:                            return 'Une erreur est survenue. Veuillez réessayer.';
     }
   };
 
   const register = async (userData) => {
+    if (!auth) return { success: false, error: firebaseError ? `Erreur Firebase: ${firebaseError}` : 'Firebase Auth non initialisé. Redémarrez l\'app.' };
     try {
+      const email = userData.email.trim().toLowerCase();
+      // 1. Créer le compte Firebase Auth (gratuit, chiffrement serveur, hash PBKDF2 géré par Google)
+      const credential = await createUserWithEmailAndPassword(auth, email, userData.password);
+      const firebaseUser = credential.user;
+      // 2. Sauvegarder le prénom comme displayName
+      await updateProfile(firebaseUser, { displayName: userData.name.trim() });
+      // 3. Profil local sans mot de passe (Firebase Auth gère les secrets)
       const newUser = {
-        id: Date.now().toString(),
-        ...userData,
+        id: firebaseUser.uid,
+        name: userData.name.trim(),
+        email,
+        avatar: userData.avatar || '😊',
+        birthday: userData.birthday || '',
+        gender: userData.gender || '',
         createdAt: new Date().toISOString(),
       };
-      
-      // Sauvegarder l'utilisateur actif
       await AsyncStorage.setItem('@user', JSON.stringify(newUser));
-      
-      // Sauvegarder aussi dans la liste des utilisateurs enregistrés (pour la reconnexion)
-      const storedUsers = await AsyncStorage.getItem('@registeredUsers');
-      let users = storedUsers ? JSON.parse(storedUsers) : [];
-      
-      // Vérifier si l'email existe déjà
-      const existingIndex = users.findIndex(u => u.email === newUser.email);
-      if (existingIndex >= 0) {
-        users[existingIndex] = newUser; // Mettre à jour
-      } else {
-        users.push(newUser); // Ajouter
-      }
-      
-      await AsyncStorage.setItem('@registeredUsers', JSON.stringify(users));
-      
       setUser(newUser);
       return { success: true, user: newUser };
     } catch (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: _authError(error.code) };
     }
   };
 
-  const login = async (name, password) => {
+  const login = async (email, password) => {
+    if (!auth) return { success: false, error: firebaseError ? `Erreur Firebase: ${firebaseError}` : 'Firebase Auth non initialisé. Redémarrez l\'app.' };
     try {
-      // Chercher dans la liste des utilisateurs enregistrés
-      const storedUsers = await AsyncStorage.getItem('@registeredUsers');
-      
-      console.log('🔑 Tentative de connexion pour:', name);
-      
-      if (storedUsers) {
-        const users = JSON.parse(storedUsers);
-        if (!Array.isArray(users)) {
-          console.log('❌ Données utilisateurs corrompues');
-          return { success: false, error: 'Données corrompues. Veuillez vous réinscrire.' };
-        }
-        console.log('📋 Utilisateurs enregistrés:', users.filter(u => u?.name).map(u => u.name).join(', '));
-        
-        // Recherche plus flexible (trim + lowercase)
-        const normalizedName = name.toLowerCase().trim();
-        const foundUser = users.find(u => {
-          if (!u?.name) return false;
-          const userNameNormalized = u.name.toLowerCase().trim();
-          const passwordMatch = u.password === password;
-          console.log(`  Comparaison: "${userNameNormalized}" === "${normalizedName}" = ${userNameNormalized === normalizedName}, pwd: ${passwordMatch}`);
-          return userNameNormalized === normalizedName && passwordMatch;
-        });
-        
-        if (foundUser) {
-          console.log('✅ Utilisateur trouvé:', foundUser.name);
-          
-          // Restaurer l'utilisateur
-          await AsyncStorage.setItem('@user', JSON.stringify(foundUser));
-          setUser(foundUser);
-          
-          // Charger le couple associé à cet utilisateur si existe
-          const storedCouples = await AsyncStorage.getItem('@registeredCouples');
-          if (storedCouples) {
-            const couples = JSON.parse(storedCouples);
-            const userCouple = couples.find(c => c.members && c.members.includes(foundUser.id));
-            if (userCouple) {
-              await AsyncStorage.setItem('@couple', JSON.stringify(userCouple));
-              await AsyncStorage.setItem('@coupleId', userCouple.id);
-              setCouple(userCouple);
-              console.log('👫 Couple restauré:', userCouple.code);
-            }
-          }
-          
-          // Charger le partenaire si existe (essayer plusieurs clés)
-          let partnerData = await AsyncStorage.getItem(`@partner_${foundUser.id}`);
-          if (!partnerData) {
-            partnerData = await AsyncStorage.getItem('@partner');
-          }
-          if (partnerData) {
-            setPartner(JSON.parse(partnerData));
-            console.log('💕 Partenaire restauré');
-          }
-          
-          return { success: true };
-        } else {
-          // Vérifier si le nom existe mais mauvais mot de passe
-          const nameExists = users.find(u => u?.name && u.name.toLowerCase().trim() === normalizedName);
-          if (nameExists) {
-            console.log('❌ Mot de passe incorrect pour:', name);
-            return { success: false, error: 'Mot de passe incorrect' };
-          }
-        }
-      } else {
-        console.log('❌ Aucun utilisateur enregistré');
-        return { success: false, error: 'Aucun compte trouvé. Veuillez vous inscrire.' };
-      }
-      
-      return { success: false, error: 'Nom d\'utilisateur non trouvé' };
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email.trim().toLowerCase(),
+        password
+      );
+      // onAuthStateChanged s'occupe de restaurer le profil et le couple automatiquement
+      const storedUser = await AsyncStorage.getItem('@user').catch(() => null);
+      const name = storedUser
+        ? JSON.parse(storedUser).name
+        : credential.user.displayName || email;
+      return { success: true, name };
     } catch (error) {
-      console.log('❌ Erreur login:', error.message);
-      return { success: false, error: error.message };
+      return { success: false, error: _authError(error.code) };
+    }
+  };
+
+  const sendPasswordReset = async (email) => {
+    if (!auth) return { success: false, error: firebaseError ? `Erreur Firebase: ${firebaseError}` : 'Firebase Auth non initialisé.' };
+    try {
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: _authError(error.code) };
     }
   };
 
@@ -294,44 +285,32 @@ export function AuthProvider({ children }) {
       let foundCouple = null;
       let coupleId = null;
 
-      // Normaliser le code (majuscules, trim)
-      const normalizedCode = code?.toUpperCase().trim();
-      console.log('🔗 Tentative de rejoindre avec le code:', normalizedCode);
+      // Normaliser et sanitiser le code (majuscules, trim, caractères spéciaux Firebase)
+      const normalizedCode = sanitizeFirebasePath(code?.toUpperCase().trim());
+      if (!normalizedCode) {
+        return { success: false, error: 'Code invalide.' };
+      }
 
       // Chercher d'abord sur Firebase si connecté
       if (isConfigured && database && isOnline) {
         try {
-          console.log('🔍 Recherche du code sur Firebase...');
           const couplesRef = ref(database, 'couples');
           const snapshot = await get(couplesRef);
           
           if (snapshot.exists()) {
             const couples = snapshot.val();
-            console.log('📋 Nombre de couples sur Firebase:', Object.keys(couples).length);
-            
             for (const [id, data] of Object.entries(couples)) {
-              const firebaseCode = data.code?.toUpperCase().trim();
-              console.log(`  Comparaison: "${firebaseCode}" === "${normalizedCode}" = ${firebaseCode === normalizedCode}`);
-              
+              const firebaseCode = sanitizeFirebasePath(data.code?.toUpperCase().trim());
               if (firebaseCode === normalizedCode) {
                 coupleId = id;
                 foundCouple = data;
-                console.log('✅ Couple trouvé sur Firebase:', data.name, '- ID:', id);
                 break;
               }
             }
-            
-            if (!foundCouple) {
-              console.log('❌ Code non trouvé sur Firebase');
-            }
-          } else {
-            console.log('❌ Aucun couple sur Firebase');
           }
         } catch (e) {
-          console.log('⚠️ Erreur recherche Firebase:', e.message);
+          console.warn('⚠️ Erreur recherche Firebase:', e.message);
         }
-      } else {
-        console.log('⚠️ Firebase non disponible - isConfigured:', isConfigured, 'isOnline:', isOnline);
       }
 
       // Chercher aussi localement si pas trouvé sur Firebase
@@ -486,7 +465,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      // Ne supprimer que la session active, pas les données enregistrées
+      if (auth) await signOut(auth); // Déconnexion Firebase Auth (invalide le token JWT)
       await AsyncStorage.multiRemove(['@user', '@couple', '@partner']);
       setUser(null);
       setCouple(null);
@@ -499,90 +478,47 @@ export function AuthProvider({ children }) {
   // Suppression complète du compte utilisateur
   const deleteAccount = async () => {
     try {
-      console.log('🗑️ Début suppression complète du compte...');
-      
-      // 1. Supprimer l'utilisateur de la liste des utilisateurs enregistrés
-      const storedUsers = await AsyncStorage.getItem('@registeredUsers');
-      let users = storedUsers ? JSON.parse(storedUsers) : [];
-      if (user && user.email) {
-        users = users.filter(u => u.email !== user.email);
-        await AsyncStorage.setItem('@registeredUsers', JSON.stringify(users));
-        console.log('✅ Utilisateur supprimé de la liste des comptes');
-      }
-
-      // 2. Supprimer sur Firebase si connecté
+      // 1. Supprimer les données Firebase Database (membre + token push)
       if (isConfigured && database && user?.id && couple?.id) {
         try {
-          // Supprimer le membre du couple
           const memberRef = ref(database, `couples/${couple.id}/members/${user.id}`);
           await set(memberRef, null);
-          
-          // Supprimer le token push
           const tokenRef = ref(database, `couples/${couple.id}/pushTokens/${user.id}`);
           await set(tokenRef, null);
-          
-          console.log('✅ Données Firebase supprimées');
         } catch (e) {
-          console.log('⚠️ Erreur suppression Firebase:', e.message);
+          console.warn('⚠️ Erreur suppression Firebase Database:', e.message);
         }
       }
 
-      // 3. Liste de TOUTES les clés à supprimer du stockage local
+      // 2. Supprimer toutes les données locales
       const keysToRemove = [
-        '@user',
-        '@couple',
-        '@partner',
-        '@coupleId',
-        '@pushToken',
-        '@expoPushToken',
-        '@scheduledNotifications',
-        '@letterNotifications',
-        '@memories',
-        '@loveNotes',
-        '@bucketList',
-        '@challenges',
-        '@dailyChallengeStatus',
-        '@weeklyChallenges',
-        '@challengeXP',
-        '@challengeStreak',
-        '@challengeLevel',
-        '@wheelHistory',
-        '@journal',
-        '@timeCapsules',
-        '@scheduledLetters',
-        '@secretContent',
-        '@secretPin',
-        '@useBiometrics',
-        '@gameScores',
-        '@quizScores',
-        '@selectedTheme',
-        '@loveMeterValue',
-        '@stats',
-        '@lastSync',
-        '@notifications',
-        '@settings',
+        '@user', '@couple', '@partner', '@coupleId',
+        '@pushToken', '@expoPushToken', '@scheduledNotifications', '@letterNotifications',
+        '@memories', '@loveNotes', '@bucketList', '@challenges',
+        '@dailyChallengeStatus', '@weeklyChallenges', '@challengeXP',
+        '@challengeStreak', '@challengeLevel', '@wheelHistory', '@journal',
+        '@timeCapsules', '@scheduledLetters', '@secretContent', '@secretPin',
+        '@useBiometrics', '@gameScores', '@quizScores', '@selectedTheme',
+        '@loveMeterValue', '@stats', '@lastSync', '@notifications', '@settings',
+        '@pinCode', '@registeredUsers', '@registeredCouples', '@chatMessages',
       ];
-
-      // Supprimer aussi les clés spécifiques à l'utilisateur si elles existent
       if (user?.id) {
         keysToRemove.push(`@partner_${user.id}`);
         keysToRemove.push(`@user_${user.id}`);
       }
-
-      // 4. Supprimer toutes les clés
       await AsyncStorage.multiRemove(keysToRemove);
-      console.log('✅ Toutes les données locales supprimées');
 
-      // 5. Pour être sûr, vider tout le AsyncStorage (option nucléaire)
-      // Décommenter si besoin: await AsyncStorage.clear();
+      // 3. Supprimer le compte Firebase Authentication (irréversible)
+      const firebaseCurrentUser = auth?.currentUser;
+      if (firebaseCurrentUser) {
+        await deleteFirebaseUser(firebaseCurrentUser);
+      }
 
-      // 6. Réinitialiser les états
+      // 4. Réinitialiser les états
       setUser(null);
       setCouple(null);
       setPartner(null);
       setIsSynced(false);
-      
-      console.log('✅ Compte supprimé avec succès !');
       return { success: true };
     } catch (error) {
       console.error('❌ Erreur suppression compte:', error);
@@ -681,6 +617,33 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // 🔐 Connexion avec Google — compatible iOS/Android via expo-auth-session
+  const loginWithGoogle = async (idToken) => {
+    if (!auth) return { success: false, error: firebaseError ? `Erreur Firebase: ${firebaseError}` : 'Firebase Auth non initialisé.' };
+    try {
+      const credential = GoogleAuthProvider.credential(idToken);
+      const result = await signInWithCredential(auth, credential);
+      const firebaseUser = result.user;
+      // Vérifier si profil local déjà existant
+      const storedUser = await AsyncStorage.getItem('@user').catch(() => null);
+      if (!storedUser) {
+        // Première connexion Google — créer le profil depuis les données Google
+        const newUser = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Utilisateur',
+          email: firebaseUser.email,
+          avatar: '😊',
+          createdAt: new Date().toISOString(),
+        };
+        await AsyncStorage.setItem('@user', JSON.stringify(newUser));
+        setUser(newUser);
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: _authError(error.code) };
+    }
+  };
+
   const value = {
     user,
     couple,
@@ -690,7 +653,9 @@ export function AuthProvider({ children }) {
     isSynced,
     register,
     login,
+    loginWithGoogle,
     logout,
+    sendPasswordReset,
     createCouple,
     joinCouple,
     updateUser,

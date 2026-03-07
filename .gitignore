@@ -38,3 +38,17 @@ build.apk
 # Firebase Admin SDK key (SECRET - never commit!)
 h-couple-firebase-adminsdk*.json
 *-adminsdk*.json
+
+# Google Services (contient des identifiants projet)
+google-services.json
+GoogleService-Info.plist
+
+# Variables d'environnement
+.env
+.env.*
+!.env.example
+
+# Cloudinary / autres secrets
+*.secret
+secrets.js
+secrets.json

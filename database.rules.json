@@ -1,56 +1,154 @@
-{
-  "rules": {
-    "couples": {
-      ".read": true,
-      ".write": true,
-      "$coupleId": {
-        ".read": true,
-        ".write": true,
-        "pushTokens": {
-          ".read": true,
-          ".write": true
-        },
-        "members": {
-          ".read": true,
-          ".write": true
-        }
-      }
-    },
-    "couplesMembers": {
-      ".read": true,
-      ".write": true
-    },
-    "games": {
-      ".read": true,
-      ".write": true,
-      "$coupleId": {
-        ".read": true,
-        ".write": true,
-        "session": {
-          ".read": true,
-          ".write": true
-        },
-        "_connectionTest": {
-          ".read": true,
-          ".write": true
-        }
-      }
-    },
-    "messages": {
-      ".read": true,
-      ".write": true
-    },
-    "memories": {
-      ".read": true,
-      ".write": true
-    },
-    "challenges": {
-      ".read": true,
-      ".write": true
-    },
-    "notifications": {
-      ".read": true,
-      ".write": true
-    }
-  }
+﻿{
+    "rules":  {
+                  "couples":  {
+                                  "$coupleId":  {
+                                                    ".read":  "auth != null",
+                                                    ".write":  "auth != null",
+                                                    "code":  {
+                                                                 ".validate":  "newData.isString() && newData.val().length >= 4 && newData.val().length <= 16"
+                                                             },
+                                                    "name":  {
+                                                                 ".validate":  "newData.isString() && newData.val().length <= 100"
+                                                             },
+                                                    "anniversary":  {
+                                                                        ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 20)"
+                                                                    },
+                                                    "loveMeter":  {
+                                                                      ".validate":  "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+                                                                  },
+                                                    "couplePhoto":  {
+                                                                        ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 500)"
+                                                                    },
+                                                    "couplePhotoPublicId":  {
+                                                                                ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 200)"
+                                                                            },
+                                                    "members":  {
+                                                                    "$memberId":  {
+                                                                                      ".read":  "auth != null",
+                                                                                      ".write":  "auth != null && (auth.uid == $memberId || data.parent().child(auth.uid).exists() || !data.parent().exists())",
+                                                                                      ".validate":  "newData.hasChildren([\"name\"])",
+                                                                                      "name":  {
+                                                                                                   ".validate":  "newData.isString() && newData.val().length >= 1 && newData.val().length <= 100"
+                                                                                               },
+                                                                                      "email":  {
+                                                                                                    ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 200)"
+                                                                                                },
+                                                                                      "avatar":  {
+                                                                                                     ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 10)"
+                                                                                                 },
+                                                                                      "gender":  {
+                                                                                                     ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 20)"
+                                                                                                 },
+                                                                                      "isOnline":  {
+                                                                                                       ".validate":  "!newData.exists() || newData.isBoolean()"
+                                                                                                   },
+                                                                                      "lastSeen":  {
+                                                                                                       ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 30)"
+                                                                                                   },
+                                                                                      "isCreator":  {
+                                                                                                        ".validate":  "!newData.exists() || newData.isBoolean()"
+                                                                                                    },
+                                                                                      "joinedAt":  {
+                                                                                                       ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 30)"
+                                                                                                   }
+                                                                                  }
+                                                                },
+                                                    "pushTokens":  {
+                                                                       "$userId":  {
+                                                                                       ".read":  "auth != null",
+                                                                                       ".write":  "auth != null && auth.uid == $userId",
+                                                                                       "token":  {
+                                                                                                     ".validate":  "newData.isString() && newData.val().length <= 500"
+                                                                                                 },
+                                                                                       "platform":  {
+                                                                                                        ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 20)"
+                                                                                                    },
+                                                                                       "updatedAt":  {
+                                                                                                         ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 30)"
+                                                                                                     },
+                                                                                       "userName":  {
+                                                                                                        ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 100)"
+                                                                                                    }
+                                                                                   }
+                                                                   },
+                                                    "chat":  {
+                                                                 "messages":  {
+                                                                                  "$messageId":  {
+                                                                                                     ".read":  "auth != null",
+                                                                                                     ".write":  "auth != null",
+                                                                                                     ".validate":  "newData.hasChildren([\"senderId\",\"timestamp\",\"type\"])",
+                                                                                                     "senderId":  {
+                                                                                                                      ".validate":  "newData.isString() && newData.val() == auth.uid"
+                                                                                                                  },
+                                                                                                     "senderName":  {
+                                                                                                                        ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 100)"
+                                                                                                                    },
+                                                                                                     "type":  {
+                                                                                                                  ".validate":  "newData.isString() && newData.val().matches(/^(text|image|voice|sticker)$/)"
+                                                                                                              },
+                                                                                                     "content":  {
+                                                                                                                     ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 10000)"
+                                                                                                                 },
+                                                                                                     "timestamp":  {
+                                                                                                                       ".validate":  "newData.isString() && newData.val().length <= 30"
+                                                                                                                   },
+                                                                                                     "read":  {
+                                                                                                                  ".validate":  "!newData.exists() || newData.isBoolean()"
+                                                                                                              }
+                                                                                                 }
+                                                                              },
+                                                                 "typing":  {
+                                                                                "$userId":  {
+                                                                                                ".read":  "auth != null",
+                                                                                                ".write":  "auth != null && auth.uid == $userId",
+                                                                                                ".validate":  "newData.isString() && newData.val().length <= 30"
+                                                                                            }
+                                                                            },
+                                                                 "recording":  {
+                                                                                   "$userId":  {
+                                                                                                   ".read":  "auth != null",
+                                                                                                   ".write":  "auth != null && auth.uid == $userId",
+                                                                                                   ".validate":  "!newData.exists() || newData.isBoolean()"
+                                                                                               }
+                                                                               }
+                                                             },
+                                                    "calls":  {
+                                                                  "active":  {
+                                                                                 ".read":  "auth != null",
+                                                                                 ".write":  "auth != null"
+                                                                             }
+                                                              },
+                                                    "data":  {
+                                                                 ".read":  "auth != null",
+                                                                 ".write":  "auth != null"
+                                                             }
+                                                }
+                              },
+                  "couplesMembers":  {
+                                         ".read":  "auth != null",
+                                         ".write":  "auth != null"
+                                     },
+                  "games":  {
+                                "$coupleId":  {
+                                                  ".read":  "auth != null",
+                                                  ".write":  "auth != null"
+                                              }
+                            },
+                  "messages":  {
+                                   ".read":  "auth != null",
+                                   ".write":  "auth != null"
+                               },
+                  "memories":  {
+                                   ".read":  "auth != null",
+                                   ".write":  "auth != null"
+                               },
+                  "challenges":  {
+                                     ".read":  "auth != null",
+                                     ".write":  "auth != null"
+                                 },
+                  "notifications":  {
+                                        ".read":  "auth != null",
+                                        ".write":  "auth != null"
+                                    }
+              }
 }

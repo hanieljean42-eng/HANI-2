@@ -2,7 +2,7 @@
   "expo": {
     "name": "HANI 2",
     "slug": "loveapp2026",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -47,6 +47,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "scheme": "hani2",
     "plugins": [
       "expo-asset",
       [

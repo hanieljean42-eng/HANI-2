@@ -1,16 +1,95 @@
 /**
  * Module de chiffrement pour données sensibles
  * Utilise AES-256 pour chiffrer les messages, notes d'amour, etc.
+ * Utilise PBKDF2 pour le hachage des mots de passe et des PINs.
  */
 
 import CryptoJS from 'crypto-js';
 
-// Clé de chiffrement - dans une app réelle, utiliser une clé depuis Firebase Cloud Function
-// Cette clé est générée une fois par couple et stockée sécurisement
+// ─── Sels statiques (application) ───────────────────────────────────────────
+// Ces sels sont publics ; la sécurité repose sur les itérations PBKDF2.
+const _PWD_SALT  = CryptoJS.enc.Utf8.parse('HANI2_PWD_SALT_v1_2024');
+const _PIN_SALT  = CryptoJS.enc.Utf8.parse('HANI2_PIN_SALT_v1_2024');
+const _KEY_SALT  = CryptoJS.enc.Utf8.parse('HANI2_KEY_SALT_v1_2024');
+
+// Préfixes pour distinguer hachages modernes des anciennes valeurs en clair
+const PWD_HASH_PREFIX = 'v2:';
+const PIN_HASH_PREFIX = 'p2:';
+
+// ─── Dérivation de la clé de chiffrement de couple (PBKDF2) ─────────────────
 const generateCoupleKey = (coupleId) => {
-  // Utiliser le coupleId pour générer une clé déterministe
-  // Dans une vrai app, ce serait une clé générée et stockée côté serveur
-  return CryptoJS.SHA256(`hani2_couple_${coupleId}`).toString().substring(0, 32);
+  return CryptoJS.PBKDF2(`HANI2_E2E_${coupleId}`, _KEY_SALT, {
+    keySize: 8,        // 256 bits
+    iterations: 5000,
+  }).toString().substring(0, 32);
+};
+
+// ─── Hachage des mots de passe ───────────────────────────────────────────────
+
+/**
+ * Hache un mot de passe avec PBKDF2 (10 000 itérations).
+ * Le résultat est préfixé par "v2:" pour identifier le format.
+ */
+export const hashPassword = (password) => {
+  if (!password) return '';
+  const hash = CryptoJS.PBKDF2(password, _PWD_SALT, {
+    keySize: 8,        // 256 bits
+    iterations: 10000,
+  }).toString();
+  return PWD_HASH_PREFIX + hash;
+};
+
+/**
+ * Vérifie un mot de passe contre un hash stocké.
+ * Supporte la migration : si le hash n'a pas le préfixe "v2:", c'est un ancien
+ * mot de passe en clair ; la comparaison directe est utilisée une dernière fois.
+ */
+export const verifyPassword = (plainPassword, stored) => {
+  if (!plainPassword || !stored) return false;
+  if (stored.startsWith(PWD_HASH_PREFIX)) {
+    return hashPassword(plainPassword) === stored;
+  }
+  // Rétro-compatibilité : ancien mot de passe en clair
+  return plainPassword === stored;
+};
+
+// ─── Hachage des PINs ────────────────────────────────────────────────────────
+
+/**
+ * Hache un PIN avec PBKDF2.
+ * Préfixé par "p2:" pour identifier le format.
+ */
+export const hashPin = (pin) => {
+  if (!pin) return '';
+  const hash = CryptoJS.PBKDF2(pin, _PIN_SALT, {
+    keySize: 4,        // 128 bits (suffisant pour PIN court)
+    iterations: 5000,
+  }).toString();
+  return PIN_HASH_PREFIX + hash;
+};
+
+/**
+ * Vérifie un PIN contre un hash stocké.
+ * Supporte la migration depuis les anciens PINs en clair.
+ */
+export const verifyPin = (inputPin, stored) => {
+  if (!inputPin || !stored) return false;
+  if (stored.startsWith(PIN_HASH_PREFIX)) {
+    return hashPin(inputPin) === stored;
+  }
+  // Rétro-compatibilité : ancien PIN en clair
+  return inputPin === stored;
+};
+
+// ─── Sanitisation des chemins Firebase ──────────────────────────────────────
+
+/**
+ * Nettoie une chaîne destinée à être utilisée comme segment de chemin Firebase.
+ * Supprime les caractères interdits : . # $ / [ ]
+ */
+export const sanitizeFirebasePath = (str) => {
+  if (!str || typeof str !== 'string') return '';
+  return str.replace(/[.#$/[\]]/g, '').trim().substring(0, 255);
 };
 
 /**

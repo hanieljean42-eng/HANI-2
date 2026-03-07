@@ -353,7 +353,7 @@ export function NotificationProvider({ children }) {
       try {
         // Obtenir le token Expo Push avec le bon projectId
         // Le projectId doit correspondre à celui de app.json/eas.json
-        const projectId = 'b1f00575-c61e-45ee-84ac-b1644dff132f'; // ID du projet EAS
+        const projectId = 'de6488a3-2b3d-4a48-b503-185e188052c6'; // ID du projet EAS (app.json)
         const tokenData = await Notifications.getExpoPushTokenAsync({
           projectId: projectId,
         });
@@ -561,17 +561,21 @@ export function NotificationProvider({ children }) {
   // Notification quand un souvenir est ajouté
   const notifyNewMemory = async (userName) => {
     await sendPushNotification(
-      '📸 Nouveau souvenir !',
-      `${userName} a ajouté un nouveau souvenir. Viens le voir ! 💕`,
+      '📸 Nouveau souvenir partagé !',
+      `${userName} vient d'ajouter un souvenir à votre album commun 💑 Viens le voir !`,
       { type: 'memory' }
     );
   };
 
-  // Notification quand une love note est envoyée
+  // Notification quand un message est envoyé dans le chat
   const notifyLoveNote = async (userName, preview) => {
+    const isMedia = preview === '📸 Photo' || preview === '🎤 Message vocal';
+    const body = isMedia
+      ? `${userName} t'a envoyé ${preview} 💕`
+      : `${userName} : ${preview.substring(0, 60)}${preview.length > 60 ? '...' : ''}`;
     await sendPushNotification(
-      '💌 Message d\'amour',
-      `${userName}: ${preview.substring(0, 50)}${preview.length > 50 ? '...' : ''}`,
+      isMedia ? `${userName} t'a envoyé quelque chose` : '💌 Nouveau message',
+      body,
       { type: 'love_note' }
     );
   };
@@ -579,17 +583,17 @@ export function NotificationProvider({ children }) {
   // Notification quand un défi est complété
   const notifyChallengeCompleted = async (userName, challengeName) => {
     await sendPushNotification(
-      '🏆 Défi complété !',
-      `${userName} a terminé le défi "${challengeName}" !`,
+      '🏆 Défi accompli !',
+      `${userName} a relevé le défi "${challengeName}" ! Bravo ! Vous formez une super équipe 💪`,
       { type: 'challenge' }
     );
   };
 
-  // Notification quand un défi EST ASSIGNÉ (nouveau défi à faire)
+  // Notification quand un défi est assigné
   const notifyChallengeAssigned = async (userName, challengeName) => {
     await sendPushNotification(
-      '⚡ Nouveau défi !',
-      `${userName} t'a assigné le défi "${challengeName}" ! Tu peux le faire ? 💪`,
+      '⚡ Défi lancé !',
+      `${userName} te lance le défi "${challengeName}" ! Tu l'acceptes ? 💪`,
       { type: 'challenge_assigned' }
     );
   };
@@ -597,17 +601,17 @@ export function NotificationProvider({ children }) {
   // Notification quand une capsule temporelle est créée
   const notifyTimeCapsule = async (userName) => {
     await sendPushNotification(
-      '💊 Capsule temporelle',
-      `${userName} a créé une capsule temporelle secrète ! 🔒`,
+      '⏳ Capsule du futur créée !',
+      `${userName} a scellé un souvenir pour vous deux dans une capsule... 🔒 Elle s'ouvrira bientôt !`,
       { type: 'capsule' }
     );
   };
 
-  // Notification quand une capsule temporelle est OUVERTE
+  // Notification quand une capsule temporelle est ouverte
   const notifyCapsuleOpened = async (userName, capsuleTitle) => {
     await sendPushNotification(
-      '💊 Capsule ouverte !',
-      `${userName} a ouvert la capsule "${capsuleTitle}" ! Venez revivre ce moment ensemble 💕`,
+      '✨ Capsule déscellée !',
+      `${userName} a ouvert la capsule "${capsuleTitle}" ! Un voyage dans le temps vous attend 💕`,
       { type: 'capsule_opened' }
     );
   };
@@ -615,8 +619,8 @@ export function NotificationProvider({ children }) {
   // Notification quand le partenaire se connecte
   const notifyPartnerOnline = async (userName) => {
     await sendPushNotification(
-      '💚 En ligne',
-      `${userName} vient de se connecter ! 👋`,
+      `💚 ${userName} est là !`,
+      `${userName} vient de se connecter sur HANI 👋 Dis-lui bonjour !`,
       { type: 'online' }
     );
   };
@@ -624,8 +628,8 @@ export function NotificationProvider({ children }) {
   // Notification quand un élément bucket list est coché
   const notifyBucketCompleted = async (userName, itemName) => {
     await sendPushNotification(
-      '✨ Rêve réalisé !',
-      `${userName} a coché "${itemName}" de votre bucket list ! 🎉`,
+      '🌟 Rêve accompli !',
+      `${userName} a coché "${itemName}" de votre bucket list ! Un rêve de moins, un souvenir de plus 🎉`,
       { type: 'bucket' }
     );
   };
@@ -633,17 +637,17 @@ export function NotificationProvider({ children }) {
   // Notification pour invitation à jouer
   const notifyGameInvite = async (userName, gameName) => {
     await sendPushNotification(
-      '🎮 Invitation à jouer',
-      `${userName} t'invite à jouer à ${gameName} ! Viens vite ! 🎯`,
+      `🎮 ${userName} te défie !`,
+      `${userName} veut jouer à ${gameName} avec toi ! Tu es prêt(e) à relever le défi ? 🎯`,
       { type: 'game_invite', game: gameName }
     );
   };
 
-  // Notification quand la roue est tournée (une seule notification combinée)
+  // Notification quand la roue des dates est tournée
   const notifyWheelSpin = async (userName, result) => {
     await sendPushNotification(
-      '🎰 Roue des Dates',
-      `${userName} a tourné la roue ! Résultat : "${result}" 🎯 Viens voir !`,
+      '🎰 La roue a tourné !',
+      `${userName} vient de faire tourner la roue des dates ! Résultat : "${result}" 💑 À vous de jouer !`,
       { type: 'wheel_spin', result }
     );
   };
@@ -663,8 +667,8 @@ export function NotificationProvider({ children }) {
     
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: '💕 Bonjour !',
-        body: 'N\'oublie pas de dire bonjour à ton amour aujourd\'hui !',
+        title: '☀️ Bonne journée !',
+        body: 'N\'oublie pas d\'envoyer un message à ton amour aujourd\'hui 💕 Même un petit mot compte !',
         sound: 'default',
         priority: Notifications.AndroidNotificationPriority.HIGH,
       },
@@ -689,10 +693,10 @@ export function NotificationProvider({ children }) {
     
     const seconds = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
     
-    const title = isChallengeIncomplete ? '⚡ Le défi t\'attend !' : '💬 Prends du temps ensemble';
-    const body = isChallengeIncomplete 
-      ? `Vous n'avez pas encore complété le défi d'aujourd'hui ! C'est le moment ? 🎯`
-      : `Ça fait un moment que tu n'as pas parlé avec ${partnerName}... Elle/il te manque peut-être ? 💭`;
+    const title = isChallengeIncomplete ? '⚡ Le défi t\'attend !' : '💬 Un moment ensemble ?';
+    const body = isChallengeIncomplete
+      ? `Le défi du jour n'est pas encore terminé ! C'est le moment parfait pour le faire ensemble 🎯`
+      : `Ça fait un moment que tu n'as pas écrit à ${partnerName}... Un petit message pour lui faire sourire ? 💭`;
     
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -864,8 +868,8 @@ export function NotificationProvider({ children }) {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🎉 Bienvenue sur HANI 2 !',
-          body: `Salut ${userName} ! Ton compte a été créé avec succès. L'amour t'attend ! 💕`,
+          title: '🎉 Bienvenue sur HANI !',
+          body: `Salut ${userName} ! Prends le temps de te connecter avec ton amour 💕 Explore les jeux, souvenirs et bien plus !`,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
           data: { type: 'welcome' },
@@ -966,8 +970,8 @@ export function NotificationProvider({ children }) {
   const notifyPartnerJoinedCreator = async (partnerName) => {
     try {
       await sendPushNotification(
-        '👫 Partenaire connecté !',
-        `${partnerName} a rejoint votre espace couple ! 🎉 Synchronisation en temps réel activée 💕`,
+        '👫 Votre couple est complet !',
+        `${partnerName} a rejoint votre espace couple sur HANI ! 🎉 Tout se synchronise maintenant en temps réel 💕`,
         { type: 'partner_joined_creator' }
       );
       return true;
@@ -982,8 +986,8 @@ export function NotificationProvider({ children }) {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '👋 Re-bonjour !',
-          body: `Content de te revoir ${userName} ! Ton amour t'attend 💕`,
+          title: `👋 Re-bonjour ${userName} !`,
+          body: `Quelque chose de nouveau t'attend peut-être 💕 Viens vite !`,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.DEFAULT,
           data: { type: 'login' },
