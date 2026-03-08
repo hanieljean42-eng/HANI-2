@@ -90,14 +90,21 @@ export function ChatProvider({ children }) {
     const callListener = onValue(callActiveRef, (snapshot) => {
       if (snapshot.exists()) {
         const callData = snapshot.val();
-        if (callData.callerId !== user.id && callData.status === 'ringing') {
+        if (callData.status === 'ringing' && callData.callerId !== user.id) {
+          // Appel entrant pour moi
           setIncomingCall(callData);
+        } else if (callData.status === 'accepted') {
+          // Appel accepté — mettre à jour activeCall pour les DEUX côtés
+          setActiveCall(callData);
+          setIncomingCall(null);
         } else if (callData.status === 'ended') {
           setIncomingCall(null);
           setActiveCall(null);
         }
       } else {
+        // Noeud supprimé = appel terminé
         setIncomingCall(null);
+        setActiveCall(null);
       }
     });
 
@@ -280,10 +287,16 @@ export function ChatProvider({ children }) {
   const acceptCall = async () => {
     if (!couple?.id || !incomingCall) return null;
     try {
-      const statusRef = ref(database, `couples/${couple.id}/calls/active/status`);
-      await set(statusRef, 'accepted');
+      // Mettre à jour le status + ajouter acceptedAt pour synchroniser le timer
+      const callRef = ref(database, `couples/${couple.id}/calls/active`);
+      const updatedCallData = {
+        ...incomingCall,
+        status: 'accepted',
+        acceptedAt: Date.now(),
+      };
+      await set(callRef, updatedCallData);
       const roomId = incomingCall.roomId;
-      setActiveCall(incomingCall);
+      setActiveCall(updatedCallData);
       setIncomingCall(null);
       return roomId;
     } catch (error) {

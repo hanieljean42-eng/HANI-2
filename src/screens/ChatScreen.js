@@ -16,6 +16,8 @@ import {
   Modal,
   StatusBar,
   ActivityIndicator,
+  Vibration,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -137,6 +139,8 @@ export default function ChatScreen({ navigation }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaker, setIsSpeaker] = useState(false);
   const callTimerRef = useRef(null);
+  const ringtoneRef = useRef(null);
+  const vibrationRef = useRef(null);
   
   const flatListRef = useRef(null);
   const recordingRef = useRef(null);
@@ -178,6 +182,11 @@ export default function ChatScreen({ navigation }) {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
       }
+      if (ringtoneRef.current) {
+        ringtoneRef.current.unloadAsync();
+        ringtoneRef.current = null;
+      }
+      Vibration.cancel();
     };
   }, []);
 
@@ -243,6 +252,37 @@ export default function ChatScreen({ navigation }) {
     return null;
   };
 
+  // === SONNERIE & VIBRATION POUR APPELS ENTRANTS ===
+  const startRingtone = async () => {
+    try {
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+      // Générer un son de sonnerie en boucle via le système
+      // On utilise un pattern de vibration qui simule une sonnerie
+      Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800], true); // Boucle de vibration
+    } catch (e) {
+      console.log('⚠️ Erreur sonnerie:', e.message);
+    }
+  };
+
+  const stopRingtone = () => {
+    Vibration.cancel();
+    if (ringtoneRef.current) {
+      ringtoneRef.current.unloadAsync().catch(() => {});
+      ringtoneRef.current = null;
+    }
+  };
+
+  // Déclencher sonnerie + vibration quand appel entrant
+  useEffect(() => {
+    if (incomingCall) {
+      startRingtone();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } else {
+      stopRingtone();
+    }
+    return () => stopRingtone();
+  }, [incomingCall]);
+
   // Lancer un appel
   const handleCall = async (type) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -260,6 +300,7 @@ export default function ChatScreen({ navigation }) {
 
   // Accepter un appel entrant
   const handleAcceptCall = async () => {
+    stopRingtone();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await acceptCall();
     setShowCallScreen(true);
@@ -270,6 +311,7 @@ export default function ChatScreen({ navigation }) {
 
   // Raccrocher l'appel
   const handleEndCall = async () => {
+    stopRingtone();
     setShowCallScreen(false);
     setCallTimer(0);
     if (callTimerRef.current) clearInterval(callTimerRef.current);
@@ -277,23 +319,40 @@ export default function ChatScreen({ navigation }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   };
 
-  // Timer d'appel — démarre quand l'appel est accepté (activeCall existe)
+  // Timer d'appel synchronisé via acceptedAt (Firebase timestamp)
   useEffect(() => {
-    if (showCallScreen && activeCall) {
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+      callTimerRef.current = null;
+    }
+    
+    if (showCallScreen && activeCall?.acceptedAt) {
+      // Calculer le temps écoulé depuis acceptedAt pour synchronisation
+      const updateTimer = () => {
+        const elapsed = Math.floor((Date.now() - activeCall.acceptedAt) / 1000);
+        setCallTimer(Math.max(0, elapsed));
+      };
+      updateTimer(); // Mise à jour immédiate
+      callTimerRef.current = setInterval(updateTimer, 1000);
+    } else if (showCallScreen && activeCall?.status === 'accepted' && !activeCall?.acceptedAt) {
+      // Fallback si pas de acceptedAt
       callTimerRef.current = setInterval(() => {
         setCallTimer(prev => prev + 1);
       }, 1000);
-    } else if (callTimerRef.current) {
-      clearInterval(callTimerRef.current);
     }
-    return () => { if (callTimerRef.current) clearInterval(callTimerRef.current); };
-  }, [showCallScreen, activeCall]);
+    
+    return () => { 
+      if (callTimerRef.current) clearInterval(callTimerRef.current); 
+    };
+  }, [showCallScreen, activeCall?.acceptedAt, activeCall?.status]);
 
   // Fermer l'écran d'appel si l'appel se termine (partenaire raccroche)
   useEffect(() => {
-    if (showCallScreen && !activeCall && !incomingCall && callTimer > 0) {
+    if (showCallScreen && !activeCall && !incomingCall) {
+      stopRingtone();
       setShowCallScreen(false);
       setCallTimer(0);
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
     }
   }, [activeCall, incomingCall]);
 
@@ -302,6 +361,24 @@ export default function ChatScreen({ navigation }) {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
+  };
+
+  // Lancer un vrai appel téléphonique via le numéro du partenaire
+  const launchPhoneCall = () => {
+    Alert.alert(
+      '📞 Appel téléphonique',
+      'Voulez-vous appeler votre partenaire via le téléphone ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: '📞 Appeler', 
+          onPress: () => {
+            // Ouvrir le dialer nativement
+            Linking.openURL('tel:');
+          }
+        },
+      ]
+    );
   };
 
   const handleSend = async () => {
@@ -905,21 +982,42 @@ export default function ChatScreen({ navigation }) {
         onRequestClose={handleEndCall}
       >
         <LinearGradient
-          colors={['#1a1a2e', '#16213e', '#0f3460']}
+          colors={
+            (activeCall?.type || incomingCall?.type) === 'video'
+              ? ['#1a0a2e', '#2d1b69', '#441188']  // Violet pour vidéo
+              : ['#1a1a2e', '#16213e', '#0f3460']   // Bleu pour vocal
+          }
           style={styles.callScreenContainer}
         >
           <StatusBar backgroundColor="#1a1a2e" barStyle="light-content" />
           
           {/* Info partenaire */}
           <View style={styles.callPartnerInfo}>
-            <View style={styles.callAvatar}>
+            {/* Icône type d'appel en haut */}
+            <View style={[
+              styles.callTypeIcon,
+              (activeCall?.type || incomingCall?.type) === 'video' && styles.callTypeIconVideo
+            ]}>
+              <Ionicons 
+                name={(activeCall?.type || incomingCall?.type) === 'video' ? 'videocam' : 'call'} 
+                size={24} 
+                color="#fff" 
+              />
+            </View>
+            
+            <View style={[
+              styles.callAvatar,
+              (activeCall?.type || incomingCall?.type) === 'video' && styles.callAvatarVideo
+            ]}>
               <Text style={styles.callAvatarText}>{partner?.avatar || '💕'}</Text>
             </View>
             <Text style={styles.callPartnerName}>{partner?.name || 'Mon amour'}</Text>
             <Text style={styles.callStatus}>
-              {activeCall
+              {activeCall?.status === 'accepted'
                 ? formatCallTimer(callTimer)
-                : '📞 Appel en cours...'}
+                : activeCall?.status === 'ringing'
+                  ? '📞 Appel en cours...'
+                  : '⏳ Connexion...'}
             </Text>
             <Text style={styles.callType}>
               {(activeCall?.type || incomingCall?.type) === 'video' ? '🎥 Appel vidéo' : '📞 Appel vocal'}
@@ -931,7 +1029,15 @@ export default function ChatScreen({ navigation }) {
             {[1, 2, 3].map((i) => (
               <View key={i} style={[
                 styles.callWave,
-                { width: 120 + i * 40, height: 120 + i * 40, borderRadius: 60 + i * 20, opacity: 0.15 / i }
+                { 
+                  width: 120 + i * 40, 
+                  height: 120 + i * 40, 
+                  borderRadius: 60 + i * 20, 
+                  opacity: 0.15 / i,
+                  borderColor: (activeCall?.type || incomingCall?.type) === 'video' 
+                    ? 'rgba(168,85,247,0.4)' 
+                    : 'rgba(255,255,255,0.3)',
+                }
               ]} />
             ))}
           </View>
@@ -961,26 +1067,50 @@ export default function ChatScreen({ navigation }) {
               <Text style={styles.callControlLabel}>{isSpeaker ? 'Écouteur' : 'HP'}</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Bouton appel téléphonique réel */}
+          {activeCall?.status === 'accepted' && (
+            <TouchableOpacity 
+              style={styles.realCallButton} 
+              onPress={launchPhoneCall}
+            >
+              <Ionicons name="phone-portrait-outline" size={18} color="#fff" />
+              <Text style={styles.realCallButtonText}>Lancer un vrai appel téléphonique</Text>
+            </TouchableOpacity>
+          )}
         </LinearGradient>
       </Modal>
 
       {/* Appel entrant */}
-      {incomingCall && (
+      {incomingCall && !showCallScreen && (
         <View style={styles.incomingCallOverlay}>
-          <LinearGradient colors={['rgba(20,0,40,0.97)', 'rgba(0,0,20,0.97)']} style={styles.incomingCallCard}>
-            <Text style={styles.incomingCallEmoji}>
-              {incomingCall.type === 'video' ? '🎥' : '📞'}
-            </Text>
+          <LinearGradient 
+            colors={
+              incomingCall.type === 'video' 
+                ? ['rgba(45,27,105,0.97)', 'rgba(68,17,136,0.97)'] 
+                : ['rgba(20,0,40,0.97)', 'rgba(0,0,20,0.97)']
+            } 
+            style={styles.incomingCallCard}
+          >
+            {/* Animation pulse pour appel entrant */}
+            <View style={styles.incomingCallPulse}>
+              <Text style={styles.incomingCallEmoji}>
+                {incomingCall.type === 'video' ? '🎥' : '📞'}
+              </Text>
+            </View>
             <Text style={styles.incomingCallName}>{incomingCall.callerName}</Text>
             <Text style={styles.incomingCallType}>
               {incomingCall.type === 'video' ? 'Appel vidéo entrant' : 'Appel vocal entrant'}
             </Text>
+            <Text style={styles.incomingCallRinging}>🔔 Sonnerie...</Text>
             <View style={styles.incomingCallButtons}>
-              <TouchableOpacity style={styles.rejectCallButton} onPress={rejectCall}>
+              <TouchableOpacity style={styles.rejectCallButton} onPress={() => { stopRingtone(); rejectCall(); }}>
                 <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+                <Text style={styles.callBtnLabel}>Refuser</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.acceptCallButton} onPress={handleAcceptCall}>
                 <Ionicons name="call" size={28} color="#fff" />
+                <Text style={styles.callBtnLabel}>Répondre</Text>
               </TouchableOpacity>
             </View>
           </LinearGradient>
@@ -1502,6 +1632,21 @@ const styles = StyleSheet.create({
     paddingTop: 80,
     paddingBottom: 60,
   },
+  callTypeIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(59,130,246,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.5)',
+  },
+  callTypeIconVideo: {
+    backgroundColor: 'rgba(168,85,247,0.3)',
+    borderColor: 'rgba(168,85,247,0.5)',
+  },
   callPartnerInfo: {
     alignItems: 'center',
     zIndex: 2,
@@ -1515,7 +1660,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(59,130,246,0.4)',
+  },
+  callAvatarVideo: {
+    borderColor: 'rgba(168,85,247,0.5)',
+    backgroundColor: 'rgba(168,85,247,0.15)',
   },
   callAvatarText: {
     fontSize: 50,
@@ -1527,10 +1676,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   callStatus: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 22,
+    color: 'rgba(255,255,255,0.9)',
     marginBottom: 4,
     fontVariant: ['tabular-nums'],
+    fontWeight: '600',
   },
   callType: {
     fontSize: 14,
@@ -1583,6 +1733,22 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  realCallButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 10,
+  },
+  realCallButtonText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+  },
   // Modal appel entrant
   incomingCallOverlay: {
     position: 'absolute',
@@ -1603,9 +1769,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
   },
+  incomingCallPulse: {
+    marginBottom: 8,
+  },
   incomingCallEmoji: {
     fontSize: 64,
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  incomingCallRinging: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 20,
+  },
+  callBtnLabel: {
+    color: '#fff',
+    fontSize: 11,
+    marginTop: 6,
+    fontWeight: '500',
   },
   incomingCallName: {
     fontSize: 26,
@@ -1616,7 +1796,7 @@ const styles = StyleSheet.create({
   incomingCallType: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.75)',
-    marginBottom: 36,
+    marginBottom: 8,
   },
   incomingCallButtons: {
     flexDirection: 'row',

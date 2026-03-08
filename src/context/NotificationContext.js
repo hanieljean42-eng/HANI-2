@@ -206,6 +206,11 @@ export function NotificationProvider({ children }) {
 
     const doSave = async () => {
       try {
+        // Ne sauvegarder QUE les vrais tokens Expo sur Firebase
+        if (!expoPushToken.startsWith('ExponentPushToken')) {
+          console.log('⚠️ Token non valide, pas sauvegardé sur Firebase:', expoPushToken.substring(0, 20));
+          return;
+        }
         if (isConfigured && database) {
           const tokenRef = ref(database, `couples/${authCouple.id}/pushTokens/${authUser.id}`);
           await set(tokenRef, {
@@ -383,15 +388,15 @@ export function NotificationProvider({ children }) {
           token = savedToken;
           console.log('🔔 Token Push récupéré du cache:', token);
         } else {
-          // En mode développement, générer un token factice
-          token = `dev-token-${Date.now()}`;
-          console.log('⚠️ Mode dev - Token factice généré');
+          // Ne PAS générer de token factice - il serait sauvegardé sur Firebase
+          // et empêcherait les notifications push réelles
+          console.log('⚠️ Aucun token valide disponible');
+          token = null;
         }
       }
     } else {
       console.log('⚠️ Les notifications push nécessitent un appareil physique');
-      // Token factice pour simulateur
-      token = `simulator-token-${Date.now()}`;
+      token = null;
     }
 
     return token;
@@ -431,10 +436,10 @@ export function NotificationProvider({ children }) {
     let tokenToUse = currentPartnerToken;
     
     if (!tokenToUse && currentCouple?.id && currentUser?.id && isConfigured && database) {
-      // Essayer jusqu'à 2 tentatives avec délai
-      for (let attempt = 0; attempt < 2 && !tokenToUse; attempt++) {
+      // Essayer jusqu'à 3 tentatives avec délai progressif
+      for (let attempt = 0; attempt < 3 && !tokenToUse; attempt++) {
         if (attempt > 0) {
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise(r => setTimeout(r, 1500 * attempt));
         }
         try {
           console.log(`🔄 Récupération token partenaire depuis Firebase (tentative ${attempt + 1})...`);
@@ -485,9 +490,9 @@ export function NotificationProvider({ children }) {
         channelId: channelId,
       };
 
-      console.log('🔗 Appel Expo Push Service... (canal:', channelId, ')');
+      console.log('🔗 Appel Expo Push Service... (canal:', channelId, ', token:', tokenToUse.substring(0, 25) + '...)');
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
       
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
