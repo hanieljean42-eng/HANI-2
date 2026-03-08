@@ -61,6 +61,15 @@ export default function JoinCoupleScreen() {
 
     // Normaliser le code saisi (majuscules, sans espaces)
     const normalizedCode = coupleCode.toUpperCase().trim();
+
+    // Valider le format du code (LOVE-XXXXXX)
+    if (!/^LOVE-[A-Z0-9]{4,8}$/.test(normalizedCode)) {
+      Alert.alert(
+        'Format invalide',
+        'Le code couple doit être au format LOVE-XXXXXX.\n\nExemple : LOVE-AB12CD'
+      );
+      return;
+    }
     console.log('📝 Code saisi:', coupleCode, '→ normalisé:', normalizedCode);
     
     const result = await joinCouple(normalizedCode, formData);

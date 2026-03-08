@@ -56,7 +56,7 @@ export default function ProfileScreen({ navigation }) {
     lockSecretMode,
   } = useSecurity();
   const { user, couple, partner, logout, updateUser, updateCouple, updatePartnerName, updateCoupleName, deleteAccount } = useAuth();
-  const { loveMeter, memories, bucketList, loveNotes, addLoveNote, addBucketItem, toggleBucketItem, deleteBucketItem, updateBucketItem, updateLoveMeter } = useData();
+  const { loveMeter, memories, bucketList, loveNotes, addLoveNote, deleteLoveNote, addBucketItem, toggleBucketItem, deleteBucketItem, updateBucketItem, updateLoveMeter } = useData();
   const { 
     notifyLoveNote, 
     notifyBucket, 
@@ -536,9 +536,9 @@ export default function ProfileScreen({ navigation }) {
         { 
           text: 'Supprimer', 
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            // Note: Pour implémenter la suppression, il faudrait ajouter une fonction deleteLoveNote dans DataContext
+            await deleteLoveNote(noteId);
           }
         }
       ]

@@ -62,7 +62,7 @@ export default function WelcomeScreen({ navigation }) {
         {/* Footer */}
         <Text style={styles.footer}>Créé avec ❤️ par Djeble Haniel Henoc</Text>
         <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 4 }}>v2.5 — Build 8 mars 2026</Text>
-        <Text style={{ color: isConfigured && auth ? 'rgba(100,255,100,0.7)' : 'rgba(255,100,100,0.9)', fontSize: 10, marginTop: 2 }}>{fbStatus}</Text>
+        {__DEV__ && <Text style={{ color: isConfigured && auth ? 'rgba(100,255,100,0.7)' : 'rgba(255,100,100,0.9)', fontSize: 10, marginTop: 2 }}>{fbStatus}</Text>}
       </View>
     </LinearGradient>
   );

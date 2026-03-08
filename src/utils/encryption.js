@@ -128,7 +128,9 @@ export const decryptMessage = (encryptedText, coupleId) => {
     
     const key = generateCoupleKey(coupleId);
     const decrypted = CryptoJS.AES.decrypt(encryptedText, key);
-    return decrypted.toString(CryptoJS.enc.Utf8);
+    const result = decrypted.toString(CryptoJS.enc.Utf8);
+    if (!result || result.length === 0) return encryptedText;
+    return result;
   } catch (error) {
     console.error('❌ Erreur déchiffrement:', error);
     return encryptedText; // Fallback

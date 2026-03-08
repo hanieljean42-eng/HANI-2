@@ -103,7 +103,16 @@
                                                                                                                    },
                                                                                                      "read":  {
                                                                                                                   ".validate":  "!newData.exists() || newData.isBoolean()"
-                                                                                                              }
+                                                                                                              },
+                                                                                                     "reactions":  {
+                                                                                                                      ".validate":  "!newData.exists() || newData.hasChildren()"
+                                                                                                                  },
+                                                                                                     "replyTo":  {
+                                                                                                                     ".validate":  "!newData.exists() || newData.hasChildren()"
+                                                                                                                 },
+                                                                                                     "metadata":  {
+                                                                                                                      ".validate":  "!newData.exists() || newData.hasChildren()"
+                                                                                                                  }
                                                                                                  }
                                                                               },
                                                                  "typing":  {
@@ -142,22 +151,6 @@
                                                   ".read":  "auth != null",
                                                   ".write":  "auth != null"
                                               }
-                            },
-                  "messages":  {
-                                   ".read":  "auth != null",
-                                   ".write":  "auth != null"
-                               },
-                  "memories":  {
-                                   ".read":  "auth != null",
-                                   ".write":  "auth != null"
-                               },
-                  "challenges":  {
-                                     ".read":  "auth != null",
-                                     ".write":  "auth != null"
-                                 },
-                  "notifications":  {
-                                        ".read":  "auth != null",
-                                        ".write":  "auth != null"
-                                    }
+                            }
               }
 }

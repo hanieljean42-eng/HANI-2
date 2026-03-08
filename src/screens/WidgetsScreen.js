@@ -51,8 +51,20 @@ export default function WidgetsScreen({ navigation }) {
       const mood = await AsyncStorage.getItem('@todayMood');
       if (mood) setTodayMood(JSON.parse(mood));
       
-      const loveCount = await AsyncStorage.getItem('@quickLoveToday');
-      if (loveCount) setQuickLoveCount(parseInt(loveCount) || 0);
+      const loveData = await AsyncStorage.getItem('@quickLoveToday');
+      if (loveData) {
+        try {
+          const parsed = JSON.parse(loveData);
+          if (parsed?.date === new Date().toDateString()) {
+            setQuickLoveCount(parsed.count || 0);
+          } else {
+            setQuickLoveCount(0);
+            await AsyncStorage.setItem('@quickLoveToday', JSON.stringify({ date: new Date().toDateString(), count: 0 }));
+          }
+        } catch {
+          setQuickLoveCount(0);
+        }
+      }
     } catch (error) {
       console.log('Erreur chargement widgets:', error);
     }
@@ -112,7 +124,7 @@ export default function WidgetsScreen({ navigation }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const newCount = quickLoveCount + 1;
     setQuickLoveCount(newCount);
-    await AsyncStorage.setItem('@quickLoveToday', newCount.toString());
+    await AsyncStorage.setItem('@quickLoveToday', JSON.stringify({ date: new Date().toDateString(), count: newCount }));
     
     const messages = {
       heart: 'Je t\'aime ❤️',
@@ -272,7 +284,10 @@ export default function WidgetsScreen({ navigation }) {
             </View>
             <View style={styles.challengeCard}>
               <Text style={styles.challengeText}>{getDailyChallenge()}</Text>
-              <TouchableOpacity style={styles.challengeDoneButton}>
+              <TouchableOpacity style={styles.challengeDoneButton} onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert('✅ Bravo !', 'Défi du jour validé ! Continuez comme ça 💕');
+              }}>
                 <LinearGradient
                   colors={theme.primary}
                   style={styles.challengeDoneGradient}
