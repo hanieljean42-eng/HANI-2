@@ -134,7 +134,15 @@
                                                                   "active":  {
                                                                                  ".read":  "auth != null",
                                                                                  ".write":  "auth != null"
-                                                                             }
+                                                                             },
+                                                                  "sdp":  {
+                                                                              ".read":  "auth != null",
+                                                                              ".write":  "auth != null"
+                                                                           },
+                                                                  "ice":  {
+                                                                              ".read":  "auth != null",
+                                                                              ".write":  "auth != null"
+                                                                           }
                                                               },
                                                     "data":  {
                                                                  ".read":  "auth != null",

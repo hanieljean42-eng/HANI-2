@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { AppState } from 'react-native';
 import { auth, database, isConfigured, firebaseError } from '../config/firebase';
-import { ref, set, onValue, update, get, off } from 'firebase/database';
+import { ref, set, onValue, update, get, off, onDisconnect } from 'firebase/database';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -84,9 +85,27 @@ export function AuthProvider({ children }) {
     console.log('🔄 Écoute Firebase activée pour:', couple.id);
     const coupleRef = ref(database, `couples/${couple.id}`);
     
-    // Mettre à jour le statut online
+    // Mettre à jour le statut online + configurer onDisconnect pour auto-offline
     const memberStatusRef = ref(database, `couples/${couple.id}/members/${user.id}/isOnline`);
+    const lastSeenRef = ref(database, `couples/${couple.id}/members/${user.id}/lastSeen`);
     set(memberStatusRef, true).catch(e => console.log('Status update error:', e));
+    
+    // Firebase onDisconnect : automatiquement mettre offline quand la connexion est perdue
+    onDisconnect(memberStatusRef).set(false).catch(() => {});
+    onDisconnect(lastSeenRef).set(new Date().toISOString()).catch(() => {});
+    
+    // AppState : gérer foreground/background
+    const appStateListener = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        set(memberStatusRef, true).catch(() => {});
+        // Re-configurer onDisconnect après retour au premier plan
+        onDisconnect(memberStatusRef).set(false).catch(() => {});
+        onDisconnect(lastSeenRef).set(new Date().toISOString()).catch(() => {});
+      } else if (nextState === 'background' || nextState === 'inactive') {
+        set(memberStatusRef, false).catch(() => {});
+        set(lastSeenRef, new Date().toISOString()).catch(() => {});
+      }
+    });
     
     const unsubscribe = onValue(coupleRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -137,12 +156,13 @@ export function AuthProvider({ children }) {
 
     return () => {
       console.log('🔕 Arrêt écoute Firebase');
+      appStateListener?.remove();
       // Marquer offline + enregistrer lastSeen quand on quitte
       if (couple?.id && user?.id) {
         const offlineRef = ref(database, `couples/${couple.id}/members/${user.id}/isOnline`);
         set(offlineRef, false).catch(() => {});
-        const lastSeenRef = ref(database, `couples/${couple.id}/members/${user.id}/lastSeen`);
-        set(lastSeenRef, new Date().toISOString()).catch(() => {});
+        const lastSeenRefCleanup = ref(database, `couples/${couple.id}/members/${user.id}/lastSeen`);
+        set(lastSeenRefCleanup, new Date().toISOString()).catch(() => {});
       }
       off(coupleRef);
       coupleIdRef.current = null;

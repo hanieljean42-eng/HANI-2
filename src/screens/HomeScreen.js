@@ -48,7 +48,7 @@ export default function HomeScreen({ navigation }) {
   const { loveMeter, challenges, memories, loveNotes, countdownEvents, addCountdownEvent, deleteCountdownEvent, unlockedBadges, checkBadges } = useData();
   const { notifyMissYou, notifyOnline, sendDailyReminder, sendSmartReminder } = useNotifyPartner();
   const { notifyMilestone, notifyBadgeUnlocked, notifyLevelUp, scheduleCountdownReminder } = useNotifications();
-  const { messages: chatMessages } = useChat();
+  const { messages: chatMessages, unreadCount, partnerTyping } = useChat();
   const [daysCount, setDaysCount] = useState(0);
   const [timeTogetherText, setTimeTogetherText] = useState('');
   const [hasValidDate, setHasValidDate] = useState(false);
@@ -339,7 +339,7 @@ export default function HomeScreen({ navigation }) {
 
         {/* Header */}
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>Bonjour {user?.name} 💖</Text>
             {/* Nom du couple - seulement si partenaire a rejoint */}
             {partner?.name ? (
@@ -347,24 +347,117 @@ export default function HomeScreen({ navigation }) {
             ) : (
               <Text style={styles.waitingText}>En attente de votre partenaire...</Text>
             )}
-            {/* Indicateur de synchronisation - seulement si partenaire a rejoint */}
+            {/* Présence partenaire : en ligne / écrit / dernière vue */}
             {partner?.name && (
               <View style={styles.syncIndicator}>
-                <Text style={styles.syncDot}>{isOnline ? '🟢' : '🔴'}</Text>
-                <Text style={styles.syncText}>
-                  {isOnline ? (isSynced ? 'Synchronisé' : 'En ligne') : 'Hors ligne'}
-                </Text>
-                <Text style={styles.partnerName}> • avec {partner.name}</Text>
+                {partnerTyping ? (
+                  <>
+                    <Text style={styles.syncDot}>✏️</Text>
+                    <Text style={[styles.syncText, { color: '#7FFF7F', fontStyle: 'italic' }]}>
+                      {partner.name} écrit...
+                    </Text>
+                  </>
+                ) : partner?.isOnline ? (
+                  <>
+                    <Text style={styles.syncDot}>🟢</Text>
+                    <Text style={[styles.syncText, { color: '#7FFF7F' }]}>
+                      {partner.name} est en ligne
+                    </Text>
+                  </>
+                ) : partner?.lastSeen ? (
+                  <>
+                    <Text style={styles.syncDot}>⚪</Text>
+                    <Text style={styles.syncText}>
+                      {(() => {
+                        const lastSeen = new Date(partner.lastSeen);
+                        const now = new Date();
+                        const diffMins = Math.floor((now - lastSeen) / 60000);
+                        if (diffMins < 1) return `${partner.name} vu à l'instant`;
+                        if (diffMins < 60) return `${partner.name} vu il y a ${diffMins} min`;
+                        const diffHours = Math.floor(diffMins / 60);
+                        if (diffHours < 24) return `${partner.name} vu à ${lastSeen.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+                        return `${partner.name} vu le ${lastSeen.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
+                      })()}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.syncDot}>{isOnline ? '🟢' : '🔴'}</Text>
+                    <Text style={styles.syncText}>
+                      {isOnline ? (isSynced ? 'Synchronisé' : 'En ligne') : 'Hors ligne'}
+                    </Text>
+                  </>
+                )}
               </View>
             )}
           </View>
           <View style={styles.avatarContainer}>
             <Text style={styles.avatar}>{user?.avatar || '😊'}</Text>
             {partner?.name && (
-              <Text style={styles.partnerAvatar}>{partner?.avatar || '💕'}</Text>
+              <View>
+                <Text style={styles.partnerAvatar}>{partner?.avatar || '💕'}</Text>
+                {/* Point de présence sur l'avatar du partenaire */}
+                <View style={[
+                  styles.presenceDot,
+                  { backgroundColor: partner?.isOnline ? '#4ADE80' : '#9CA3AF' }
+                ]} />
+              </View>
             )}
           </View>
         </View>
+
+        {/* Raccourcis rapides vers le Chat */}
+        {partner?.name && (
+          <TouchableOpacity
+            style={styles.chatShortcutCard}
+            onPress={() => navigation.navigate('Chat')}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#FF6B9D', '#FF8E53']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.chatShortcutGradient}
+            >
+              <View style={styles.chatShortcutLeft}>
+                <Text style={styles.chatShortcutIcon}>💬</Text>
+                <View>
+                  <Text style={styles.chatShortcutTitle}>
+                    Chat avec {partner.name}
+                  </Text>
+                  <Text style={styles.chatShortcutSub}>
+                    {partnerTyping 
+                      ? '✏️ écrit en ce moment...'
+                      : unreadCount > 0 
+                        ? `${unreadCount} message${unreadCount > 1 ? 's' : ''} non lu${unreadCount > 1 ? 's' : ''}`
+                        : partner?.isOnline 
+                          ? '🟢 En ligne maintenant'
+                          : 'Envoyer un message'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.chatShortcutActions}>
+                <TouchableOpacity 
+                  style={styles.chatShortcutCallBtn}
+                  onPress={(e) => { e.stopPropagation(); navigation.navigate('Chat', { autoCall: 'audio' }); }}
+                >
+                  <Text style={styles.chatShortcutCallIcon}>📞</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.chatShortcutCallBtn}
+                  onPress={(e) => { e.stopPropagation(); navigation.navigate('Chat', { autoCall: 'video' }); }}
+                >
+                  <Text style={styles.chatShortcutCallIcon}>🎥</Text>
+                </TouchableOpacity>
+                {unreadCount > 0 && (
+                  <View style={styles.chatBadge}>
+                    <Text style={styles.chatBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                  </View>
+                )}
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
         {/* Days Counter */}
         <View style={styles.counterCard}>
@@ -819,6 +912,88 @@ const styles = StyleSheet.create({
   },
   partnerAvatar: {
     fontSize: 40,
+  },
+  presenceDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  // Raccourcis chat
+  chatShortcutCard: {
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#FF6B9D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  chatShortcutGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingHorizontal: 18,
+  },
+  chatShortcutLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  chatShortcutIcon: {
+    fontSize: 32,
+  },
+  chatShortcutTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  chatShortcutSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+  },
+  chatShortcutActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chatShortcutCallBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatShortcutCallIcon: {
+    fontSize: 18,
+  },
+  chatBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  chatBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   counterCard: {
     backgroundColor: 'rgba(255,255,255,0.2)',

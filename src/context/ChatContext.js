@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, off, push, query as fbQuery, limitToLast } from 'firebase/database';
+import { ref, set, onValue, off, push, query as fbQuery, limitToLast, get } from 'firebase/database';
 import { useAuth } from './AuthContext';
 import { encryptMessageObject, decryptMessageObject } from '../utils/encryption';
+import webrtcService from '../services/webrtcService';
 
 const ChatContext = createContext({});
 
@@ -18,9 +19,13 @@ export function ChatProvider({ children }) {
   const [incomingCall, setIncomingCall] = useState(null);
   const [activeCall, setActiveCall] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [webrtcState, setWebrtcState] = useState(null); // 'connecting', 'connected', 'disconnected'
   
   const typingTimeoutRef = useRef(null);
   const listenerRef = useRef(null);
+  const isCallerRef = useRef(false);
 
   // Écouter les messages Firebase
   useEffect(() => {
@@ -97,14 +102,27 @@ export function ChatProvider({ children }) {
           // Appel accepté — mettre à jour activeCall pour les DEUX côtés
           setActiveCall(callData);
           setIncomingCall(null);
+          
+          // Si on est l'appelant, envoyer l'offre SDP maintenant que l'appel est accepté
+          if (isCallerRef.current && callData.callerId === user.id && webrtcService.peerConnection) {
+            webrtcService.createOffer().catch(e => console.log('⚠️ SDP offer error:', e));
+          }
         } else if (callData.status === 'ended') {
           setIncomingCall(null);
           setActiveCall(null);
+          setLocalStream(null);
+          setRemoteStream(null);
+          setWebrtcState(null);
+          webrtcService.cleanup();
         }
       } else {
         // Noeud supprimé = appel terminé
         setIncomingCall(null);
         setActiveCall(null);
+        setLocalStream(null);
+        setRemoteStream(null);
+        setWebrtcState(null);
+        webrtcService.cleanup();
       }
     });
 
@@ -260,7 +278,7 @@ export function ChatProvider({ children }) {
     }
   };
 
-  // Lancer un appel (audio ou vidéo)
+  // Lancer un appel (audio ou vidéo) avec WebRTC
   const initiateCall = async (type) => {
     if (!couple?.id || !user?.id || !isConfigured || !database) return null;
     const roomId = `HANI2${couple.id.replace(/-/g, '')}${Date.now()}`;
@@ -273,9 +291,27 @@ export function ChatProvider({ children }) {
       timestamp: new Date().toISOString(),
     };
     try {
+      // Nettoyer d'abord les anciennes données de signaling
+      const sdpRef = ref(database, `couples/${couple.id}/calls/sdp`);
+      const iceRef = ref(database, `couples/${couple.id}/calls/ice`);
+      await set(sdpRef, null);
+      await set(iceRef, null);
+
       const callRef = ref(database, `couples/${couple.id}/calls/active`);
       await set(callRef, callData);
       setActiveCall(callData);
+      isCallerRef.current = true;
+
+      // Initialiser WebRTC côté appelant
+      webrtcService.init(couple.id, user.id);
+      webrtcService.onLocalStream = (stream) => setLocalStream(stream);
+      webrtcService.onRemoteStream = (stream) => setRemoteStream(stream);
+      webrtcService.onConnectionStateChange = (state) => setWebrtcState(state);
+      
+      await webrtcService.getLocalStream(type);
+      webrtcService.createPeerConnection();
+      // L'offre SDP sera envoyée quand l'appel est accepté (status='accepted')
+
       return roomId;
     } catch (error) {
       console.log('Erreur initiation appel:', error);
@@ -283,7 +319,7 @@ export function ChatProvider({ children }) {
     }
   };
 
-  // Accepter un appel entrant
+  // Accepter un appel entrant avec WebRTC
   const acceptCall = async () => {
     if (!couple?.id || !incomingCall) return null;
     try {
@@ -298,6 +334,32 @@ export function ChatProvider({ children }) {
       const roomId = incomingCall.roomId;
       setActiveCall(updatedCallData);
       setIncomingCall(null);
+      isCallerRef.current = false;
+
+      // Initialiser WebRTC côté appelé
+      webrtcService.init(couple.id, user.id);
+      webrtcService.onLocalStream = (stream) => setLocalStream(stream);
+      webrtcService.onRemoteStream = (stream) => setRemoteStream(stream);
+      webrtcService.onConnectionStateChange = (state) => setWebrtcState(state);
+      
+      await webrtcService.getLocalStream(incomingCall.type);
+      webrtcService.createPeerConnection();
+
+      // Lire l'offre SDP du caller depuis Firebase
+      const offerRef = ref(database, `couples/${couple.id}/calls/sdp/offer`);
+      const offerSnap = await get(offerRef);
+      if (offerSnap.exists()) {
+        await webrtcService.handleOffer(offerSnap.val());
+      } else {
+        // L'offre n'est pas encore là, écouter
+        const offerListener = onValue(offerRef, async (snapshot) => {
+          if (snapshot.exists()) {
+            off(offerRef);
+            await webrtcService.handleOffer(snapshot.val());
+          }
+        });
+      }
+
       return roomId;
     } catch (error) {
       console.log('Erreur acceptation appel:', error);
@@ -309,6 +371,10 @@ export function ChatProvider({ children }) {
   const rejectCall = async () => {
     if (!couple?.id) return;
     try {
+      await webrtcService.cleanup();
+      setLocalStream(null);
+      setRemoteStream(null);
+      setWebrtcState(null);
       const callRef = ref(database, `couples/${couple.id}/calls/active`);
       await set(callRef, null);
       setIncomingCall(null);
@@ -317,10 +383,15 @@ export function ChatProvider({ children }) {
     }
   };
 
-  // Terminer un appel
+  // Terminer un appel + cleanup WebRTC
   const endCall = async () => {
     if (!couple?.id) return;
     try {
+      await webrtcService.cleanup();
+      setLocalStream(null);
+      setRemoteStream(null);
+      setWebrtcState(null);
+      isCallerRef.current = false;
       const callRef = ref(database, `couples/${couple.id}/calls/active`);
       await set(callRef, null);
       setActiveCall(null);
@@ -328,6 +399,21 @@ export function ChatProvider({ children }) {
     } catch (error) {
       console.log('Erreur fin appel:', error);
     }
+  };
+
+  // Toggle mute micro (WebRTC)
+  const toggleMute = () => {
+    return webrtcService.toggleMute();
+  };
+
+  // Toggle caméra on/off (WebRTC)
+  const toggleCamera = () => {
+    return webrtcService.toggleCamera();
+  };
+
+  // Basculer caméra avant/arrière
+  const switchCamera = async () => {
+    await webrtcService.switchCamera();
   };
 
   // Supprimer un message
@@ -354,6 +440,9 @@ export function ChatProvider({ children }) {
     partnerRecording,
     incomingCall,
     activeCall,
+    localStream,
+    remoteStream,
+    webrtcState,
     sendMessage,
     markAsRead,
     addReaction,
@@ -364,6 +453,9 @@ export function ChatProvider({ children }) {
     acceptCall,
     rejectCall,
     endCall,
+    toggleMute,
+    toggleCamera,
+    switchCamera,
   };
 
   return (
