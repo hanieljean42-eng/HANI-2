@@ -46,7 +46,7 @@ export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, couple, partner, isOnline, isSynced } = useAuth();
   const { loveMeter, challenges, memories, loveNotes, countdownEvents, addCountdownEvent, deleteCountdownEvent, unlockedBadges, checkBadges } = useData();
-  const { notifyMissYou, notifyLoveNote, sendCustomNotification, notifyOnline } = useNotifyPartner();
+  const { notifyMissYou, notifyOnline, sendDailyReminder, sendSmartReminder } = useNotifyPartner();
   const { notifyMilestone, notifyBadgeUnlocked, notifyLevelUp, scheduleCountdownReminder } = useNotifications();
   const { messages: chatMessages } = useChat();
   const [daysCount, setDaysCount] = useState(0);
@@ -138,10 +138,13 @@ export default function HomeScreen({ navigation }) {
     }
   }, [todayMilestone]);
 
-  // Notifier le partenaire qu'on est en ligne
+  // Notifier le partenaire qu'on est en ligne + programmer les rappels quotidiens
   useEffect(() => {
     if (user?.id && couple?.id) {
       notifyOnline();
+      sendDailyReminder();
+      const hasPendingChallenge = challenges?.some(c => !c.completed);
+      sendSmartReminder(hasPendingChallenge);
     }
   }, [user?.id, couple?.id]);
 

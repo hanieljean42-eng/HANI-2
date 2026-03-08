@@ -35,6 +35,16 @@ export function NotificationProvider({ children }) {
   const [coupleId, setCoupleId] = useState(null);
   const [partnerToken, setPartnerToken] = useState(null);
 
+  // ✅ Refs pour éviter les closures stale dans sendPushNotification
+  const partnerTokenRef = useRef(null);
+  const authUserRef = useRef(null);
+  const authCoupleRef = useRef(null);
+
+  // Synchroniser les refs avec les valeurs actuelles
+  useEffect(() => { partnerTokenRef.current = partnerToken; }, [partnerToken]);
+  useEffect(() => { authUserRef.current = authUser; }, [authUser]);
+  useEffect(() => { authCoupleRef.current = authCouple; }, [authCouple]);
+
   // ✅ Mapping type de notification → écran de destination
   const getScreenForType = (type) => {
     switch (type) {
@@ -236,6 +246,7 @@ export function NotificationProvider({ children }) {
           for (const [id, tokenData] of Object.entries(tokens)) {
             if (id !== userId && tokenData?.token) {
               setPartnerToken(tokenData.token);
+              partnerTokenRef.current = tokenData.token;
               console.log('✅ Token partenaire détecté:', tokenData.token.substring(0, 20) + '...');
               break;
             }
@@ -243,6 +254,7 @@ export function NotificationProvider({ children }) {
         } else {
           console.log('⚠️ Pas de tokens trouvés - partenaire pas encore en ligne');
           setPartnerToken(null);
+          partnerTokenRef.current = null;
         }
       },
       (error) => {
@@ -407,23 +419,29 @@ export function NotificationProvider({ children }) {
 
   // ✅ RESTRUCTURÉ: Envoyer une notification au partenaire via Expo Push
   const sendPushNotification = async (title, body, data = {}) => {
-    console.log('📤 Tentative envoi notification push:', { title, body, type: data?.type, hasPartnerToken: !!partnerToken });
+    // ✅ Utiliser les refs pour avoir les valeurs les plus récentes (pas de closure stale)
+    const currentPartnerToken = partnerTokenRef.current;
+    const currentUser = authUserRef.current;
+    const currentCouple = authCoupleRef.current;
+    
+    console.log('📤 Tentative envoi notification push:', { title, body, type: data?.type, hasPartnerToken: !!currentPartnerToken });
     
     // ÉTAPE 1: Vérifier si on a un token partenaire valide
     // Si pas en mémoire, tenter de le récupérer depuis Firebase
-    let tokenToUse = partnerToken;
+    let tokenToUse = currentPartnerToken;
     
-    if (!tokenToUse && authCouple?.id && authUser?.id && isConfigured && database) {
+    if (!tokenToUse && currentCouple?.id && currentUser?.id && isConfigured && database) {
       try {
         console.log('🔄 Token partenaire absent en mémoire, récupération depuis Firebase...');
-        const tokensRef = ref(database, `couples/${authCouple.id}/pushTokens`);
+        const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
         const snapshot = await get(tokensRef);
         if (snapshot.exists()) {
           const tokens = snapshot.val();
           for (const [id, tokenData] of Object.entries(tokens)) {
-            if (id !== authUser.id && tokenData?.token) {
+            if (id !== currentUser.id && tokenData?.token) {
               tokenToUse = tokenData.token;
               setPartnerToken(tokenToUse);
+              partnerTokenRef.current = tokenToUse;
               console.log('✅ Token partenaire récupéré depuis Firebase:', tokenToUse.substring(0, 20) + '...');
               break;
             }
