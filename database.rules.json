@@ -1,6 +1,14 @@
 ﻿{
     "rules":  {
+                  "coupleCodes": {
+                      ".read": "auth != null",
+                      ".write": "auth != null",
+                      "$code": {
+                          ".validate": "newData.isString() && newData.val().length <= 100"
+                      }
+                  },
                   "couples":  {
+                                  ".read": "auth != null",
                                   "$coupleId":  {
                                                     ".read":  "auth != null",
                                                     ".write":  "auth != null",

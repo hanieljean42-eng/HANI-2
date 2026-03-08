@@ -270,6 +270,9 @@ export function AuthProvider({ children }) {
             },
             createdAt: new Date().toISOString(),
           });
+          // Lookup direct par code → permet à joinCouple de trouver le couple sans lire tout /couples
+          const codeRef = ref(database, `coupleCodes/${coupleCode}`);
+          await set(codeRef, coupleId);
           console.log('✅ Couple créé sur Firebase:', coupleCode);
         } catch (e) {
           console.log('⚠️ Erreur Firebase createCouple:', e.message);
@@ -296,23 +299,50 @@ export function AuthProvider({ children }) {
 
       // Chercher d'abord sur Firebase si connecté
       if (isConfigured && database && isOnline) {
+        // Méthode 1 : lookup direct via coupleCodes/{code} (rapide, pas besoin de lire tout /couples)
         try {
-          const couplesRef = ref(database, 'couples');
-          const snapshot = await get(couplesRef);
-          
-          if (snapshot.exists()) {
-            const couples = snapshot.val();
-            for (const [id, data] of Object.entries(couples)) {
-              const firebaseCode = sanitizeFirebasePath(data.code?.toUpperCase().trim());
-              if (firebaseCode === normalizedCode) {
-                coupleId = id;
-                foundCouple = data;
-                break;
-              }
+          const codeRef = ref(database, `coupleCodes/${normalizedCode}`);
+          const codeSnapshot = await get(codeRef);
+          if (codeSnapshot.exists()) {
+            coupleId = codeSnapshot.val();
+            console.log('✅ Lookup direct trouvé:', normalizedCode, '→', coupleId);
+            const coupleRef = ref(database, `couples/${coupleId}`);
+            const coupleSnapshot = await get(coupleRef);
+            if (coupleSnapshot.exists()) {
+              foundCouple = coupleSnapshot.val();
+              console.log('✅ Couple trouvé via lookup:', foundCouple.name);
             }
           }
         } catch (e) {
-          console.warn('⚠️ Erreur recherche Firebase:', e.message);
+          console.warn('⚠️ Lookup direct échoué:', e.message);
+        }
+
+        // Méthode 2 : fallback — parcourir tous les couples (si lookup n'a rien trouvé)
+        if (!foundCouple) {
+          try {
+            const couplesRef = ref(database, 'couples');
+            const snapshot = await get(couplesRef);
+            
+            if (snapshot.exists()) {
+              const couples = snapshot.val();
+              for (const [id, data] of Object.entries(couples)) {
+                const firebaseCode = sanitizeFirebasePath(data.code?.toUpperCase().trim());
+                if (firebaseCode === normalizedCode) {
+                  coupleId = id;
+                  foundCouple = data;
+                  console.log('✅ Couple trouvé via scan:', foundCouple.name);
+                  // Créer le lookup manquant pour les prochaines fois
+                  try {
+                    const codeFixRef = ref(database, `coupleCodes/${normalizedCode}`);
+                    await set(codeFixRef, id);
+                  } catch (_) {}
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Scan couples échoué:', e.message);
+          }
         }
       }
 
