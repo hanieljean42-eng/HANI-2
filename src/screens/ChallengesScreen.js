@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useChat } from '../context/ChatContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useNavigation } from '@react-navigation/native';
 import AnimatedModal from '../components/AnimatedModal';
 
 const { width } = Dimensions.get('window');
@@ -177,6 +178,7 @@ const WOULD_YOU_RATHER = [
 ];
 
 export default function ChallengesScreen() {
+  const navigation = useNavigation();
   const { theme } = useTheme();
   const { loveMeter, updateLoveMeter, challenges, addChallenge } = useData();
   const { partner, user } = useAuth();
@@ -1107,11 +1109,6 @@ export default function ChallengesScreen() {
     }
   };
 
-  // Si un jeu est actif, afficher le jeu
-  if (activeGame) {
-    return renderActiveGame();
-  }
-
   // Écran principal des défis
   return (
     <LinearGradient
@@ -1246,188 +1243,48 @@ export default function ChallengesScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Couple Games */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>🎮 Jeux à Deux (En Temps Réel)</Text>
+        {/* Couple Games - Accès au GamesScreen avec les 2 modes */}
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>🎮 Jeux à Deux</Text>
         
-        {/* ========== SECTION JEUX À DISTANCE ========== */}
         {!partner?.name ? (
-          /* Message si partenaire n'a pas rejoint */
-          <View style={[styles.noPartnerCard, { backgroundColor: theme.card, borderColor: theme.accent }] }>
+          <View style={[styles.noPartnerCard, { backgroundColor: theme.card, borderColor: theme.accent }]}>
             <Text style={styles.noPartnerEmoji}>💑</Text>
             <Text style={[styles.noPartnerTitle, { color: theme.text }]}>En attente de votre partenaire</Text>
             <Text style={[styles.noPartnerDesc, { color: theme.text }]}>
-              Les jeux à distance seront disponibles une fois que votre partenaire aura rejoint votre espace couple avec le code.
+              Les jeux seront disponibles une fois que votre partenaire aura rejoint votre espace couple.
             </Text>
           </View>
         ) : (
-        <View style={[styles.distanceGamingSection, { backgroundColor: theme.card, borderColor: theme.accent }] }>
-          {/* Status de connexion */}
-          <View style={styles.connectionStatusBar}>
-            <View style={styles.connectionDot}>
-              <View style={[styles.dot, coupleId ? { backgroundColor: theme.accent } : { backgroundColor: '#EF4444' }]} />
-              <Text style={[styles.connectionText, { color: theme.text }]}>
-                {coupleId ? `🟢 Connecté avec ${partner.name}` : '🔴 Non connecté'}
-              </Text>
+          <TouchableOpacity 
+            style={[styles.distanceGamingSection, { backgroundColor: theme.card, borderColor: theme.accent }]}
+            onPress={() => navigation.navigate('Games')}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 10 }}>🎮</Text>
+            <Text style={[styles.noPartnerTitle, { color: theme.text, marginBottom: 8 }]}>4 Jeux disponibles</Text>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              <Text style={{ fontSize: 14, color: theme.text }}>🧠 Quiz</Text>
+              <Text style={{ fontSize: 14, color: theme.text }}>🎲 Action/Vérité</Text>
+              <Text style={{ fontSize: 14, color: theme.text }}>🏆 Qui est le plus</Text>
+              <Text style={{ fontSize: 14, color: theme.text }}>🤔 Tu Préfères</Text>
             </View>
-            <Text style={[styles.coupleIdText, { color: theme.text }]}>
-              Code: {coupleId ? coupleId.slice(-6).toUpperCase() : '------'}
-            </Text>
-          </View>
 
-          {/* Bannière d'invitation si partenaire attend */}
-          {pendingGameInvite && (
-            <TouchableOpacity 
-              style={styles.inviteBanner}
-              onPress={() => {
-                startGame(pendingGameInvite.gameType);
-              }}
-            >
-              <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.inviteBannerGradient}>
-                <Text style={styles.inviteBannerEmoji}>🎉</Text>
-                <View style={styles.inviteBannerContent}>
-                  <Text style={styles.inviteBannerTitle}>
-                    {pendingGameInvite.creatorName || 'Ton/Ta partenaire'} t'attend !
-                  </Text>
-                  <Text style={styles.inviteBannerDesc}>
-                    Appuie ici pour rejoindre la partie
-                  </Text>
-                </View>
-                <Text style={styles.inviteBannerArrow}>→</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          {/* Session active */}
-          {hasActiveSession && gameSession && !pendingGameInvite && (
-            <View style={[styles.activeSessionBar, { backgroundColor: theme.card }] }>
-              <Text style={styles.activeSessionIcon}>⚡</Text>
-                <Text style={[styles.activeSessionText, { color: theme.text }] }>
-                Partie en cours: {gameSession.gameType}
-              </Text>
-              <TouchableOpacity 
-                style={styles.quitSessionBtn}
-                onPress={async () => {
-                  Alert.alert(
-                    'Quitter la partie ?',
-                    'Voulez-vous vraiment quitter cette partie ?',
-                    [
-                      { text: 'Non', style: 'cancel' },
-                      { 
-                        text: 'Oui, quitter', 
-                        style: 'destructive',
-                        onPress: async () => {
-                          await endGameSession();
-                          Alert.alert('✅', 'Partie terminée');
-                        }
-                      }
-                    ]
-                  );
-                }}
-              >
-                <Text style={styles.quitSessionText}>Quitter</Text>
-              </TouchableOpacity>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 15, marginBottom: 12 }}>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 22 }}>🌐</Text>
+                <Text style={{ fontSize: 11, color: theme.text }}>En ligne</Text>
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 22 }}>📱</Text>
+                <Text style={{ fontSize: 11, color: theme.text }}>Même téléphone</Text>
+              </View>
             </View>
-          )}
 
-          {/* Boutons principaux CRÉER / REJOINDRE */}
-          <View style={styles.mainActionsRow}>
-            {/* Bouton CRÉER une partie */}
-            <TouchableOpacity 
-              style={styles.mainActionBtn}
-              onPress={() => {
-                Alert.alert(
-                  '🎮 Créer une partie',
-                  'Choisissez un jeu pour créer une partie que votre partenaire pourra rejoindre.',
-                  [
-                    { text: '🧠 Quiz', onPress: () => startGame('quiz') },
-                    { text: '🎲 Action/Vérité', onPress: () => startGame('truthordare') },
-                    { text: '🏆 Qui est le plus...', onPress: () => startGame('whoismore') },
-                    { text: '🤔 Tu préfères...', onPress: () => startGame('wouldyourather') },
-                    { text: 'Annuler', style: 'cancel' },
-                  ]
-                );
-              }}
-            >
-              <LinearGradient colors={theme.primary} style={styles.mainActionGradient}>
-                <Text style={styles.mainActionIcon}>🎮</Text>
-                <Text style={styles.mainActionTitle}>CRÉER</Text>
-                <Text style={styles.mainActionSubtitle}>une partie</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Bouton REJOINDRE une partie */}
-            <TouchableOpacity 
-              style={styles.mainActionBtn}
-              onPress={async () => {
-                const session = await checkActiveSession();
-                if (session) {
-                  Alert.alert(
-                    '🎉 Partie trouvée !',
-                    `Une partie de ${session.gameType} vous attend !`,
-                    [
-                      { text: 'Annuler', style: 'cancel' },
-                      { text: 'Rejoindre !', onPress: () => startGame(session.gameType) },
-                    ]
-                  );
-                } else {
-                  Alert.alert(
-                    '😕 Aucune partie',
-                    'Votre partenaire n\'a pas encore créé de partie.\n\nDemandez-lui de cliquer sur "CRÉER une partie" d\'abord !',
-                    [{ text: 'OK' }]
-                  );
-                }
-              }}
-            >
-              <LinearGradient colors={[theme.secondary, theme.accent]} style={styles.mainActionGradient}>
-                <Text style={styles.mainActionIcon}>🤝</Text>
-                <Text style={styles.mainActionTitle}>REJOINDRE</Text>
-                <Text style={styles.mainActionSubtitle}>une partie</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          {/* Instructions */}
-          <View style={styles.instructionsBox}>
-            <Text style={[styles.instructionsTitle, { color: theme.text }]}>📱 Comment jouer à distance ?</Text>
-            <Text style={[styles.instructionsText, { color: theme.text }]}>
-              1️⃣ L'un de vous crée une partie{'\n'}
-              2️⃣ L'autre clique sur "REJOINDRE"{'\n'}
-              3️⃣ Jouez ensemble en temps réel ! 💕
-            </Text>
-          </View>
-        </View>
-        )}
-        {/* ========== FIN SECTION JEUX À DISTANCE ========== */}
-
-        {partner?.name && (
-        <>
-        <Text style={[styles.gamesSectionHint, { color: theme.text }]}>📱 Ou choisissez directement un jeu :</Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.gamesScroll}
-        >
-          {COUPLE_GAMES.map((game) => (
-            <TouchableOpacity
-              key={game.id}
-              style={styles.gameCard}
-              onPress={() => startGame(game.type)}
-            >
-              <LinearGradient
-                colors={game.color || theme.primary}
-                style={styles.gameGradient}
-              >
-                <Text style={styles.gameIcon}>{game.icon}</Text>
-                <Text style={[styles.gameTitle, { color: theme.text }]}>{game.title}</Text>
-                <Text style={[styles.gameDesc, { color: theme.text }]}>{game.desc}</Text>
-                <View style={styles.gamePlayBadge}>
-                  <Text style={[styles.gamePlayText, { color: theme.text }]}>▶ JOUER</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        </>
+            <LinearGradient colors={theme.primary} style={{ borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>▶ ACCÉDER AUX JEUX</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         )}
 
         {/* More Daily Challenges */}
