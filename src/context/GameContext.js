@@ -290,12 +290,12 @@ export function GameProvider({ children }) {
       console.log('📤 Soumission réponse:', { questionIndex, answer, myPlayerId });
       
       const answerRef = ref(database, `games/${coupleId}/session/answers/${questionIndex}/${myPlayerId}`);
-      await set(answerRef, {
-        answer,
-        timestamp: Date.now(),
-        playerName: playerName || 'Joueur',
-        playerId: myPlayerId,
-      });
+      // Si answer est un objet, on spread ses propriétés directement pour éviter
+      // le double-encapsulage (answer.answer) qui empêche les listeners de lire les données
+      const payload = typeof answer === 'object' && answer !== null
+        ? { ...answer, timestamp: Date.now(), playerName: playerName || 'Joueur', playerId: myPlayerId }
+        : { answer, timestamp: Date.now(), playerName: playerName || 'Joueur', playerId: myPlayerId };
+      await set(answerRef, payload);
       
       console.log('✅ Réponse soumise avec succès');
       return true;

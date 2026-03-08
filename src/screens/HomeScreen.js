@@ -147,10 +147,14 @@ export default function HomeScreen({ navigation }) {
   // Notifier le partenaire qu'on est en ligne + programmer les rappels quotidiens
   useEffect(() => {
     if (user?.id && couple?.id) {
-      notifyOnline();
+      // Délai pour laisser le temps au système de notifications de récupérer le token partenaire
+      const timer = setTimeout(() => {
+        notifyOnline();
+      }, 4000);
       sendDailyReminder();
       const hasPendingChallenge = challenges?.some(c => !c.completed);
       sendSmartReminder(hasPendingChallenge);
+      return () => clearTimeout(timer);
     }
   }, [user?.id, couple?.id]);
 

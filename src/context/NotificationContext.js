@@ -431,24 +431,30 @@ export function NotificationProvider({ children }) {
     let tokenToUse = currentPartnerToken;
     
     if (!tokenToUse && currentCouple?.id && currentUser?.id && isConfigured && database) {
-      try {
-        console.log('🔄 Token partenaire absent en mémoire, récupération depuis Firebase...');
-        const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
-        const snapshot = await get(tokensRef);
-        if (snapshot.exists()) {
-          const tokens = snapshot.val();
-          for (const [id, tokenData] of Object.entries(tokens)) {
-            if (id !== currentUser.id && tokenData?.token) {
-              tokenToUse = tokenData.token;
-              setPartnerToken(tokenToUse);
-              partnerTokenRef.current = tokenToUse;
-              console.log('✅ Token partenaire récupéré depuis Firebase:', tokenToUse.substring(0, 20) + '...');
-              break;
+      // Essayer jusqu'à 2 tentatives avec délai
+      for (let attempt = 0; attempt < 2 && !tokenToUse; attempt++) {
+        if (attempt > 0) {
+          await new Promise(r => setTimeout(r, 2000));
+        }
+        try {
+          console.log(`🔄 Récupération token partenaire depuis Firebase (tentative ${attempt + 1})...`);
+          const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
+          const snapshot = await get(tokensRef);
+          if (snapshot.exists()) {
+            const tokens = snapshot.val();
+            for (const [id, tokenData] of Object.entries(tokens)) {
+              if (id !== currentUser.id && tokenData?.token) {
+                tokenToUse = tokenData.token;
+                setPartnerToken(tokenToUse);
+                partnerTokenRef.current = tokenToUse;
+                console.log('✅ Token partenaire récupéré depuis Firebase:', tokenToUse.substring(0, 20) + '...');
+                break;
+              }
             }
           }
+        } catch (e) {
+          console.log('⚠️ Erreur récupération token partenaire:', e.message);
         }
-      } catch (e) {
-        console.log('⚠️ Erreur récupération token partenaire:', e.message);
       }
     }
     

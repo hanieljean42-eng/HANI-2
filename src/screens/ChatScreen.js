@@ -28,7 +28,6 @@ import { useTheme } from '../context/ThemeContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useData } from '../context/DataContext';
 import { uploadToCloudinary, uploadAudioToCloudinary } from '../utils/uploadToCloudinary';
-import { WebView } from 'react-native-webview';
 
 const { width, height } = Dimensions.get('window');
 
@@ -133,7 +132,11 @@ export default function ChatScreen({ navigation }) {
   const [audioProgress, setAudioProgress] = useState({});
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageDimensions, setImageDimensions] = useState({});
-  const [callWebViewUrl, setCallWebViewUrl] = useState(null);
+  const [showCallScreen, setShowCallScreen] = useState(false);
+  const [callTimer, setCallTimer] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaker, setIsSpeaker] = useState(false);
+  const callTimerRef = useRef(null);
   
   const flatListRef = useRef(null);
   const recordingRef = useRef(null);
@@ -240,7 +243,7 @@ export default function ChatScreen({ navigation }) {
     return null;
   };
 
-  // Lancer un appel (ouvre une salle Jitsi sécurisée dans l'app)
+  // Lancer un appel
   const handleCall = async (type) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     const roomId = await initiateCall(type);
@@ -249,24 +252,56 @@ export default function ChatScreen({ navigation }) {
       return;
     }
     await notifyCall(type);
-    const jitsiUrl = `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=${type === 'audio' ? 'true' : 'false'}`;
-    setCallWebViewUrl(jitsiUrl);
+    setShowCallScreen(true);
+    setCallTimer(0);
+    setIsMuted(false);
+    setIsSpeaker(false);
   };
 
   // Accepter un appel entrant
   const handleAcceptCall = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const roomId = await acceptCall();
-    if (roomId) {
-      const jitsiUrl = `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false`;
-      setCallWebViewUrl(jitsiUrl);
-    }
+    await acceptCall();
+    setShowCallScreen(true);
+    setCallTimer(0);
+    setIsMuted(false);
+    setIsSpeaker(false);
   };
 
   // Raccrocher l'appel
-  const handleEndCallWebView = async () => {
-    setCallWebViewUrl(null);
+  const handleEndCall = async () => {
+    setShowCallScreen(false);
+    setCallTimer(0);
+    if (callTimerRef.current) clearInterval(callTimerRef.current);
     await endCall();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  };
+
+  // Timer d'appel — démarre quand l'appel est accepté (activeCall existe)
+  useEffect(() => {
+    if (showCallScreen && activeCall) {
+      callTimerRef.current = setInterval(() => {
+        setCallTimer(prev => prev + 1);
+      }, 1000);
+    } else if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+    }
+    return () => { if (callTimerRef.current) clearInterval(callTimerRef.current); };
+  }, [showCallScreen, activeCall]);
+
+  // Fermer l'écran d'appel si l'appel se termine (partenaire raccroche)
+  useEffect(() => {
+    if (showCallScreen && !activeCall && !incomingCall && callTimer > 0) {
+      setShowCallScreen(false);
+      setCallTimer(0);
+    }
+  }, [activeCall, incomingCall]);
+
+  // Formater le timer
+  const formatCallTimer = (seconds) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   const handleSend = async () => {
@@ -863,31 +898,70 @@ export default function ChatScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* Modal Appel en cours (WebView Jitsi) */}
+      {/* Écran d'appel */}
       <Modal
-        visible={!!callWebViewUrl}
+        visible={showCallScreen}
         animationType="slide"
-        onRequestClose={handleEndCallWebView}
+        onRequestClose={handleEndCall}
       >
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <View style={styles.callHeader}>
-            <TouchableOpacity style={styles.endCallButton} onPress={handleEndCallWebView}>
-              <Ionicons name="call" size={24} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-              <Text style={styles.endCallText}>Raccrocher</Text>
+        <LinearGradient
+          colors={['#1a1a2e', '#16213e', '#0f3460']}
+          style={styles.callScreenContainer}
+        >
+          <StatusBar backgroundColor="#1a1a2e" barStyle="light-content" />
+          
+          {/* Info partenaire */}
+          <View style={styles.callPartnerInfo}>
+            <View style={styles.callAvatar}>
+              <Text style={styles.callAvatarText}>{partner?.avatar || '💕'}</Text>
+            </View>
+            <Text style={styles.callPartnerName}>{partner?.name || 'Mon amour'}</Text>
+            <Text style={styles.callStatus}>
+              {activeCall
+                ? formatCallTimer(callTimer)
+                : '📞 Appel en cours...'}
+            </Text>
+            <Text style={styles.callType}>
+              {(activeCall?.type || incomingCall?.type) === 'video' ? '🎥 Appel vidéo' : '📞 Appel vocal'}
+            </Text>
+          </View>
+
+          {/* Animation ondulation */}
+          <View style={styles.callWaveContainer}>
+            {[1, 2, 3].map((i) => (
+              <View key={i} style={[
+                styles.callWave,
+                { width: 120 + i * 40, height: 120 + i * 40, borderRadius: 60 + i * 20, opacity: 0.15 / i }
+              ]} />
+            ))}
+          </View>
+
+          {/* Boutons de contrôle */}
+          <View style={styles.callControls}>
+            <TouchableOpacity
+              style={[styles.callControlButton, isMuted && styles.callControlActive]}
+              onPress={() => { setIsMuted(!isMuted); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            >
+              <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={26} color="#fff" />
+              <Text style={styles.callControlLabel}>{isMuted ? 'Activer' : 'Muet'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.callEndButton}
+              onPress={handleEndCall}
+            >
+              <Ionicons name="call" size={32} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.callControlButton, isSpeaker && styles.callControlActive]}
+              onPress={() => { setIsSpeaker(!isSpeaker); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            >
+              <Ionicons name={isSpeaker ? 'volume-high' : 'volume-medium'} size={26} color="#fff" />
+              <Text style={styles.callControlLabel}>{isSpeaker ? 'Écouteur' : 'HP'}</Text>
             </TouchableOpacity>
           </View>
-          {callWebViewUrl && (
-            <WebView
-              source={{ uri: callWebViewUrl }}
-              style={{ flex: 1 }}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              mediaPlaybackRequiresUserAction={false}
-              allowsInlineMediaPlayback={true}
-              mediaCapturePermissionGrantType="grant"
-            />
-          )}
-        </View>
+        </LinearGradient>
       </Modal>
 
       {/* Appel entrant */}
@@ -1420,28 +1494,94 @@ const styles = StyleSheet.create({
     padding: 7,
     marginHorizontal: 1,
   },
-  // Header appel WebView
-  callHeader: {
-    flexDirection: 'row',
+  // Écran d'appel
+  callScreenContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingBottom: 60,
+  },
+  callPartnerInfo: {
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  callAvatar: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingBottom: 12,
-    backgroundColor: '#1a1a2e',
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  endCallButton: {
+  callAvatarText: {
+    fontSize: 50,
+  },
+  callPartnerName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  callStatus: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 4,
+    fontVariant: ['tabular-nums'],
+  },
+  callType: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  callWaveContainer: {
+    position: 'absolute',
+    top: '30%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  callWave: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  callControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 30,
-    gap: 8,
+    gap: 40,
+    zIndex: 2,
   },
-  endCallText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  callControlButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  callControlActive: {
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  callControlLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 10,
+    marginTop: 4,
+  },
+  callEndButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   // Modal appel entrant
   incomingCallOverlay: {
