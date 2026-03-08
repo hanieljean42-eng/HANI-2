@@ -407,6 +407,7 @@ export default function ChallengesScreen() {
       icon: challenge.icon,
       desc: challenge.desc,
       xp: challenge.xp,
+      completed: true,
       completedBy: user?.name || 'Moi',
       completedById: user?.id,
     });

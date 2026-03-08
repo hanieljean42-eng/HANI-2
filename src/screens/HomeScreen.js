@@ -46,7 +46,7 @@ export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
   const { user, couple, partner, isOnline, isSynced } = useAuth();
   const { loveMeter, challenges, memories, loveNotes, countdownEvents, addCountdownEvent, deleteCountdownEvent, unlockedBadges, checkBadges } = useData();
-  const { notifyMissYou, notifyLoveNote, sendCustomNotification } = useNotifyPartner();
+  const { notifyMissYou, notifyLoveNote, sendCustomNotification, notifyOnline } = useNotifyPartner();
   const { notifyMilestone, notifyBadgeUnlocked, notifyLevelUp, scheduleCountdownReminder } = useNotifications();
   const { messages: chatMessages } = useChat();
   const [daysCount, setDaysCount] = useState(0);
@@ -137,6 +137,13 @@ export default function HomeScreen({ navigation }) {
       notifyMilestone(daysCount, emoji);
     }
   }, [todayMilestone]);
+
+  // Notifier le partenaire qu'on est en ligne
+  useEffect(() => {
+    if (user?.id && couple?.id) {
+      notifyOnline();
+    }
+  }, [user?.id, couple?.id]);
 
   // Notification level up quand le rang change
   const [prevLevel, setPrevLevel] = useState(null);

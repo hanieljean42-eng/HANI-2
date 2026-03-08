@@ -28,7 +28,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useData } from '../context/DataContext';
 import { uploadToCloudinary, uploadAudioToCloudinary } from '../utils/uploadToCloudinary';
-import * as WebBrowser from 'expo-web-browser';
+import { WebView } from 'react-native-webview';
 
 const { width, height } = Dimensions.get('window');
 
@@ -133,6 +133,7 @@ export default function ChatScreen({ navigation }) {
   const [audioProgress, setAudioProgress] = useState({});
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageDimensions, setImageDimensions] = useState({});
+  const [callWebViewUrl, setCallWebViewUrl] = useState(null);
   
   const flatListRef = useRef(null);
   const recordingRef = useRef(null);
@@ -231,7 +232,7 @@ export default function ChatScreen({ navigation }) {
     return null;
   };
 
-  // Lancer un appel (ouvre une salle Jitsi sécurisée)
+  // Lancer un appel (ouvre une salle Jitsi sécurisée dans l'app)
   const handleCall = async (type) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     const roomId = await initiateCall(type);
@@ -240,9 +241,8 @@ export default function ChatScreen({ navigation }) {
       return;
     }
     await notifyCall(type);
-    const jitsiUrl = `https://meet.jit.si/${roomId}`;
-    await WebBrowser.openBrowserAsync(jitsiUrl);
-    await endCall();
+    const jitsiUrl = `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=${type === 'audio' ? 'true' : 'false'}`;
+    setCallWebViewUrl(jitsiUrl);
   };
 
   // Accepter un appel entrant
@@ -250,10 +250,15 @@ export default function ChatScreen({ navigation }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const roomId = await acceptCall();
     if (roomId) {
-      const jitsiUrl = `https://meet.jit.si/${roomId}`;
-      await WebBrowser.openBrowserAsync(jitsiUrl);
-      await endCall();
+      const jitsiUrl = `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false`;
+      setCallWebViewUrl(jitsiUrl);
     }
+  };
+
+  // Raccrocher l'appel
+  const handleEndCallWebView = async () => {
+    setCallWebViewUrl(null);
+    await endCall();
   };
 
   const handleSend = async () => {
@@ -850,6 +855,33 @@ export default function ChatScreen({ navigation }) {
         </View>
       </Modal>
 
+      {/* Modal Appel en cours (WebView Jitsi) */}
+      <Modal
+        visible={!!callWebViewUrl}
+        animationType="slide"
+        onRequestClose={handleEndCallWebView}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={styles.callHeader}>
+            <TouchableOpacity style={styles.endCallButton} onPress={handleEndCallWebView}>
+              <Ionicons name="call" size={24} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+              <Text style={styles.endCallText}>Raccrocher</Text>
+            </TouchableOpacity>
+          </View>
+          {callWebViewUrl && (
+            <WebView
+              source={{ uri: callWebViewUrl }}
+              style={{ flex: 1 }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              mediaPlaybackRequiresUserAction={false}
+              allowsInlineMediaPlayback={true}
+              mediaCapturePermissionGrantType="grant"
+            />
+          )}
+        </View>
+      </Modal>
+
       {/* Appel entrant */}
       {incomingCall && (
         <View style={styles.incomingCallOverlay}>
@@ -1379,6 +1411,29 @@ const styles = StyleSheet.create({
   callButton: {
     padding: 7,
     marginHorizontal: 1,
+  },
+  // Header appel WebView
+  callHeader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingBottom: 12,
+    backgroundColor: '#1a1a2e',
+  },
+  endCallButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 30,
+    gap: 8,
+  },
+  endCallText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   // Modal appel entrant
   incomingCallOverlay: {
