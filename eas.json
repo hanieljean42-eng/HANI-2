@@ -18,7 +18,7 @@
         "gradleCommand": ":app:assembleRelease"
       },
       "env": {
-        "APP_VERSION": "2.3.0",
+        "APP_VERSION": "2.4.0",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },

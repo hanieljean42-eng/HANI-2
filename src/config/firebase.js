@@ -1,11 +1,20 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+// ============================================================
+// FIREBASE — Initialisation robuste pour React Native / Hermes
+// ============================================================
+// Stratégie : les imports compat FORCENT l'enregistrement des
+// composants Firebase (auth, database) dans le registre interne.
+// Cela résout l'erreur "component auth has not been registered yet"
+// qui survient avec Hermes/Metro en builds production.
+// Ensuite on utilise l'API modulaire normalement.
+// ============================================================
+
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';      // Force l'enregistrement du composant auth
+import 'firebase/compat/database';   // Force l'enregistrement du composant database
+
+import { getApp } from 'firebase/app';
+import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
-import {
-  initializeAuth,
-  getAuth,
-  getReactNativePersistence,
-  inMemoryPersistence,
-} from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -26,49 +35,25 @@ let isConfigured = false;
 let firebaseError = null;
 
 try {
-  // 1. Initialiser l'app (éviter double init)
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  // 1. Initialiser via compat (garantit l'enregistrement des composants)
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
 
-  // 2. Base de données
+  // 2. Récupérer l'app modulaire depuis le registre partagé
+  app = getApp();
+
+  // 3. Database — API modulaire
   database = getDatabase(app);
 
-  // 3. Auth — stratégie à 3 niveaux de fallback
-  //    Niveau 1 : initializeAuth + AsyncStorage persistence
-  //    Niveau 2 : initializeAuth + inMemoryPersistence (si AsyncStorage échoue)
-  //    Niveau 3 : getAuth (si auth déjà initialisé)
-  const isAlreadyInit = (e) =>
-    e?.code === 'auth/already-initialized' || String(e).includes('already');
-
+  // 4. Auth — API modulaire avec persistence AsyncStorage
   try {
     auth = initializeAuth(app, {
       persistence: getReactNativePersistence(AsyncStorage),
     });
-  } catch (e1) {
-    if (isAlreadyInit(e1)) {
-      auth = getAuth(app);
-    } else {
-      // Niveau 2 : persistence AsyncStorage a échoué → essayer sans
-      console.warn('⚠️ Auth persistence failed, trying inMemory:', e1.message);
-      try {
-        auth = initializeAuth(app, { persistence: inMemoryPersistence });
-      } catch (e2) {
-        if (isAlreadyInit(e2)) {
-          auth = getAuth(app);
-        } else {
-          // Niveau 3 : dernier recours — initializeAuth nu
-          console.warn('⚠️ inMemory failed too, trying bare init:', e2.message);
-          try {
-            auth = initializeAuth(app);
-          } catch (e3) {
-            if (isAlreadyInit(e3)) {
-              auth = getAuth(app);
-            } else {
-              throw e3;
-            }
-          }
-        }
-      }
-    }
+  } catch (e) {
+    // Déjà initialisé (hot reload ou compat) → récupérer l'instance existante
+    auth = getAuth(app);
   }
 
   isConfigured = !!auth;
