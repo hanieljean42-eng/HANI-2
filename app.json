@@ -20,7 +20,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSUserNotificationsUsageDescription": "Nous utilisons les notifications pour vous alerter des messages de votre partenaire."
-      }
+      },
+      "bitcode": false
     },
     "android": {
       "adaptiveIcon": {
@@ -88,9 +89,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "de6488a3-2b3d-4a48-b503-185e188052c6"
+        "projectId": "5d46427e-8133-41af-b0e3-1fde0d752d43"
       }
     },
-    "owner": "25aa01280s"
+    "owner": "25inf01522s"
   }
 }
