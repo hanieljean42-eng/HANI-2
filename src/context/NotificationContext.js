@@ -247,14 +247,29 @@ export function NotificationProvider({ children }) {
           const tokens = snapshot.val();
           console.log('📋 Tokens trouvés:', Object.keys(tokens));
           
+          let foundValid = false;
           // Chercher le token du partenaire (pas le nôtre)
           for (const [id, tokenData] of Object.entries(tokens)) {
             if (id !== userId && tokenData?.token) {
-              setPartnerToken(tokenData.token);
-              partnerTokenRef.current = tokenData.token;
-              console.log('✅ Token partenaire détecté:', tokenData.token.substring(0, 20) + '...');
+              // ✅ Accepter UNIQUEMENT les vrais tokens Expo
+              if (tokenData.token.startsWith('ExponentPushToken')) {
+                setPartnerToken(tokenData.token);
+                partnerTokenRef.current = tokenData.token;
+                foundValid = true;
+                console.log('✅ Token partenaire valide détecté:', tokenData.token.substring(0, 25) + '...');
+              } else {
+                // Nettoyer le token invalide de Firebase
+                console.log('⚠️ Token partenaire invalide détecté, nettoyage:', tokenData.token.substring(0, 20));
+                const invalidRef = ref(database, `couples/${coupleId}/pushTokens/${id}`);
+                set(invalidRef, null).catch(() => {});
+              }
               break;
             }
+          }
+          if (!foundValid) {
+            console.log('⚠️ Aucun token partenaire valide trouvé');
+            setPartnerToken(null);
+            partnerTokenRef.current = null;
           }
         } else {
           console.log('⚠️ Pas de tokens trouvés - partenaire pas encore en ligne');
@@ -433,7 +448,10 @@ export function NotificationProvider({ children }) {
     
     // ÉTAPE 1: Vérifier si on a un token partenaire valide
     // Si pas en mémoire, tenter de le récupérer depuis Firebase
-    let tokenToUse = currentPartnerToken;
+    // Si le token en mémoire n'est pas un vrai token Expo, le traiter comme absent
+    let tokenToUse = (currentPartnerToken && currentPartnerToken.startsWith('ExponentPushToken')) 
+      ? currentPartnerToken 
+      : null;
     
     if (!tokenToUse && currentCouple?.id && currentUser?.id && isConfigured && database) {
       // Essayer jusqu'à 3 tentatives avec délai progressif
@@ -449,10 +467,18 @@ export function NotificationProvider({ children }) {
             const tokens = snapshot.val();
             for (const [id, tokenData] of Object.entries(tokens)) {
               if (id !== currentUser.id && tokenData?.token) {
-                tokenToUse = tokenData.token;
-                setPartnerToken(tokenToUse);
-                partnerTokenRef.current = tokenToUse;
-                console.log('✅ Token partenaire récupéré depuis Firebase:', tokenToUse.substring(0, 20) + '...');
+                // Accepter uniquement les vrais tokens Expo
+                if (tokenData.token.startsWith('ExponentPushToken')) {
+                  tokenToUse = tokenData.token;
+                  setPartnerToken(tokenToUse);
+                  partnerTokenRef.current = tokenToUse;
+                  console.log('✅ Token partenaire récupéré depuis Firebase:', tokenToUse.substring(0, 25) + '...');
+                } else {
+                  console.log('⚠️ Token invalide trouvé sur Firebase, ignoré:', tokenData.token.substring(0, 20));
+                  // Supprimer le token invalide
+                  const badTokenRef = ref(database, `couples/${currentCouple.id}/pushTokens/${id}`);
+                  set(badTokenRef, null).catch(() => {});
+                }
                 break;
               }
             }
@@ -463,15 +489,10 @@ export function NotificationProvider({ children }) {
       }
     }
     
-    if (!tokenToUse) {
-      console.log('⚠️ Pas de token partenaire - impossible d\'envoyer push');
+    if (!tokenToUse || !tokenToUse.startsWith('ExponentPushToken')) {
+      console.log('⚠️ Pas de token partenaire valide - impossible d\'envoyer push');
+      console.log('   Token actuel:', tokenToUse ? tokenToUse.substring(0, 20) + '...' : 'null');
       console.log('   (Le partenaire doit ouvrir l\'app au moins une fois pour recevoir des notifications)');
-      return false;
-    }
-
-    // ÉTAPE 2: Vérifier que c'est un vrai token Expo (pas mode dev)
-    if (!tokenToUse.startsWith('ExponentPushToken')) {
-      console.log('⚠️ Token partenaire non valide (mode dev/simulator)');
       return false;
     }
 
