@@ -446,15 +446,19 @@ export default function ChatScreen({ navigation, route }) {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ['images', 'videos'],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase().split('?')[0];
+        const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', bmp: 'image/bmp', mp4: 'video/mp4', mov: 'video/quicktime' };
+        const mimeType = asset.mimeType || mimeMap[ext] || 'image/jpeg';
         const file = {
-          uri: result.assets[0].uri,
-          type: 'image/jpeg',
-          name: `chat_${Date.now()}.jpg`
+          uri: asset.uri,
+          type: mimeType,
+          name: `chat_${Date.now()}.${ext}`
         };
 
         try {
@@ -1012,32 +1016,8 @@ export default function ChatScreen({ navigation, route }) {
         >
           <StatusBar backgroundColor="#1a1a2e" barStyle="light-content" />
 
-          {/* Vidéo distante en plein écran (si appel vidéo + stream reçu) */}
-          {(activeCall?.type === 'video') && remoteStream && (
-            <RTCView
-              streamURL={remoteStream.toURL()}
-              style={styles.remoteVideo}
-              objectFit="cover"
-              mirror={false}
-            />
-          )}
-
-          {/* Vidéo locale en miniature (si appel vidéo + stream local) */}
-          {(activeCall?.type === 'video') && localStream && !isCameraOff && (
-            <View style={styles.localVideoContainer}>
-              <RTCView
-                streamURL={localStream.toURL()}
-                style={styles.localVideo}
-                objectFit="cover"
-                mirror={true}
-                zOrder={1}
-              />
-            </View>
-          )}
-          
-          {/* Info partenaire (visible si audio OU vidéo sans stream distant) */}
-          {((activeCall?.type !== 'video') || !remoteStream) && (
-            <View style={styles.callPartnerInfo}>
+          {/* Info partenaire — toujours visible (WebRTC natif indisponible) */}
+          <View style={styles.callPartnerInfo}>
               <View style={[
                 styles.callTypeIcon,
                 (activeCall?.type || incomingCall?.type) === 'video' && styles.callTypeIconVideo
@@ -1066,22 +1046,10 @@ export default function ChatScreen({ navigation, route }) {
               <Text style={styles.callType}>
                 {(activeCall?.type || incomingCall?.type) === 'video' ? '🎥 Appel vidéo' : '📞 Appel vocal'}
               </Text>
-            </View>
-          )}
+          </View>
 
-          {/* Timer overlay pour appel vidéo avec stream */}
-          {(activeCall?.type === 'video') && remoteStream && (
-            <View style={styles.videoCallInfoOverlay}>
-              <Text style={styles.videoCallName}>{partner?.name || 'Mon amour'}</Text>
-              <Text style={styles.videoCallTimer}>
-                {webrtcState === 'connected' ? formatCallTimer(callTimer) : '🔄 Connexion...'}
-              </Text>
-            </View>
-          )}
-
-          {/* Animation ondulation (seulement pour audio ou en attente) */}
-          {((activeCall?.type !== 'video') || !remoteStream) && (
-            <View style={styles.callWaveContainer}>
+          {/* Animation ondulation */}
+          <View style={styles.callWaveContainer}>
               {[1, 2, 3].map((i) => (
                 <View key={i} style={[
                   styles.callWave,
@@ -1095,9 +1063,7 @@ export default function ChatScreen({ navigation, route }) {
                       : 'rgba(255,255,255,0.3)',
                   }
                 ]} />
-              ))}
-            </View>
-          )}
+              ))}            </View>
 
           {/* Boutons de contrôle */}
           <View style={styles.callControls}>

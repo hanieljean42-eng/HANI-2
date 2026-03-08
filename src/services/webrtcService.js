@@ -19,22 +19,27 @@ class WebRTCService {
     this.onRemoteStream = null;
     this.onLocalStream = null;
     this.onConnectionStateChange = null;
+    // État interne pour les toggles
+    this._isMuted = false;
+    this._isCameraOff = false;
+    this._isSpeaker = false;
   }
 
   init(coupleId, userId) {
     this.coupleId = coupleId;
     this.userId = userId;
+    this._isMuted = false;
+    this._isCameraOff = false;
+    this._isSpeaker = false;
   }
 
   async getLocalStream(type = 'audio') {
     this.callType = type;
-    // Pas de vrai stream sans WebRTC natif
     console.log('📱 WebRTC stub: mode signaling-only (audio/vidéo natif indisponible)');
     return null;
   }
 
   createPeerConnection() {
-    // Simuler une connexion réussie après un court délai
     setTimeout(() => {
       if (this.onConnectionStateChange) this.onConnectionStateChange('connected');
     }, 2000);
@@ -52,10 +57,25 @@ class WebRTCService {
     }, 1500);
   }
 
-  toggleMute() { return false; }
-  toggleSpeaker() { return true; }
-  async switchCamera() {}
-  toggleCamera() { return false; }
+  toggleMute() {
+    this._isMuted = !this._isMuted;
+    return this._isMuted;
+  }
+
+  toggleSpeaker() {
+    this._isSpeaker = !this._isSpeaker;
+    return this._isSpeaker;
+  }
+
+  async switchCamera() {
+    // Stub — pas de caméra native disponible
+    console.log('📷 switchCamera stub');
+  }
+
+  toggleCamera() {
+    this._isCameraOff = !this._isCameraOff;
+    return this._isCameraOff;
+  }
 
   async cleanup() {
     console.log('🧹 WebRTC stub: nettoyage');
@@ -73,6 +93,9 @@ class WebRTCService {
     this.onLocalStream = null;
     this.onConnectionStateChange = null;
     this.callType = null;
+    this._isMuted = false;
+    this._isCameraOff = false;
+    this._isSpeaker = false;
   }
 }
 

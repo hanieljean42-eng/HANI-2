@@ -162,9 +162,7 @@ export default function MemoriesScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.7,
+        quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -227,10 +225,12 @@ export default function MemoriesScreen() {
         
         setUploadProgress(50);
         
+        const ext = (newMemory.imageUri.split('.').pop() || 'jpg').toLowerCase().split('?')[0];
+        const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', bmp: 'image/bmp' };
         const file = {
           uri: newMemory.imageUri,
-          type: 'image/jpeg',
-          name: `memory_${Date.now()}.jpg`
+          type: mimeMap[ext] || 'image/jpeg',
+          name: `memory_${Date.now()}.${ext === 'heic' ? 'jpg' : ext}`
         };
         
         const cloudinaryResult = await uploadToCloudinary(file);
