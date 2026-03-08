@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, off, push } from 'firebase/database';
+import { ref, set, onValue, off, push, query as fbQuery, limitToLast } from 'firebase/database';
 import { useAuth } from './AuthContext';
 import { encryptMessageObject, decryptMessageObject } from '../utils/encryption';
 
@@ -27,10 +27,11 @@ export function ChatProvider({ children }) {
     if (!couple?.id || !isConfigured || !database) return;
 
     const messagesRef = ref(database, `couples/${couple.id}/chat/messages`);
+    const messagesQuery = fbQuery(messagesRef, limitToLast(100));
     const typingRef = ref(database, `couples/${couple.id}/chat/typing`);
 
-    // Écouter les messages
-    const messagesListener = onValue(messagesRef, (snapshot) => {
+    // Écouter les 100 derniers messages
+    const messagesListener = onValue(messagesQuery, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const messagesArray = Object.entries(data).map(([key, value]) => {
@@ -103,7 +104,7 @@ export function ChatProvider({ children }) {
     listenerRef.current = { messagesListener, typingListener, recordingListener, callListener };
 
     return () => {
-      off(messagesRef);
+      off(messagesQuery);
       off(typingRef);
       off(recordingRef);
       off(callActiveRef);

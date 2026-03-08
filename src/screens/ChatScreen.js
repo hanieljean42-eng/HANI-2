@@ -180,14 +180,22 @@ export default function ChatScreen({ navigation }) {
 
   // Marquer comme lu à l'ouverture + notifier le partenaire
   const hasNotifiedReadRef = React.useRef(false);
+  const lastNotifiedCountRef = React.useRef(0);
   useEffect(() => {
     markAsRead();
-    // Notifier le partenaire qu'on a lu ses messages (une seule fois par session)
-    if (messages.length > 0 && !hasNotifiedReadRef.current) {
+    // Notifier le partenaire qu'on a lu ses messages
+    if (messages.length > 0) {
       const unreadFromPartner = messages.filter(m => m.senderId !== user?.id && !m.read);
-      if (unreadFromPartner.length > 0) {
-        hasNotifiedReadRef.current = true;
-        notifyNoteRead();
+      // Re-notifier seulement si de nouveaux messages non-lus sont apparus
+      if (unreadFromPartner.length > 0 && unreadFromPartner.length !== lastNotifiedCountRef.current) {
+        lastNotifiedCountRef.current = unreadFromPartner.length;
+        if (!hasNotifiedReadRef.current) {
+          hasNotifiedReadRef.current = true;
+          notifyNoteRead();
+        }
+      } else if (unreadFromPartner.length === 0) {
+        hasNotifiedReadRef.current = false;
+        lastNotifiedCountRef.current = 0;
       }
     }
   }, [messages]);

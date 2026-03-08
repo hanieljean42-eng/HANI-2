@@ -3,8 +3,8 @@ import { CLOUDINARY_CONFIG } from '../config/cloudinary';
 
 export const uploadToCloudinary = async (file) => {
   try {
-    console.log('Ã¢ËœÂÃ¯Â¸Â Upload Cloudinary dÃƒÂ©marrÃƒÂ©:', file.name);
-    console.log('Ã¢ËœÂÃ¯Â¸Â URI:', file.uri?.substring(0, 50) + '...');
+    console.log('☁️ Upload Cloudinary démarré:', file.name);
+    console.log('☁️ URI:', file.uri?.substring(0, 50) + '...');
     
     const formData = new FormData();
     
@@ -15,11 +15,17 @@ export const uploadToCloudinary = async (file) => {
     });
     formData.append('upload_preset', 'HANI2_couple');
 
+    // Détecter si c'est une vidéo pour utiliser le bon endpoint
+    const isVideo = file.type?.startsWith('video/') || 
+                    /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name || '') ||
+                    /\.(mp4|mov|avi|mkv|webm)$/i.test(file.uri || '');
+    const resourceType = isVideo ? 'video' : 'image';
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), isVideo ? 60000 : 30000);
 
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`,
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/${resourceType}/upload`,
       {
         method: 'POST',
         body: formData,

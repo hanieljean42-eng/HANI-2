@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -106,28 +106,34 @@ export default function HomeScreen({ navigation }) {
     return unlockedBadges?.length || 0;
   }, [unlockedBadges]);
 
-  // Check badges quand les données changent
+  // Check badges quand les données changent (avec debounce)
+  const badgeCheckTimerRef = useRef(null);
   useEffect(() => {
     if (!user?.id) return;
-    const completedChallenges = challenges?.filter(c => c.completed)?.length || 0;
-    const statsObj = {
-      streak: 0, // streak est calculé dans ChallengesScreen, les badges flamme se débloquent là-bas
-      challenges: completedChallenges,
-      messages: chatMessages?.length || 0,
-      memories: memories?.length || 0,
-      notes: loveNotes?.length || 0,
-      days: daysCount,
-      level: levelInfo.level,
-    };
-    checkBadges(statsObj).then(newBadges => {
-      if (newBadges && newBadges.length > 0) {
-        const badge = BADGES_LIST.find(b => b.id === newBadges[0].id);
-        if (badge) {
-          notifyBadgeUnlocked(badge.name, badge.emoji);
-          Alert.alert(`${badge.emoji} Nouveau badge !`, `Tu as débloqué "${badge.name}" !\n${badge.desc}`);
+    // Debounce pour éviter les appels multiples rapides
+    if (badgeCheckTimerRef.current) clearTimeout(badgeCheckTimerRef.current);
+    badgeCheckTimerRef.current = setTimeout(() => {
+      const completedChallenges = challenges?.filter(c => c.completed)?.length || 0;
+      const statsObj = {
+        streak: 0, // streak est calculé dans ChallengesScreen, les badges flamme se débloquent là-bas
+        challenges: completedChallenges,
+        messages: chatMessages?.length || 0,
+        memories: memories?.length || 0,
+        notes: loveNotes?.length || 0,
+        days: daysCount,
+        level: levelInfo.level,
+      };
+      checkBadges(statsObj).then(newBadges => {
+        if (newBadges && newBadges.length > 0) {
+          const badge = BADGES_LIST.find(b => b.id === newBadges[0].id);
+          if (badge) {
+            notifyBadgeUnlocked(badge.name, badge.emoji);
+            Alert.alert(`${badge.emoji} Nouveau badge !`, `Tu as débloqué "${badge.name}" !\n${badge.desc}`);
+          }
         }
-      }
-    });
+      });
+    }, 2000);
+    return () => { if (badgeCheckTimerRef.current) clearTimeout(badgeCheckTimerRef.current); };
   }, [challenges?.length, memories?.length, daysCount, levelInfo.level, chatMessages?.length, loveNotes?.length]);
 
   // Check milestones

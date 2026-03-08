@@ -69,6 +69,12 @@ export default function ProfileScreen({ navigation }) {
   } = useNotifyPartner();
   const { scheduleAnniversaryReminder } = useNotifications();
   const lastMilestoneRef = React.useRef(0);
+
+  // Réinitialiser le ref de milestone quand le couple change
+  useEffect(() => {
+    lastMilestoneRef.current = 0;
+  }, [couple?.id]);
+
   const [activeSection, setActiveSection] = useState('profile');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showBucketModal, setShowBucketModal] = useState(false);

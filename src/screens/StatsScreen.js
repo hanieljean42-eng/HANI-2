@@ -26,7 +26,7 @@ export default function StatsScreen({ navigation }) {
 
   useEffect(() => {
     calculateStats();
-  }, [memories, challenges, messages, bucketList, loveNotes, timeCapsules, sharedDiary]);
+  }, [memories, challenges, messages, bucketList, loveNotes, timeCapsules, sharedDiary, loveMeter]);
 
   const calculateStats = () => {
     // Calcul des jours ensemble
