@@ -246,7 +246,7 @@ export function GameProvider({ children }) {
         
         return session;
       } else {
-        console.log('❌ Aucune session trouvée pour:', currentCoupleId);
+        console.log('❌ Aucune session trouvée pour:', coupleId);
         return { error: 'Votre partenaire n\'a pas encore créé de partie. Demandez-lui de créer une partie d\'abord!' };
       }
     } catch (error) {
@@ -503,6 +503,7 @@ export function GameProvider({ children }) {
     isFirebaseReady,
     isOnlineMode,
     isConnected,
+    firebaseError: (!isConfigured || !database) ? 'Firebase non disponible pour les jeux' : null,
     
     // Nouveaux états pour invitations
     pendingGameInvite,
@@ -524,6 +525,15 @@ export function GameProvider({ children }) {
     getPartnerInfo,
     getMyInfo,
     toggleOnlineMode,
+    updateCoupleId: () => {}, // coupleId est dérivé de couple?.id, pas besoin de setter manuel
+    clearGameAnswers: async () => {
+      if (!coupleId || !database) return;
+      try {
+        const answersRef = ref(database, `games/${coupleId}/session/answers`);
+        await set(answersRef, null);
+        console.log('🧹 Réponses nettoyées');
+      } catch (e) { console.log('⚠️ clearGameAnswers:', e.message); }
+    },
   };
 
   return (

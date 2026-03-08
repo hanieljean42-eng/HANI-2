@@ -1001,6 +1001,47 @@ export function NotificationProvider({ children }) {
     }
   };
 
+  // ==================== NOTIFICATIONS MANQUANTES (HomeScreen) ====================
+  const notifyMilestone = async (daysCount, emoji) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: { title: `${emoji} ${daysCount} jours ensemble !`, body: 'Félicitations pour ce cap magnifique 🏆💕', sound: true },
+        trigger: null,
+      });
+    } catch (e) { console.log('⚠️ notifyMilestone:', e.message); }
+  };
+
+  const notifyBadgeUnlocked = async (badgeName, badgeEmoji) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: { title: `${badgeEmoji} Nouveau badge !`, body: `Tu as débloqué "${badgeName}" !`, sound: true },
+        trigger: null,
+      });
+    } catch (e) { console.log('⚠️ notifyBadgeUnlocked:', e.message); }
+  };
+
+  const notifyLevelUp = async (level, rank, rankEmoji) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: { title: `${rankEmoji} Niveau ${level} !`, body: `Vous êtes maintenant un couple ${rank} !`, sound: true },
+        trigger: null,
+      });
+    } catch (e) { console.log('⚠️ notifyLevelUp:', e.message); }
+  };
+
+  const scheduleCountdownReminder = async (eventName, emoji, dateStr) => {
+    try {
+      const eventDate = new Date(dateStr);
+      const reminderDate = new Date(eventDate);
+      reminderDate.setDate(reminderDate.getDate() - 1);
+      if (reminderDate <= new Date()) return;
+      await Notifications.scheduleNotificationAsync({
+        content: { title: `${emoji} Demain : ${eventName}`, body: 'Préparez-vous pour demain ! 💕', sound: true },
+        trigger: { type: SchedulableTriggerInputTypes.DATE, date: reminderDate },
+      });
+    } catch (e) { console.log('⚠️ scheduleCountdownReminder:', e.message); }
+  };
+
   const value = {
     expoPushToken,
     notification,
@@ -1035,6 +1076,31 @@ export function NotificationProvider({ children }) {
     notifyCoupleJoined,
     notifyPartnerJoinedCreator,
     notifyLoginSuccess,
+    // HomeScreen milestones & badges
+    notifyMilestone,
+    notifyBadgeUnlocked,
+    notifyLevelUp,
+    scheduleCountdownReminder,
+    // ChallengesScreen streaks
+    notifyStreakDanger: async (streakCount, partnerName) => {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: { title: '🔥 Attention à votre flamme !', body: `Votre série de ${streakCount} jours est en danger ! Parlez à ${partnerName || 'votre partenaire'} aujourd'hui 💬`, sound: true },
+          trigger: null,
+        });
+      } catch (e) { console.log('⚠️ notifyStreakDanger:', e.message); }
+    },
+    scheduleStreakReminder: async (streakCount) => {
+      try {
+        const reminderDate = new Date();
+        reminderDate.setHours(20, 0, 0, 0);
+        if (reminderDate <= new Date()) return;
+        await Notifications.scheduleNotificationAsync({
+          content: { title: '🔥 Maintenez votre flamme !', body: `${streakCount} jours consécutifs ! N'oubliez pas de discuter aujourd'hui 💕`, sound: true },
+          trigger: { type: SchedulableTriggerInputTypes.DATE, date: reminderDate },
+        });
+      } catch (e) { console.log('⚠️ scheduleStreakReminder:', e.message); }
+    },
   };
 
   return (

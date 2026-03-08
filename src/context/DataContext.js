@@ -5,6 +5,49 @@ import { ref, set, get, onValue, off } from 'firebase/database';
 import { useAuth } from './AuthContext';
 import { encryptLoveNote, decryptLoveNote } from '../utils/encryption';
 
+// ==================== CONSTANTES EXPORTÉES ====================
+
+export const BADGES_LIST = [
+  { id: 'first_memory', name: 'Premier Souvenir', emoji: '📸', desc: 'Ajoutez votre premier souvenir', check: (s) => s.memories >= 1 },
+  { id: 'first_challenge', name: 'Premier Défi', emoji: '⚡', desc: 'Complétez votre premier défi', check: (s) => s.challenges >= 1 },
+  { id: 'chatterbox', name: 'Bavards', emoji: '💬', desc: 'Envoyez 50 messages', check: (s) => s.messages >= 50 },
+  { id: 'love_writer', name: 'Poète', emoji: '✍️', desc: 'Écrivez 5 notes d\'amour', check: (s) => s.notes >= 5 },
+  { id: 'week_together', name: 'Semaine d\'amour', emoji: '📅', desc: '7 jours ensemble', check: (s) => s.days >= 7 },
+  { id: 'month_together', name: 'Premier Mois', emoji: '🌙', desc: '30 jours ensemble', check: (s) => s.days >= 30 },
+  { id: 'year_together', name: 'Un An !', emoji: '🎂', desc: '365 jours ensemble', check: (s) => s.days >= 365 },
+  { id: 'memory_collector', name: 'Collectionneur', emoji: '🏆', desc: '10 souvenirs créés', check: (s) => s.memories >= 10 },
+  { id: 'challenge_master', name: 'Maître des Défis', emoji: '🎯', desc: '10 défis complétés', check: (s) => s.challenges >= 10 },
+  { id: 'love_bomb', name: 'Bombe d\'amour', emoji: '💝', desc: '20 notes d\'amour', check: (s) => s.notes >= 20 },
+  { id: 'hundred_days', name: '100 Jours', emoji: '💯', desc: '100 jours ensemble', check: (s) => s.days >= 100 },
+  { id: 'level_5', name: 'Niveau 5', emoji: '⭐', desc: 'Atteindre le niveau 5', check: (s) => s.level >= 5 },
+];
+
+export const MILESTONES = [1, 7, 14, 30, 50, 100, 150, 200, 250, 300, 365, 500, 730, 1000, 1095, 1461, 1826, 2000, 2500, 3000, 3650];
+
+export const SPECIAL_DATES = [
+  { month: 2, day: 14, name: 'Saint-Valentin', emoji: '❤️' },
+  { month: 12, day: 25, name: 'Noël', emoji: '🎄' },
+  { month: 1, day: 1, name: 'Nouvel An', emoji: '🎆' },
+  { month: 3, day: 8, name: 'Journée de la Femme', emoji: '🌸' },
+  { month: 5, day: 1, name: 'Fête du Travail', emoji: '🌻' },
+  { month: 6, day: 21, name: 'Fête de la Musique', emoji: '🎵' },
+];
+
+export function getLevelInfo(xp) {
+  const level = Math.floor((xp || 0) / 100) + 1;
+  const ranks = [
+    { min: 1, rank: 'Débutant', emoji: '🌱' },
+    { min: 3, rank: 'Amoureux', emoji: '💕' },
+    { min: 5, rank: 'Complices', emoji: '🤝' },
+    { min: 10, rank: 'Fusionnels', emoji: '🔥' },
+    { min: 20, rank: 'Légendaires', emoji: '👑' },
+  ];
+  const rankInfo = [...ranks].reverse().find(r => level >= r.min) || ranks[0];
+  return { level, totalXP: xp || 0, rank: rankInfo.rank, rankEmoji: rankInfo.emoji };
+}
+
+// ==================== CONTEXTE ====================
+
 const DataContext = createContext({});
 
 export const useData = () => useContext(DataContext);
@@ -27,6 +70,10 @@ export function DataProvider({ children }) {
   
   // 🔥 Système de flammes/streaks
   const [streak, setStreak] = useState({ count: 0, lastDate: null, bestStreak: 0 });
+
+  // 🏆 Badges & Countdown
+  const [unlockedBadges, setUnlockedBadges] = useState([]);
+  const [countdownEvents, setCountdownEvents] = useState([]);
 
   // Référence pour éviter les boucles
   const coupleIdRef = useRef(null);
@@ -165,7 +212,8 @@ export function DataProvider({ children }) {
     try {
       const keys = [
         '@memories', '@challenges', '@quizScores', '@loveMeter',
-        '@bucketList', '@loveNotes', '@timeCapsules', '@scheduledLetters', '@sharedDiary', '@streak'
+        '@bucketList', '@loveNotes', '@timeCapsules', '@scheduledLetters', '@sharedDiary', '@streak',
+        '@unlockedBadges', '@countdownEvents'
       ];
       const results = await AsyncStorage.multiGet(keys);
       
@@ -185,6 +233,8 @@ export function DataProvider({ children }) {
               case '@scheduledLetters': if (Array.isArray(data)) setScheduledLetters(data); break;
               case '@sharedDiary': if (Array.isArray(data)) setSharedDiary(data); break;
               case '@streak': if (data && typeof data === 'object') setStreak(data); break;
+              case '@unlockedBadges': if (Array.isArray(data)) setUnlockedBadges(data); break;
+              case '@countdownEvents': if (Array.isArray(data)) setCountdownEvents(data); break;
             }
           } catch (parseError) {
             console.error(`Erreur parsing ${key}:`, parseError);
@@ -991,6 +1041,63 @@ export function DataProvider({ children }) {
     }
   };
 
+  // ==================== BADGES ====================
+  const checkBadges = async (stats) => {
+    try {
+      const newlyUnlocked = [];
+      for (const badge of BADGES_LIST) {
+        const alreadyUnlocked = unlockedBadges.some(b => b.id === badge.id);
+        if (!alreadyUnlocked && badge.check(stats)) {
+          newlyUnlocked.push({ id: badge.id, unlockedAt: new Date().toISOString() });
+        }
+      }
+      if (newlyUnlocked.length > 0) {
+        const updated = [...unlockedBadges, ...newlyUnlocked];
+        setUnlockedBadges(updated);
+        await AsyncStorage.setItem('@unlockedBadges', JSON.stringify(updated));
+        if (couple?.id && isConfigured && database) {
+          try {
+            const badgesRef = ref(database, `couples/${couple.id}/data/unlockedBadges`);
+            const obj = {};
+            updated.forEach(b => { obj[b.id] = b; });
+            await set(badgesRef, obj);
+          } catch (e) { console.log('⚠️ Erreur sync badges:', e.message); }
+        }
+      }
+      return newlyUnlocked;
+    } catch (e) {
+      console.log('⚠️ Erreur checkBadges:', e.message);
+      return [];
+    }
+  };
+
+  // ==================== COUNTDOWN EVENTS ====================
+  const addCountdownEvent = async (event) => {
+    const newEvent = { id: Date.now().toString(), ...event, createdAt: new Date().toISOString() };
+    const updated = [...countdownEvents, newEvent].sort((a, b) => new Date(a.date) - new Date(b.date));
+    setCountdownEvents(updated);
+    await AsyncStorage.setItem('@countdownEvents', JSON.stringify(updated));
+    if (couple?.id && isConfigured && database) {
+      try {
+        const evRef = ref(database, `couples/${couple.id}/data/countdownEvents/${newEvent.id}`);
+        await set(evRef, newEvent);
+      } catch (e) { console.log('⚠️ Erreur sync countdown:', e.message); }
+    }
+    return newEvent;
+  };
+
+  const deleteCountdownEvent = async (eventId) => {
+    const updated = countdownEvents.filter(e => e.id !== eventId);
+    setCountdownEvents(updated);
+    await AsyncStorage.setItem('@countdownEvents', JSON.stringify(updated));
+    if (couple?.id && isConfigured && database) {
+      try {
+        const evRef = ref(database, `couples/${couple.id}/data/countdownEvents/${eventId}`);
+        await set(evRef, null);
+      } catch (e) { console.log('⚠️ Erreur suppression countdown:', e.message); }
+    }
+  };
+
   const value = {
     memories,
     challenges,
@@ -1003,6 +1110,12 @@ export function DataProvider({ children }) {
     scheduledLetters,
     sharedDiary,
     isDataSynced,
+    // Badges & Countdown
+    unlockedBadges,
+    countdownEvents,
+    checkBadges,
+    addCountdownEvent,
+    deleteCountdownEvent,
     // Memories
     addMemory,
     deleteMemory,
