@@ -24,7 +24,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
-import { RTCView } from 'react-native-webrtc';
+// RTCView stub — react-native-webrtc temporairement retiré (jitpack down)
+const RTCView = () => null;
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';

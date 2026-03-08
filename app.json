@@ -72,14 +72,7 @@
           "mode": "production"
         }
       ],
-      "expo-font",
-      [
-        "@config-plugins/react-native-webrtc",
-        {
-          "cameraPermission": "L'application a besoin de la caméra pour les appels vidéo.",
-          "microphonePermission": "L'application a besoin du microphone pour les appels vocaux et vidéo."
-        }
-      ]
+      "expo-font"
     ],
     "notification": {
       "icon": "./assets/icon.png",
