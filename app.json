@@ -48,7 +48,7 @@
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.BLUETOOTH"
       ],
-      "newArchEnabled": false
+      "newArchEnabled": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
