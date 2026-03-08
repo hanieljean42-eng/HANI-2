@@ -1,6 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
-import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
+import {
+  initializeAuth,
+  getAuth,
+  getReactNativePersistence,
+  inMemoryPersistence,
+} from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -21,24 +26,52 @@ let isConfigured = false;
 let firebaseError = null;
 
 try {
-  // 1. Initialiser l'app Firebase (éviter double init)
+  // 1. Initialiser l'app (éviter double init)
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-  // 2. Initialiser la base de données
+  // 2. Base de données
   database = getDatabase(app);
 
-  // 3. Initialiser l'authentification avec persistance AsyncStorage
+  // 3. Auth — stratégie à 3 niveaux de fallback
+  //    Niveau 1 : initializeAuth + AsyncStorage persistence
+  //    Niveau 2 : initializeAuth + inMemoryPersistence (si AsyncStorage échoue)
+  //    Niveau 3 : getAuth (si auth déjà initialisé)
+  const isAlreadyInit = (e) =>
+    e?.code === 'auth/already-initialized' || String(e).includes('already');
+
   try {
     auth = initializeAuth(app, {
       persistence: getReactNativePersistence(AsyncStorage),
     });
-  } catch (authError) {
-    // Si déjà initialisé (double chargement module), récupérer l'instance existante
-    console.warn('⚠️ initializeAuth error, fallback getAuth:', authError.message);
-    auth = getAuth(app);
+  } catch (e1) {
+    if (isAlreadyInit(e1)) {
+      auth = getAuth(app);
+    } else {
+      // Niveau 2 : persistence AsyncStorage a échoué → essayer sans
+      console.warn('⚠️ Auth persistence failed, trying inMemory:', e1.message);
+      try {
+        auth = initializeAuth(app, { persistence: inMemoryPersistence });
+      } catch (e2) {
+        if (isAlreadyInit(e2)) {
+          auth = getAuth(app);
+        } else {
+          // Niveau 3 : dernier recours — initializeAuth nu
+          console.warn('⚠️ inMemory failed too, trying bare init:', e2.message);
+          try {
+            auth = initializeAuth(app);
+          } catch (e3) {
+            if (isAlreadyInit(e3)) {
+              auth = getAuth(app);
+            } else {
+              throw e3;
+            }
+          }
+        }
+      }
+    }
   }
 
-  isConfigured = true;
+  isConfigured = !!auth;
   console.log('✅ Firebase connecté — auth:', !!auth, 'db:', !!database);
 } catch (error) {
   firebaseError = error.message || 'Erreur inconnue Firebase';
