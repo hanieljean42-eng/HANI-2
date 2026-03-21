@@ -5,7 +5,7 @@ import * as Device from 'expo-device';
 import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, get, onValue, off, remove, push as fbPush } from 'firebase/database';
+import { ref, set, get, onValue, off } from 'firebase/database';
 import { useAuth } from './AuthContext';
 import { navigate } from '../navigation/navigationRef';
 
@@ -39,8 +39,6 @@ export function NotificationProvider({ children }) {
   const partnerTokenRef = useRef(null);
   const authUserRef = useRef(null);
   const authCoupleRef = useRef(null);
-  const inAppListenerRef = useRef(null); // Listener notifications in-app Firebase
-  const processedInAppRef = useRef(new Set()); // Déduplication notifications in-app
 
   // Synchroniser les refs avec les valeurs actuelles
   useEffect(() => { partnerTokenRef.current = partnerToken; }, [partnerToken]);
@@ -298,64 +296,6 @@ export function NotificationProvider({ children }) {
     };
   }, [coupleId, userId]);
 
-  // ✅ NOTIFICATIONS IN-APP VIA FIREBASE
-  // Quand les 2 partenaires sont en ligne, les push peuvent être lents ou silencieux.
-  // Ce listener détecte les notifications écrites dans Firebase et les affiche localement.
-  useEffect(() => {
-    if (!coupleId || !userId || !isConfigured || !database) return;
-
-    console.log('👂 Écoute notifications in-app Firebase pour:', userId);
-    const inAppRef = ref(database, `couples/${coupleId}/inAppNotifications/${userId}`);
-
-    const unsubscribe = onValue(inAppRef, async (snapshot) => {
-      if (!snapshot.exists()) return;
-      const notifications = snapshot.val();
-
-      for (const [key, notif] of Object.entries(notifications)) {
-        // Déduplication: ne pas afficher une notification déjà traitée
-        if (processedInAppRef.current.has(key)) continue;
-        processedInAppRef.current.add(key);
-
-        // Ignorer les notifications trop anciennes (> 30 secondes)
-        if (notif.timestamp && Date.now() - notif.timestamp > 30000) {
-          // Nettoyer l'ancienne notification
-          remove(ref(database, `couples/${coupleId}/inAppNotifications/${userId}/${key}`)).catch(() => {});
-          continue;
-        }
-
-        console.log('📬 Notification in-app reçue:', notif.title);
-        try {
-          // Afficher comme notification locale immédiate
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: notif.title,
-              body: notif.body,
-              sound: 'default',
-              priority: Notifications.AndroidNotificationPriority.HIGH,
-              data: notif.data || {},
-            },
-            trigger: null, // Immédiat
-          });
-        } catch (e) {
-          console.log('⚠️ Erreur affichage notification in-app:', e.message);
-        }
-
-        // Supprimer la notification de Firebase après affichage
-        remove(ref(database, `couples/${coupleId}/inAppNotifications/${userId}/${key}`)).catch(() => {});
-      }
-    });
-
-    inAppListenerRef.current = unsubscribe;
-
-    return () => {
-      console.log('🔕 Arrêt écoute notifications in-app');
-      if (inAppListenerRef.current) {
-        inAppListenerRef.current();
-        inAppListenerRef.current = null;
-      }
-    };
-  }, [coupleId, userId]);
-
   // Fonction pour demander les permissions (Android 13+ compatible)
   async function registerForPushNotificationsAsync() {
     let token;
@@ -495,87 +435,61 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // ✅ RESTRUCTURÉ: Envoyer une notification au partenaire via Expo Push + Firebase in-app
+  // ✅ Envoyer une notification push au partenaire via Expo Push API
   const sendPushNotification = async (title, body, data = {}) => {
-    // ✅ Utiliser les refs pour avoir les valeurs les plus récentes (pas de closure stale)
     const currentPartnerToken = partnerTokenRef.current;
     const currentUser = authUserRef.current;
     const currentCouple = authCoupleRef.current;
     
-    console.log('📤 Tentative envoi notification:', { title, type: data?.type });
-
-    // ✅ ÉTAPE 0: Écrire la notification dans Firebase pour livraison in-app garantie
-    // Fonctionne même si le push échoue (quand les 2 sont en ligne)
-    if (currentCouple?.id && currentUser?.id && isConfigured && database) {
-      try {
-        // Trouver l'ID du partenaire
-        const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
-        const tokensSnap = await get(tokensRef);
-        let partnerId = null;
-        if (tokensSnap.exists()) {
-          for (const id of Object.keys(tokensSnap.val())) {
-            if (id !== currentUser.id) { partnerId = id; break; }
-          }
-        }
-        // Si pas trouvé via tokens, chercher dans le couple
-        if (!partnerId) {
-          const coupleRef = ref(database, `couples/${currentCouple.id}/members`);
-          const membersSnap = await get(coupleRef);
-          if (membersSnap.exists()) {
-            for (const id of Object.keys(membersSnap.val())) {
-              if (id !== currentUser.id) { partnerId = id; break; }
-            }
-          }
-        }
-        
-        if (partnerId) {
-          const inAppRef = ref(database, `couples/${currentCouple.id}/inAppNotifications/${partnerId}`);
-          const newNotifRef = fbPush(inAppRef);
-          await set(newNotifRef, { title, body, data, timestamp: Date.now() });
-          console.log('✅ Notification in-app écrite dans Firebase pour:', partnerId);
-        }
-      } catch (e) {
-        console.log('⚠️ Erreur écriture notification in-app:', e.message);
-      }
-    }
+    console.log('📤 Tentative envoi notification push:', { title, body, type: data?.type, hasPartnerToken: !!currentPartnerToken });
     
-    // ÉTAPE 1: Vérifier si on a un token partenaire valide pour le push
+    // ÉTAPE 1: Vérifier si on a un token partenaire valide
     let tokenToUse = (currentPartnerToken && currentPartnerToken.startsWith('ExponentPushToken')) 
       ? currentPartnerToken 
       : null;
     
     if (!tokenToUse && currentCouple?.id && currentUser?.id && isConfigured && database) {
-      try {
-        const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
-        const snapshot = await get(tokensRef);
-        if (snapshot.exists()) {
-          const tokens = snapshot.val();
-          for (const [id, tokenData] of Object.entries(tokens)) {
-            if (id !== currentUser.id && tokenData?.token) {
-              if (tokenData.token.startsWith('ExponentPushToken')) {
-                tokenToUse = tokenData.token;
-                setPartnerToken(tokenToUse);
-                partnerTokenRef.current = tokenToUse;
-                console.log('✅ Token partenaire récupéré:', tokenToUse.substring(0, 25) + '...');
-              } else {
-                const badTokenRef = ref(database, `couples/${currentCouple.id}/pushTokens/${id}`);
-                set(badTokenRef, null).catch(() => {});
+      // Essayer jusqu'à 3 tentatives avec délai progressif
+      for (let attempt = 0; attempt < 3 && !tokenToUse; attempt++) {
+        if (attempt > 0) {
+          await new Promise(r => setTimeout(r, 1500 * attempt));
+        }
+        try {
+          console.log(`🔄 Récupération token partenaire depuis Firebase (tentative ${attempt + 1})...`);
+          const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
+          const snapshot = await get(tokensRef);
+          if (snapshot.exists()) {
+            const tokens = snapshot.val();
+            for (const [id, tokenData] of Object.entries(tokens)) {
+              if (id !== currentUser.id && tokenData?.token) {
+                if (tokenData.token.startsWith('ExponentPushToken')) {
+                  tokenToUse = tokenData.token;
+                  setPartnerToken(tokenToUse);
+                  partnerTokenRef.current = tokenToUse;
+                  console.log('✅ Token partenaire récupéré depuis Firebase:', tokenToUse.substring(0, 25) + '...');
+                } else {
+                  console.log('⚠️ Token invalide trouvé sur Firebase, ignoré:', tokenData.token.substring(0, 20));
+                  const badTokenRef = ref(database, `couples/${currentCouple.id}/pushTokens/${id}`);
+                  set(badTokenRef, null).catch(() => {});
+                }
+                break;
               }
-              break;
             }
           }
+        } catch (e) {
+          console.log('⚠️ Erreur récupération token partenaire:', e.message);
         }
-      } catch (e) {
-        console.log('⚠️ Erreur récupération token partenaire:', e.message);
       }
     }
     
     if (!tokenToUse || !tokenToUse.startsWith('ExponentPushToken')) {
-      console.log('⚠️ Pas de token push valide - notification in-app envoyée via Firebase uniquement');
-      return true; // ✅ Retourner true car la notification in-app a été envoyée
+      console.log('⚠️ Pas de token partenaire valide - impossible d\'envoyer push');
+      console.log('   Token actuel:', tokenToUse ? tokenToUse.substring(0, 20) + '...' : 'null');
+      console.log('   (Le partenaire doit ouvrir l\'app au moins une fois pour recevoir des notifications)');
+      return false;
     }
 
-    // ÉTAPE 3: Essayer d'envoyer via Expo Push Service
+    // ÉTAPE 2: Envoyer via Expo Push Service
     try {
       // ✅ Choisir le bon canal Android selon le type de notification
       const channelId = getChannelForType(data?.type);
