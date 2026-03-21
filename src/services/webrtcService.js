@@ -144,7 +144,11 @@ class WebRTCService {
       await set(sdpRef, { type: offer.type, sdp: offer.sdp });
       console.log('📤 Offre SDP envoyée');
 
-      // Écouter la réponse SDP du partenaire
+      // Écouter la réponse SDP du partenaire (cleanup ancien listener si existant)
+      if (this._answerListener) {
+        this._answerListener();
+        this._answerListener = null;
+      }
       const answerRef = ref(database, `couples/${this.coupleId}/calls/sdp/answer`);
       const answerListener = onValue(answerRef, async (snap) => {
         if (snap.exists() && this.peerConnection && !this.peerConnection.remoteDescription) {

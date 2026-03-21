@@ -158,12 +158,9 @@ export function AuthProvider({ children }) {
       console.log('🔕 Arrêt écoute Firebase');
       appStateListener?.remove();
       // Marquer offline + enregistrer lastSeen quand on quitte
-      if (couple?.id && user?.id) {
-        const offlineRef = ref(database, `couples/${couple.id}/members/${user.id}/isOnline`);
-        set(offlineRef, false).catch(() => {});
-        const lastSeenRefCleanup = ref(database, `couples/${couple.id}/members/${user.id}/lastSeen`);
-        set(lastSeenRefCleanup, new Date().toISOString()).catch(() => {});
-      }
+      // Réutiliser les refs locales déjà définies (évite de recréer des refs identiques)
+      set(memberStatusRef, false).catch(() => {});
+      set(lastSeenRef, new Date().toISOString()).catch(() => {});
       off(coupleRef);
       coupleIdRef.current = null;
       userIdRef.current = null;

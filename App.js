@@ -12,6 +12,7 @@ import { SecurityProvider } from './src/context/SecurityContext';
 import { ChatProvider } from './src/context/ChatContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, View, Text } from 'react-native';
+import IncomingCallOverlay from './src/components/IncomingCallOverlay';
 
 // Error Boundary pour capturer les erreurs globales
 class ErrorBoundary extends React.Component {
@@ -159,6 +160,7 @@ export default function App() {
                         <NavigationContainer ref={navigationRef}>
                           <StatusBar style="light" />
                           <AppNavigator />
+                          <IncomingCallOverlay />
                         </NavigationContainer>
                       </GameProvider>
                     </ChatProvider>

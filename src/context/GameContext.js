@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, remove, update, push, get, off } from 'firebase/database';
+import { ref, set, onValue, remove, update, get } from 'firebase/database';
 import { useAuth } from './AuthContext';
 
 const GameContext = createContext({});

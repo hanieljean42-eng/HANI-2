@@ -53,6 +53,7 @@ export function NotificationProvider({ children }) {
       case 'note_read':
       case 'chat_message':
       case 'voice_message':
+      case 'incoming_call':
         return { stack: 'Chat' };
       // Jeux
       case 'game_invite':
@@ -257,13 +258,14 @@ export function NotificationProvider({ children }) {
                 partnerTokenRef.current = tokenData.token;
                 foundValid = true;
                 console.log('✅ Token partenaire valide détecté:', tokenData.token.substring(0, 25) + '...');
+                break;
               } else {
-                // Nettoyer le token invalide de Firebase
+                // Nettoyer le token invalide de Firebase et continuer la recherche
                 console.log('⚠️ Token partenaire invalide détecté, nettoyage:', tokenData.token.substring(0, 20));
                 const invalidRef = ref(database, `couples/${coupleId}/pushTokens/${id}`);
                 set(invalidRef, null).catch(() => {});
+                // Ne pas break ici — continuer à chercher un token valide
               }
-              break;
             }
           }
           if (!foundValid) {

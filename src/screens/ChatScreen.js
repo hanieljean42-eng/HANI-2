@@ -147,8 +147,6 @@ export default function ChatScreen({ navigation, route }) {
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const callTimerRef = useRef(null);
-  const ringtoneRef = useRef(null);
-  const vibrationRef = useRef(null);
   
   const flatListRef = useRef(null);
   const recordingRef = useRef(null);
@@ -190,10 +188,6 @@ export default function ChatScreen({ navigation, route }) {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
       }
-      if (ringtoneRef.current) {
-        ringtoneRef.current.unloadAsync();
-        ringtoneRef.current = null;
-      }
       Vibration.cancel();
     };
   }, []);
@@ -204,10 +198,25 @@ export default function ChatScreen({ navigation, route }) {
     const autoCall = route?.params?.autoCall;
     if (autoCall && !autoCallHandled.current) {
       autoCallHandled.current = true;
-      // Petit délai pour que l'écran soit monté
       setTimeout(() => handleCall(autoCall), 500);
     }
   }, [route?.params?.autoCall]);
+
+  // Si navigué depuis IncomingCallOverlay après acceptation, afficher l'écran d'appel
+  const fromOverlayHandled = useRef(false);
+  useEffect(() => {
+    if (route?.params?.fromCallOverlay && activeCall && !fromOverlayHandled.current) {
+      fromOverlayHandled.current = true;
+      setShowCallScreen(true);
+      setCallTimer(0);
+      setIsMuted(false);
+      setIsSpeaker(false);
+    }
+    // Reset le flag quand l'appel se termine
+    if (!activeCall) {
+      fromOverlayHandled.current = false;
+    }
+  }, [route?.params?.fromCallOverlay, activeCall]);
 
   // Marquer comme lu à l'ouverture + notifier le partenaire
   const hasNotifiedReadRef = React.useRef(false);
@@ -271,36 +280,7 @@ export default function ChatScreen({ navigation, route }) {
     return null;
   };
 
-  // === SONNERIE & VIBRATION POUR APPELS ENTRANTS ===
-  const startRingtone = async () => {
-    try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
-      // Générer un son de sonnerie en boucle via le système
-      // On utilise un pattern de vibration qui simule une sonnerie
-      Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800], true); // Boucle de vibration
-    } catch (e) {
-      console.log('⚠️ Erreur sonnerie:', e.message);
-    }
-  };
-
-  const stopRingtone = () => {
-    Vibration.cancel();
-    if (ringtoneRef.current) {
-      ringtoneRef.current.unloadAsync().catch(() => {});
-      ringtoneRef.current = null;
-    }
-  };
-
-  // Déclencher sonnerie + vibration quand appel entrant
-  useEffect(() => {
-    if (incomingCall) {
-      startRingtone();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    } else {
-      stopRingtone();
-    }
-    return () => stopRingtone();
-  }, [incomingCall]);
+  // La sonnerie et vibration des appels entrants sont gérées par IncomingCallOverlay (global)
 
   // Lancer un appel
   const handleCall = async (type) => {
@@ -317,9 +297,9 @@ export default function ChatScreen({ navigation, route }) {
     setIsSpeaker(false);
   };
 
-  // Accepter un appel entrant
+  // Accepter un appel entrant (appelé depuis le ChatScreen si déjà dessus)
   const handleAcceptCall = async () => {
-    stopRingtone();
+    Vibration.cancel();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await acceptCall();
     setShowCallScreen(true);
@@ -330,7 +310,7 @@ export default function ChatScreen({ navigation, route }) {
 
   // Raccrocher l'appel
   const handleEndCall = async () => {
-    stopRingtone();
+    Vibration.cancel();
     setShowCallScreen(false);
     setCallTimer(0);
     setIsCameraOff(false);
@@ -369,7 +349,7 @@ export default function ChatScreen({ navigation, route }) {
   // Fermer l'écran d'appel si l'appel se termine (partenaire raccroche)
   useEffect(() => {
     if (showCallScreen && !activeCall && !incomingCall) {
-      stopRingtone();
+      Vibration.cancel();
       setShowCallScreen(false);
       setCallTimer(0);
       if (callTimerRef.current) clearInterval(callTimerRef.current);
@@ -1147,41 +1127,7 @@ export default function ChatScreen({ navigation, route }) {
         </LinearGradient>
       </Modal>
 
-      {/* Appel entrant */}
-      {incomingCall && !showCallScreen && (
-        <View style={styles.incomingCallOverlay}>
-          <LinearGradient 
-            colors={
-              incomingCall.type === 'video' 
-                ? ['rgba(45,27,105,0.97)', 'rgba(68,17,136,0.97)'] 
-                : ['rgba(20,0,40,0.97)', 'rgba(0,0,20,0.97)']
-            } 
-            style={styles.incomingCallCard}
-          >
-            {/* Animation pulse pour appel entrant */}
-            <View style={styles.incomingCallPulse}>
-              <Text style={styles.incomingCallEmoji}>
-                {incomingCall.type === 'video' ? '🎥' : '📞'}
-              </Text>
-            </View>
-            <Text style={styles.incomingCallName}>{incomingCall.callerName}</Text>
-            <Text style={styles.incomingCallType}>
-              {incomingCall.type === 'video' ? 'Appel vidéo entrant' : 'Appel vocal entrant'}
-            </Text>
-            <Text style={styles.incomingCallRinging}>🔔 Sonnerie...</Text>
-            <View style={styles.incomingCallButtons}>
-              <TouchableOpacity style={styles.rejectCallButton} onPress={() => { stopRingtone(); rejectCall(); }}>
-                <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-                <Text style={styles.callBtnLabel}>Refuser</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.acceptCallButton} onPress={handleAcceptCall}>
-                <Ionicons name="call" size={28} color="#fff" />
-                <Text style={styles.callBtnLabel}>Répondre</Text>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
+      {/* Appel entrant géré par IncomingCallOverlay global (App.js) */}
 
       {/* Reactions Modal */}
       {showReactions && (

@@ -26,6 +26,7 @@ export function ChatProvider({ children }) {
   const typingTimeoutRef = useRef(null);
   const listenerRef = useRef(null);
   const isCallerRef = useRef(false);
+  const pendingOfferListenerRef = useRef(null);
 
   // Écouter les messages Firebase
   useEffect(() => {
@@ -352,12 +353,14 @@ export function ChatProvider({ children }) {
         await webrtcService.handleOffer(offerSnap.val());
       } else {
         // L'offre n'est pas encore là, écouter
-        const offerListener = onValue(offerRef, async (snapshot) => {
+        const unsubscribeOffer = onValue(offerRef, async (snapshot) => {
           if (snapshot.exists()) {
-            off(offerRef);
+            unsubscribeOffer();
+            pendingOfferListenerRef.current = null;
             await webrtcService.handleOffer(snapshot.val());
           }
         });
+        pendingOfferListenerRef.current = unsubscribeOffer;
       }
 
       return roomId;
@@ -371,6 +374,10 @@ export function ChatProvider({ children }) {
   const rejectCall = async () => {
     if (!couple?.id) return;
     try {
+      if (pendingOfferListenerRef.current) {
+        pendingOfferListenerRef.current();
+        pendingOfferListenerRef.current = null;
+      }
       await webrtcService.cleanup();
       setLocalStream(null);
       setRemoteStream(null);
@@ -387,6 +394,10 @@ export function ChatProvider({ children }) {
   const endCall = async () => {
     if (!couple?.id) return;
     try {
+      if (pendingOfferListenerRef.current) {
+        pendingOfferListenerRef.current();
+        pendingOfferListenerRef.current = null;
+      }
       await webrtcService.cleanup();
       setLocalStream(null);
       setRemoteStream(null);

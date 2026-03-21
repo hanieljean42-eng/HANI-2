@@ -60,7 +60,6 @@ export function DataProvider({ children }) {
   const [quizScores, setQuizScores] = useState({ user: 0, partner: 0 });
   const [loveMeter, setLoveMeter] = useState(0);
   const [dailyChallenge, setDailyChallenge] = useState(null);
-  const [notifications, setNotifications] = useState([]);
   const [bucketList, setBucketList] = useState([]);
   const [loveNotes, setLoveNotes] = useState([]);
   const [timeCapsules, setTimeCapsules] = useState([]);
@@ -188,8 +187,8 @@ export function DataProvider({ children }) {
         console.warn('⚠️ Erreur Firebase:', errorType, error.message);
       }
       
-      // Tentative de reconnexion après 5 secondes (avec backoff progressif)
-      const retryDelay = Math.min(5000, isListeningRef.current ? 5000 : 10000);
+      // Tentative de reconnexion après délai (avec backoff progressif)
+      const retryDelay = isListeningRef.current ? 5000 : 10000;
       setTimeout(() => {
         if (coupleIdRef.current === couple.id && !isListeningRef.current) {
           console.log('🔄 Tentative de reconnexion Firebase...');
@@ -547,10 +546,12 @@ export function DataProvider({ children }) {
       fromId: user?.id
     };
     
-    // Chiffrer la note avant de la sauvegarder
+    // Chiffrer la note pour Firebase
     const encryptedNote = encryptLoveNote(newNote, couple?.id);
     
-    const updated = [encryptedNote, ...loveNotes];
+    // Stocker la version déchiffrée en local (état + AsyncStorage)
+    // car le listener Firebase déchiffre aussi avant de mettre en état
+    const updated = [newNote, ...loveNotes];
     setLoveNotes(updated);
     await AsyncStorage.setItem('@loveNotes', JSON.stringify(updated));
     

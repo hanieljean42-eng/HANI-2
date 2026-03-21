@@ -978,7 +978,8 @@ export default function GamesScreen() {
     const question = shuffledQuizQuestions[currentQuestion];
     if (!question || question.type !== 'choice') return;
     
-    const iAmResponder = currentQuestion % 2 === 0;
+    const iAmCreatorForScoring = gameSession?.createdBy === myPlayerId;
+    const iAmResponder = (currentQuestion % 2 === 0) === iAmCreatorForScoring;
     const responderAnswer = iAmResponder ? player1Answer : onlinePartnerAnswer;
     const guesserAnswer = iAmResponder ? onlinePartnerAnswer : player1Answer;
     const isChoiceCorrect = responderAnswer === guesserAnswer;
@@ -992,7 +993,7 @@ export default function GamesScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     setQuizValidated(true);
-  }, [quizPhase, quizValidated, activeGame, gameMode, currentQuestion, player1Answer, onlinePartnerAnswer]);
+  }, [quizPhase, quizValidated, activeGame, gameMode, currentQuestion, player1Answer, onlinePartnerAnswer, gameSession, myPlayerId]);
 
   // ✅ LISTENER ROBUSTE: Détecte les réponses du partenaire pour Quiz/WIM/WYR en mode online
   useEffect(() => {
@@ -1075,17 +1076,22 @@ export default function GamesScreen() {
       setQuizValidated(true);
       setQuizLastValidationResult(data.isCorrect);
       if (data.isCorrect) {
-        // Le devineur (moi) gagne un point car le répondeur (partenaire) a validé
+        // En mode online, le devineur est celui qui n'est PAS répondeur
+        // Si je reçois la validation, c'est que je suis le devineur (le répondeur est le partenaire)
+        const iAmCreatorForValidation = gameSession?.createdBy === myPlayerId;
+        const iAmResponder = (currentQuestion % 2 === 0) === iAmCreatorForValidation;
+        // Si je reçois la validation, je suis le devineur (l'autre joueur est le répondeur)
+        const scoringPlayer = iAmResponder ? 'player2' : 'player1';
         setScores(prev => ({
           ...prev,
-          player1: prev.player1 + 1,
+          [scoringPlayer]: prev[scoringPlayer] + 1,
         }));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     }
-  }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, myPlayerId]);
+  }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, myPlayerId, gameSession]);
 
   // ✅ LISTENER ROBUSTE: Détecte quand le partenaire clique "Suivant" pour synchroniser
   useEffect(() => {
@@ -2359,10 +2365,14 @@ export default function GamesScreen() {
     const partnerName = partner?.name || 'Joueur 2';
     const isOnline = gameMode === 'online';
     
-    // ✅ ALTERNANCE: Questions paires → la question parle de MOI, questions impaires → parle du PARTENAIRE
+    // ✅ ALTERNANCE: Le créateur de la session est répondeur sur les questions paires,
+    // le joiner est répondeur sur les questions impaires.
     // "Répondeur" = celui dont la question parle (il connaît la vraie réponse)
     // "Devineur" = l'autre joueur (il doit deviner)
-    const iAmResponder = currentQuestion % 2 === 0; // Questions 0,2,4,6,8 → je suis le répondeur
+    const iAmCreator = gameSession?.createdBy === myPlayerId;
+    const iAmResponder = isOnline
+      ? (currentQuestion % 2 === 0) === iAmCreator
+      : currentQuestion % 2 === 0;
     const responderName = iAmResponder ? myName : partnerName;
     const guesserName = iAmResponder ? partnerName : myName;
 
@@ -2449,10 +2459,11 @@ export default function GamesScreen() {
         }, user?.name);
         
         if (isCorrect) {
-          // Le devineur est le partenaire (player2) car je suis le répondeur
+          // En mode online, le devineur est celui qui n'est PAS répondeur
+          const scoringPlayer = iAmResponder ? 'player2' : 'player1';
           setScores(prev => ({
             ...prev,
-            player2: prev.player2 + 1,
+            [scoringPlayer]: prev[scoringPlayer] + 1,
           }));
         }
       } else {
