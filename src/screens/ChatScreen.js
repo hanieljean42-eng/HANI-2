@@ -123,9 +123,14 @@ export default function ChatScreen({ navigation, route }) {
     toggleMute: webrtcToggleMute,
     toggleCamera: webrtcToggleCamera,
     switchCamera,
+    setChatActive,
   } = useChat();
 
-  // Chat is now available
+  // ✅ Indiquer au ChatContext que l'utilisateur est sur l'écran chat (évite double notif)
+  useEffect(() => {
+    setChatActive(true);
+    return () => setChatActive(false);
+  }, []);
   const chatAvailable = true;
   const { notifyLoveNote, notifyNoteRead, notifyCall } = useNotifyPartner();
   const { addDiaryEntry, recordInteraction, streak } = useData();

@@ -30,16 +30,21 @@ export default function IncomingCallOverlay() {
 
   // ✅ Jouer une sonnerie via notification locale (canal 'calls' + son) + Audio en boucle
   const startRinging = async () => {
-    // 1. Notification locale avec canal 'calls' (priorité MAX, son activé)
+    // 1. Notification PERSISTANTE avec canal 'calls' (priorité MAX, son, sticky)
+    // Cette notification reste même si l'overlay est swipé — tap pour revenir à l'appel
     try {
       await Notifications.scheduleNotificationAsync({
+        identifier: 'incoming-call',
         content: {
           title: '📞 Appel entrant',
-          body: 'Quelqu\'un vous appelle...',
+          body: `${incomingCall?.callerName || 'Partenaire'} vous appelle — Appuyez pour répondre`,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
           vibrate: [0, 800, 400, 800],
+          sticky: true, // ✅ Ne peut pas être swipé sur Android
+          autoDismiss: false, // ✅ Reste jusqu'à ce qu'on la supprime
           ...(Platform.OS === 'android' ? { channelId: 'calls' } : {}),
+          data: { type: 'incoming_call' },
         },
         trigger: null,
       });
@@ -96,7 +101,10 @@ export default function IncomingCallOverlay() {
       } catch (e) { /* ignore */ }
       ringSoundRef.current = null;
     }
-    // Supprimer les notifications de sonnerie affichées
+    // ✅ Supprimer la notification persistante d'appel entrant
+    await Notifications.dismissNotificationAsync('incoming-call').catch(() => {});
+    await Notifications.cancelScheduledNotificationAsync('incoming-call').catch(() => {});
+    // Supprimer aussi les notifications de sonnerie répétées
     await Notifications.dismissAllNotificationsAsync().catch(() => {});
   };
 

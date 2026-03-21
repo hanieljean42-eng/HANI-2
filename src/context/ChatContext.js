@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, onValue, off, push, query as fbQuery, limitToLast, get } from 'firebase/database';
 import { useAuth } from './AuthContext';
@@ -27,6 +29,8 @@ export function ChatProvider({ children }) {
   const listenerRef = useRef(null);
   const isCallerRef = useRef(false);
   const pendingOfferListenerRef = useRef(null);
+  const lastMessageTimestampRef = useRef(null); // Pour détecter les NOUVEAUX messages
+  const isChatActiveRef = useRef(false); // true si l'utilisateur est sur l'écran chat
 
   // Écouter les messages Firebase
   useEffect(() => {
@@ -60,6 +64,39 @@ export function ChatProvider({ children }) {
           m => m.senderId !== user?.id && !m.read
         ).length;
         setUnreadCount(unread);
+
+        // ✅ NOTIFICATION LOCALE pour les nouveaux messages du partenaire
+        // Fonctionne même si les push notifications sont cassées
+        const lastMsg = messagesArray[messagesArray.length - 1];
+        if (lastMsg && lastMsg.senderId !== user?.id && lastMsg.timestamp) {
+          const msgTime = new Date(lastMsg.timestamp).getTime();
+          const isNew = !lastMessageTimestampRef.current || msgTime > lastMessageTimestampRef.current;
+          const isRecent = (Date.now() - msgTime) < 10000; // Moins de 10 secondes
+          const appInBackground = AppState.currentState !== 'active';
+          
+          if (isNew && isRecent && (!isChatActiveRef.current || appInBackground)) {
+            // Envoyer une notification locale
+            const senderName = lastMsg.senderName || partner?.name || 'Partenaire';
+            let body = '';
+            if (lastMsg.type === 'image') body = `${senderName} t'a envoyé une photo 📸`;
+            else if (lastMsg.type === 'voice') body = `${senderName} t'a envoyé un vocal 🎤`;
+            else if (lastMsg.type === 'call') body = `${senderName} — ${lastMsg.content}`;
+            else body = `${senderName}: ${(lastMsg.content || '').substring(0, 80)}`;
+            
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: '💌 Nouveau message',
+                body: body,
+                sound: 'default',
+                priority: Notifications.AndroidNotificationPriority.HIGH,
+                ...(Platform.OS === 'android' ? { channelId: 'love-messages' } : {}),
+                data: { type: 'love_note' },
+              },
+              trigger: null,
+            }).catch(e => console.log('⚠️ Notif locale msg:', e.message));
+          }
+          lastMessageTimestampRef.current = msgTime;
+        }
         
         // Sauvegarder localement
         AsyncStorage.setItem('@chatMessages', JSON.stringify(messagesArray));
@@ -448,6 +485,11 @@ export function ChatProvider({ children }) {
     }
   };
 
+  // ✅ Fonction pour indiquer si l'utilisateur est sur l'écran chat
+  const setChatActive = (active) => {
+    isChatActiveRef.current = active;
+  };
+
   const value = {
     messages,
     unreadCount,
@@ -472,6 +514,7 @@ export function ChatProvider({ children }) {
     toggleMute,
     toggleCamera,
     switchCamera,
+    setChatActive,
   };
 
   return (
