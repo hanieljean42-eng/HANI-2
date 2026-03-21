@@ -15,9 +15,31 @@ import { ref, set, onValue, push } from 'firebase/database';
 
 const ICE_SERVERS = {
   iceServers: [
+    // STUN servers (découverte IP publique)
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
+    // TURN servers (relais quand connexion directe impossible)
+    // ✅ Nécessaires pour que les appels fonctionnent entre réseaux différents (4G, WiFi)
+    {
+      urls: 'turn:a.relay.metered.ca:80',
+      username: 'e8dd65c692eb1a5f56811b82',
+      credential: 'pFwIrLaijg7Besm+',
+    },
+    {
+      urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+      username: 'e8dd65c692eb1a5f56811b82',
+      credential: 'pFwIrLaijg7Besm+',
+    },
+    {
+      urls: 'turn:a.relay.metered.ca:443',
+      username: 'e8dd65c692eb1a5f56811b82',
+      credential: 'pFwIrLaijg7Besm+',
+    },
+    {
+      urls: 'turns:a.relay.metered.ca:443?transport=tcp',
+      username: 'e8dd65c692eb1a5f56811b82',
+      credential: 'pFwIrLaijg7Besm+',
+    },
   ],
 };
 
