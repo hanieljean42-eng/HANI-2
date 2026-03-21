@@ -151,6 +151,7 @@ export default function ChatScreen({ navigation, route }) {
   const [callTimer, setCallTimer] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaker, setIsSpeaker] = useState(false);
+  const [showCallMenu, setShowCallMenu] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const callTimerRef = useRef(null);
   
@@ -387,20 +388,48 @@ export default function ChatScreen({ navigation, route }) {
     return () => stopCallerRinging();
   }, [showCallScreen, activeCall?.status, activeCall?.callerId]);
 
-  // Lancer un appel
-  const handleCall = async (type) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    const roomId = await initiateCall(type);
-    if (!roomId) {
-      Alert.alert('Erreur', "Impossible de lancer l'appel. Vérifiez votre connexion.");
+  // Appeler via téléphone natif
+  const handlePhoneCall = () => {
+    const phoneNumber = partner?.phone;
+    if (!phoneNumber) {
+      Alert.alert(
+        'Numéro non configuré',
+        'Votre partenaire n\'a pas configuré son numéro de téléphone dans son profil.',
+        [
+          { text: 'OK', onPress: () => setShowCallMenu(false) }
+        ]
+      );
       return;
     }
-    await notifyCall(type);
-    callStartTimeRef.current = Date.now();
-    setShowCallScreen(true);
-    setCallTimer(0);
-    setIsMuted(false);
-    setIsSpeaker(false);
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Linking.openURL(`tel:${phoneNumber}`).catch(() => {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application téléphone');
+    });
+    setShowCallMenu(false);
+  };
+
+  // Appeler via WhatsApp
+  const handleWhatsAppCall = () => {
+    const phoneNumber = partner?.phone;
+    if (!phoneNumber) {
+      Alert.alert(
+        'Numéro non configuré',
+        'Votre partenaire n\'a pas configuré son numéro de téléphone dans son profil.',
+        [
+          { text: 'OK', onPress: () => setShowCallMenu(false) }
+        ]
+      );
+      return;
+    }
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Nettoyer le numéro (enlever +, espaces, etc.)
+    const cleanNumber = phoneNumber.replace(/[^\d]/g, '');
+    Linking.openURL(`https://wa.me/${cleanNumber}`).catch(() => {
+      Alert.alert('Erreur', 'WhatsApp n\'est pas installé');
+    });
+    setShowCallMenu(false);
   };
 
   // Accepter un appel entrant (appelé depuis le ChatScreen si déjà dessus)
@@ -1002,12 +1031,9 @@ export default function ChatScreen({ navigation, route }) {
             ) : null;
           })()}
         </View>
-        {/* Boutons appel vocal et vidéo */}
-        <TouchableOpacity style={styles.callButton} onPress={() => handleCall('audio')}>
+        {/* Boutons appel téléphone/WhatsApp */}
+        <TouchableOpacity style={styles.callButton} onPress={() => setShowCallMenu(true)}>
           <Ionicons name="call-outline" size={22} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.callButton} onPress={() => handleCall('video')}>
-          <Ionicons name="videocam-outline" size={22} color="#fff" />
         </TouchableOpacity>
         {/* 🔥 Flamme / Streak */}
         {(() => {
@@ -1373,8 +1399,59 @@ export default function ChatScreen({ navigation, route }) {
         </TouchableOpacity>
       )}
     </LinearGradient>
-  );
-}
+  )}
+
+  {/* Menu d'appel téléphone/WhatsApp */}
+  <Modal
+    visible={showCallMenu}
+    transparent
+    animationType="fade"
+    onRequestClose={() => setShowCallMenu(false)}
+  >
+    <TouchableOpacity 
+      style={styles.callMenuOverlay} 
+      activeOpacity={1} 
+      onPress={() => setShowCallMenu(false)}
+    >
+      <View style={styles.callMenuContainer}>
+        <View style={styles.callMenuHeader}>
+          <Text style={styles.callMenuTitle}>Appeler {partner?.name || 'votre partenaire'}</Text>
+          <TouchableOpacity onPress={() => setShowCallMenu(false)}>
+            <Ionicons name="close" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity style={styles.callMenuOption} onPress={handlePhoneCall}>
+          <View style={styles.callMenuIcon}>
+            <Ionicons name="call" size={24} color="#10b981" />
+          </View>
+          <View style={styles.callMenuOptionText}>
+            <Text style={styles.callMenuOptionTitle}>📞 Appel téléphonique</Text>
+            <Text style={styles.callMenuOptionDesc}>Utiliser l'application téléphone</Text>
+          </View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.callMenuOption} onPress={handleWhatsAppCall}>
+          <View style={[styles.callMenuIcon, { backgroundColor: '#25d366' }]}>
+            <Ionicons name="logo-whatsapp" size={24} color="#fff" />
+          </View>
+          <View style={styles.callMenuOptionText}>
+            <Text style={styles.callMenuOptionTitle}>💬 Appel WhatsApp</Text>
+            <Text style={styles.callMenuOptionDesc}>Appeler via WhatsApp</Text>
+          </View>
+        </TouchableOpacity>
+        
+        {!partner?.phone && (
+          <View style={styles.callMenuWarning}>
+            <Text style={styles.callMenuWarningText}>
+              ⚠️ Votre partenaire doit configurer son numéro de téléphone dans son profil
+            </Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  </Modal>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -2109,5 +2186,70 @@ const styles = StyleSheet.create({
     backgroundColor: '#34C759',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Menu d'appel téléphone/WhatsApp
+  callMenuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  callMenuContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 30,
+  },
+  callMenuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  callMenuTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  callMenuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  callMenuIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  callMenuOptionText: {
+    flex: 1,
+  },
+  callMenuOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  callMenuOptionDesc: {
+    fontSize: 14,
+    color: '#666',
+  },
+  callMenuWarning: {
+    backgroundColor: '#fef3c7',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 15,
+  },
+  callMenuWarningText: {
+    fontSize: 13,
+    color: '#92400e',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

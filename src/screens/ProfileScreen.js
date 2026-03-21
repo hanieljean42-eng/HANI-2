@@ -427,17 +427,17 @@ export default function ProfileScreen({ navigation }) {
       return;
     }
     
-    await updateUser({ name: editName.trim() });
+    await updateUser({ 
+      name: editName.trim(),
+      phone: editPhone.trim() || null
+    });
     setShowEditProfileModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     // Notifier le partenaire
     await notifyProfileUpdate();
-    Alert.alert('✅', 'Profil mis à jour !');
   };
 
   const handleUpdateAnniversary = async () => {
-    // Valider le format de la date (JJ/MM/AAAA)
-    const dateRegex = /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/;
     const match = editAnniversary.trim().match(dateRegex);
     
     if (!match) {
@@ -590,6 +590,7 @@ export default function ProfileScreen({ navigation }) {
           style={styles.editProfileButton}
           onPress={() => {
             setEditName(user?.name || '');
+            setEditPhone(user?.phone || '');
             setShowEditProfileModal(true);
           }}
         >
@@ -1237,6 +1238,15 @@ export default function ProfileScreen({ navigation }) {
               placeholderTextColor="#999"
               value={editName}
               onChangeText={setEditName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Numéro de téléphone (optionnel)"
+              placeholderTextColor="#999"
+              value={editPhone}
+              onChangeText={setEditPhone}
+              keyboardType="phone-pad"
+              maxLength={20}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity

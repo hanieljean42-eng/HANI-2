@@ -137,6 +137,7 @@ export function AuthProvider({ children }) {
               name: partnerData.name,
               avatar: partnerData.avatar || '💕',
               email: partnerData.email,
+              phone: partnerData.phone || null,
               gender: partnerData.gender || '',
               isOnline: partnerData.isOnline || false,
               lastSeen: partnerData.lastSeen || null,
