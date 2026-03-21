@@ -158,6 +158,11 @@ export function ChatProvider({ children }) {
     if (!couple?.id || !user?.id) return null;
 
     try {
+      // Normaliser metadata: si c'est un string, le convertir en objet
+      const safeMetadata = (metadata && typeof metadata === 'object' && !Array.isArray(metadata))
+        ? metadata
+        : (typeof metadata === 'string' ? { value: metadata } : {});
+
       const message = {
         content: type === 'text' ? encryptMessageObject({ content }, couple.id).content : content,
         type, // 'text', 'image', 'voice', 'sticker'
@@ -166,7 +171,7 @@ export function ChatProvider({ children }) {
         timestamp: new Date().toISOString(),
         read: false,
         reactions: {},
-        ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+        ...(Object.keys(safeMetadata).length > 0 ? { metadata: safeMetadata } : {}),
         ...(replyTo ? { replyTo: { id: replyTo.id, content: replyTo.content?.substring(0, 100), senderName: replyTo.senderName, type: replyTo.type } } : {}),
       };
 

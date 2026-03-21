@@ -442,7 +442,7 @@ export default function ChatScreen({ navigation, route }) {
 
         try {
           const { url, publicId } = await uploadToCloudinary(file);
-          await sendMessage(url, 'image', publicId);
+          await sendMessage(url, 'image', { publicId });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           // ✅ Notifier le partenaire qu'une image a été envoyée
           await notifyLoveNote('📸 Photo');

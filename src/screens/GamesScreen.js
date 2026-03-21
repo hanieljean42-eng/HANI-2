@@ -770,7 +770,23 @@ const WOULD_YOU_RATHER = [
 ];
 
 // Fonction utilitaire: sélectionner N questions aléatoires parmi un tableau
-const shuffleAndPick = (array, count) => {
+const shuffleAndPick = (array, count, seed = null) => {
+  if (seed !== null) {
+    // Shuffle déterministe avec seed (même résultat sur les 2 appareils)
+    const seededRandom = (s) => {
+      let x = Math.sin(s) * 10000;
+      return x - Math.floor(x);
+    };
+    const arr = [...array];
+    let currentSeed = seed;
+    for (let i = arr.length - 1; i > 0; i--) {
+      currentSeed++;
+      const j = Math.floor(seededRandom(currentSeed) * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.slice(0, count);
+  }
+  // Shuffle aléatoire (mode local)
   const shuffled = [...array].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 };
@@ -896,6 +912,12 @@ export default function GamesScreen() {
         setShowInviteModal(false);
         // Reset propre avant de démarrer
         resetAllGameStates();
+        // ✅ En mode online: utiliser le timestamp de création comme seed pour que
+        // les 2 appareils aient les mêmes questions dans le même ordre
+        if (gameSession.gameType === 'quiz' && gameSession.createdAt) {
+          setShuffledQuizQuestions(shuffleAndPick(QUIZ_QUESTIONS, QUIZ_QUESTIONS.length, gameSession.createdAt));
+          console.log('🎲 Quiz seed partagé:', gameSession.createdAt);
+        }
         // Re-setter gameMode après reset (resetAllGameStates ne le touche pas)
         setActiveGame(gameSession.gameType);
         console.log('🎮 Jeu démarré via session watcher:', gameSession.gameType);
