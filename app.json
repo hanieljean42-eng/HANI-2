@@ -69,7 +69,7 @@
           "icon": "./assets/icon.png",
           "color": "#FF6B9D",
           "sounds": [],
-          "mode": "production"
+          "mode": "development"
         }
       ],
       "expo-font",

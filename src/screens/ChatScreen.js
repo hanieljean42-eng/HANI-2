@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import * as Notifications from 'expo-notifications';
 import { RTCView } from '@livekit/react-native-webrtc';
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
@@ -153,6 +154,9 @@ export default function ChatScreen({ navigation, route }) {
   const soundRef = useRef(null);
   const recordingTimerRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const callerRingRef = useRef(null); // Sonnerie côté appelant
+  const callTimeoutRef = useRef(null); // Auto-timeout appel
+  const callStartTimeRef = useRef(null); // Timestamp début appel (pour historique)
 
   // Animation du bouton d'enregistrement
   useEffect(() => {
@@ -282,6 +286,71 @@ export default function ChatScreen({ navigation, route }) {
 
   // La sonnerie et vibration des appels entrants sont gérées par IncomingCallOverlay (global)
 
+  // ✅ Helpers sonnerie côté appelant
+  const startCallerRinging = () => {
+    stopCallerRinging(); // Sécurité
+    callerRingRef.current = setInterval(async () => {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '📞 Appel en cours...',
+            body: 'En attente de réponse...',
+            sound: 'default',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null,
+        });
+      } catch (e) { /* ignore */ }
+    }, 4000);
+  };
+
+  const stopCallerRinging = async () => {
+    if (callerRingRef.current) {
+      clearInterval(callerRingRef.current);
+      callerRingRef.current = null;
+    }
+    if (callTimeoutRef.current) {
+      clearTimeout(callTimeoutRef.current);
+      callTimeoutRef.current = null;
+    }
+    await Notifications.dismissAllNotificationsAsync().catch(() => {});
+  };
+
+  // ✅ Sonnerie côté appelant + auto-timeout 30s
+  useEffect(() => {
+    if (showCallScreen && activeCall?.status === 'ringing' && activeCall?.callerId === user?.id) {
+      // Je suis l'appelant, jouer une tonalité d'attente
+      startCallerRinging();
+      callStartTimeRef.current = Date.now();
+
+      // Auto-timeout après 30 secondes si pas décroché
+      callTimeoutRef.current = setTimeout(async () => {
+        console.log('⏰ Timeout appel: pas de réponse après 30s');
+        stopCallerRinging();
+        // Sauvegarder appel manqué dans le chat
+        const callType = activeCall?.type || 'audio';
+        await sendMessage(
+          `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} manqué`,
+          'call',
+          { callType, status: 'missed', duration: 0 }
+        );
+        setShowCallScreen(false);
+        setCallTimer(0);
+        if (callTimerRef.current) clearInterval(callTimerRef.current);
+        await endCall();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }, 30000);
+    } else if (activeCall?.status === 'accepted') {
+      // Appel décroché — arrêter la sonnerie
+      stopCallerRinging();
+      callStartTimeRef.current = Date.now(); // Reset pour la durée d'appel
+    } else if (!activeCall && !showCallScreen) {
+      stopCallerRinging();
+    }
+
+    return () => stopCallerRinging();
+  }, [showCallScreen, activeCall?.status, activeCall?.callerId]);
+
   // Lancer un appel
   const handleCall = async (type) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -291,6 +360,7 @@ export default function ChatScreen({ navigation, route }) {
       return;
     }
     await notifyCall(type);
+    callStartTimeRef.current = Date.now();
     setShowCallScreen(true);
     setCallTimer(0);
     setIsMuted(false);
@@ -302,19 +372,48 @@ export default function ChatScreen({ navigation, route }) {
     Vibration.cancel();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await acceptCall();
+    callStartTimeRef.current = Date.now();
     setShowCallScreen(true);
     setCallTimer(0);
     setIsMuted(false);
     setIsSpeaker(false);
   };
 
-  // Raccrocher l'appel
+  // Raccrocher l'appel + sauvegarder dans l'historique du chat
   const handleEndCall = async () => {
     Vibration.cancel();
+    await stopCallerRinging();
+
+    // Déterminer le statut et la durée de l'appel
+    const callType = activeCall?.type || 'audio';
+    const wasAccepted = activeCall?.status === 'accepted';
+    const duration = wasAccepted && callStartTimeRef.current
+      ? Math.floor((Date.now() - (activeCall?.acceptedAt || callStartTimeRef.current)) / 1000)
+      : 0;
+
+    // Sauvegarder l'appel dans le chat
+    const durationStr = duration > 0
+      ? `${Math.floor(duration / 60).toString().padStart(2, '0')}:${(duration % 60).toString().padStart(2, '0')}`
+      : '';
+    const statusText = wasAccepted
+      ? `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} • ${durationStr}`
+      : `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} annulé`;
+    
+    try {
+      await sendMessage(statusText, 'call', {
+        callType,
+        status: wasAccepted ? 'answered' : 'cancelled',
+        duration,
+      });
+    } catch (e) {
+      console.log('⚠️ Erreur sauvegarde appel:', e.message);
+    }
+
     setShowCallScreen(false);
     setCallTimer(0);
     setIsCameraOff(false);
     if (callTimerRef.current) clearInterval(callTimerRef.current);
+    callStartTimeRef.current = null;
     await endCall();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   };
@@ -346,14 +445,49 @@ export default function ChatScreen({ navigation, route }) {
     };
   }, [showCallScreen, activeCall?.acceptedAt, activeCall?.status]);
 
-  // Fermer l'écran d'appel si l'appel se termine (partenaire raccroche)
+  // Fermer l'écran d'appel si l'appel se termine (partenaire raccroche ou refuse)
+  const prevActiveCallRef = useRef(null);
   useEffect(() => {
     if (showCallScreen && !activeCall && !incomingCall) {
       Vibration.cancel();
+      stopCallerRinging();
+      
+      // Si l'appel précédent existait et n'a pas été traité par handleEndCall
+      // (= le partenaire a raccroché/refusé), sauvegarder dans l'historique
+      const prev = prevActiveCallRef.current;
+      if (prev && callStartTimeRef.current) {
+        const callType = prev.type || 'audio';
+        const wasAccepted = prev.status === 'accepted';
+        const duration = wasAccepted && prev.acceptedAt
+          ? Math.floor((Date.now() - prev.acceptedAt) / 1000)
+          : 0;
+        const durationStr = duration > 0
+          ? `${Math.floor(duration / 60).toString().padStart(2, '0')}:${(duration % 60).toString().padStart(2, '0')}`
+          : '';
+        
+        const iWasCaller = prev.callerId === user?.id;
+        let statusText;
+        if (wasAccepted) {
+          statusText = `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} • ${durationStr}`;
+        } else if (iWasCaller) {
+          statusText = `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} manqué`;
+        } else {
+          statusText = `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} manqué`;
+        }
+        
+        sendMessage(statusText, 'call', {
+          callType,
+          status: wasAccepted ? 'answered' : 'missed',
+          duration,
+        }).catch(() => {});
+        callStartTimeRef.current = null;
+      }
+
       setShowCallScreen(false);
       setCallTimer(0);
       if (callTimerRef.current) clearInterval(callTimerRef.current);
     }
+    prevActiveCallRef.current = activeCall;
   }, [activeCall, incomingCall]);
 
   // Formater le timer
@@ -705,7 +839,31 @@ export default function ChatScreen({ navigation, route }) {
             <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
           </View>
         )}
-        
+
+        {/* ✅ Message d'appel (centré, style spécial) */}
+        {item.type === 'call' ? (
+          <View style={styles.callMessageContainer}>
+            <View style={[
+              styles.callMessageBubble,
+              item.metadata?.status === 'missed' && styles.callMessageMissed,
+            ]}>
+              <Ionicons 
+                name={item.metadata?.callType === 'video' ? 'videocam' : 'call'} 
+                size={16} 
+                color={item.metadata?.status === 'missed' ? '#EF4444' : '#10B981'} 
+              />
+              <Text style={[
+                styles.callMessageText,
+                item.metadata?.status === 'missed' && styles.callMessageTextMissed,
+              ]}>
+                {item.content}
+              </Text>
+              <Text style={styles.callMessageTime}>
+                {new Date(item.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+          </View>
+        ) : (
         <TouchableOpacity
           style={[styles.messageRow, isMe && styles.messageRowMe]}
           onLongPress={() => handleLongPress(item)}
@@ -785,6 +943,7 @@ export default function ChatScreen({ navigation, route }) {
             )}
           </View>
         </TouchableOpacity>
+        )}
       </>
     );
   };
@@ -1261,6 +1420,38 @@ const styles = StyleSheet.create({
   messagesList: {
     padding: 15,
     paddingBottom: 20,
+  },
+  callMessageContainer: {
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  callMessageBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  callMessageMissed: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  callMessageText: {
+    fontSize: 13,
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  callMessageTextMissed: {
+    color: '#EF4444',
+  },
+  callMessageTime: {
+    fontSize: 11,
+    color: '#999',
+    marginLeft: 4,
   },
   dateContainer: {
     alignItems: 'center',
