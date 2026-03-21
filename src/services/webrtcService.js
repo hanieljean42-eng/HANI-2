@@ -11,7 +11,7 @@ import {
   mediaDevices,
 } from '@livekit/react-native-webrtc';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, push } from 'firebase/database';
+import { ref, set, get, push, onValue, onChildAdded, off } from 'firebase/database';
 
 // ✅ Configuration ICE: STUN gratuits (Google) + TURN gratuits (Open Relay)
 // Les serveurs TURN permettent les appels entre réseaux différents (4G, WiFi)
@@ -84,6 +84,8 @@ class WebRTCService {
     this._isMuted = false;
     this._isCameraOff = false;
     this._iceCandidateListener = null;
+    this._pendingCandidates = []; // ✅ Buffer ICE candidates avant remoteDescription
+    this._addedCandidates = new Set(); // ✅ Éviter les doublons
   }
 
   init(coupleId, userId) {
@@ -180,8 +182,43 @@ class WebRTCService {
     }
   }
 
+  // ✅ Ajouter un ICE candidate (avec buffer si remoteDescription pas encore défini)
+  async _addIceCandidate(candidate) {
+    if (!this.peerConnection || !candidate?.candidate) return;
+    
+    // Clé unique pour éviter les doublons
+    const candidateKey = candidate.candidate + candidate.sdpMid;
+    if (this._addedCandidates.has(candidateKey)) return;
+    
+    // Si remoteDescription pas encore défini, mettre en buffer
+    if (!this.peerConnection.remoteDescription) {
+      this._pendingCandidates.push(candidate);
+      console.log('📦 ICE candidate mis en buffer (en attente de remoteDescription)');
+      return;
+    }
+    
+    try {
+      await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      this._addedCandidates.add(candidateKey);
+    } catch (e) {
+      console.log('⚠️ Add ICE error:', e.message);
+    }
+  }
+
+  // ✅ Vider le buffer des ICE candidates après setRemoteDescription
+  async _flushPendingCandidates() {
+    console.log(`🔄 Flush ${this._pendingCandidates.length} ICE candidates en attente`);
+    const pending = [...this._pendingCandidates];
+    this._pendingCandidates = [];
+    for (const candidate of pending) {
+      await this._addIceCandidate(candidate);
+    }
+  }
+
   _listenForRemoteICECandidates() {
     if (!isConfigured || !database || !this.coupleId || !this.userId) return;
+    
+    // Écouter les candidates de CHAQUE autre utilisateur
     const iceRef = ref(database, `couples/${this.coupleId}/calls/ice`);
     this._iceCandidateListener = onValue(iceRef, (snapshot) => {
       if (!snapshot.exists() || !this.peerConnection) return;
@@ -190,8 +227,7 @@ class WebRTCService {
         if (uid !== this.userId && candidates) {
           Object.values(candidates).forEach(candidate => {
             if (candidate && candidate.candidate) {
-              this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
-                .catch(e => console.log('⚠️ Add ICE error:', e.message));
+              this._addIceCandidate(candidate);
             }
           });
         }
@@ -237,12 +273,15 @@ class WebRTCService {
     if (!this.peerConnection) return;
     try {
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offerData));
+      console.log('📥 Remote description (offer) appliquée');
+      // ✅ Flush les ICE candidates qui étaient en attente
+      await this._flushPendingCandidates();
       const answer = await this.peerConnection.createAnswer();
       await this.peerConnection.setLocalDescription(answer);
       if (isConfigured && database && this.coupleId) {
         const sdpRef = ref(database, `couples/${this.coupleId}/calls/sdp/answer`);
         await set(sdpRef, { type: answer.type, sdp: answer.sdp });
-        console.log('📥 Réponse SDP envoyée');
+        console.log('� Réponse SDP envoyée');
       }
     } catch (error) {
       console.log('⚠️ Erreur handleOffer:', error.message);
@@ -254,6 +293,8 @@ class WebRTCService {
     try {
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answerData));
       console.log('✅ Réponse SDP appliquée');
+      // ✅ Flush les ICE candidates qui étaient en attente
+      await this._flushPendingCandidates();
     } catch (error) {
       console.log('⚠️ Erreur handleAnswer:', error.message);
     }
@@ -323,6 +364,8 @@ class WebRTCService {
     this.callType = null;
     this._isMuted = false;
     this._isCameraOff = false;
+    this._pendingCandidates = [];
+    this._addedCandidates = new Set();
   }
 }
 

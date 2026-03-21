@@ -590,19 +590,39 @@ export function NotificationProvider({ children }) {
     // ✅ Ceci fonctionne MÊME si pas de token push — c'est le canal principal de notifications
     try {
       if (currentCouple?.id && currentUser?.id && isConfigured && database) {
-        // Trouver l'ID du partenaire via les membres du couple
-        const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
-        const tokensSnap = await get(tokensRef);
         let partnerId = null;
-        if (tokensSnap.exists()) {
-          for (const id of Object.keys(tokensSnap.val())) {
-            if (id !== currentUser.id) { partnerId = id; break; }
+        
+        // Méthode 1: Chercher dans pushTokens
+        try {
+          const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
+          const tokensSnap = await get(tokensRef);
+          if (tokensSnap.exists()) {
+            for (const id of Object.keys(tokensSnap.val())) {
+              if (id !== currentUser.id) { partnerId = id; break; }
+            }
           }
+        } catch (e) { console.log('⚠️ Erreur lecture pushTokens:', e.message); }
+        
+        // Méthode 2: Chercher dans Firebase members (FIABLE — toujours rempli)
+        if (!partnerId) {
+          try {
+            const membersRef = ref(database, `couples/${currentCouple.id}/members`);
+            const membersSnap = await get(membersRef);
+            if (membersSnap.exists()) {
+              for (const id of Object.keys(membersSnap.val())) {
+                if (id !== currentUser.id) { partnerId = id; break; }
+              }
+            }
+          } catch (e) { console.log('⚠️ Erreur lecture members:', e.message); }
         }
-        // Fallback: chercher dans les données du couple
+        
+        // Méthode 3: Fallback local
         if (!partnerId && currentCouple.members) {
-          partnerId = currentCouple.members.find(m => m !== currentUser.id);
+          partnerId = Array.isArray(currentCouple.members)
+            ? currentCouple.members.find(m => m !== currentUser.id)
+            : Object.keys(currentCouple.members).find(m => m !== currentUser.id);
         }
+        
         if (partnerId) {
           const notifRef = ref(database, `couples/${currentCouple.id}/pendingNotifications/${partnerId}`);
           await push(notifRef, {
@@ -615,6 +635,8 @@ export function NotificationProvider({ children }) {
             senderName: currentUser.name || 'Partenaire',
           });
           console.log('✅ Notification écrite sur Firebase pour partenaire:', partnerId);
+        } else {
+          console.log('⚠️ Impossible de trouver le partnerId — notification Firebase non envoyée');
         }
       }
     } catch (firebaseErr) {

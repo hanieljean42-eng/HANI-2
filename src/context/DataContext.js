@@ -167,6 +167,21 @@ export function DataProvider({ children }) {
           AsyncStorage.setItem('@streak', JSON.stringify(data.streak));
         }
         
+        // ✅ Countdown Events — synchroniser entre les 2 partenaires
+        if (data.countdownEvents && typeof data.countdownEvents === 'object') {
+          const eventsArray = Object.values(data.countdownEvents).filter(Boolean);
+          const sorted = eventsArray.sort((a, b) => new Date(a.date) - new Date(b.date));
+          setCountdownEvents(sorted);
+          AsyncStorage.setItem('@countdownEvents', JSON.stringify(sorted));
+        }
+        
+        // ✅ Badges débloqués — synchroniser entre les 2 partenaires
+        if (data.unlockedBadges && typeof data.unlockedBadges === 'object') {
+          const badgesArray = Object.values(data.unlockedBadges).filter(Boolean);
+          setUnlockedBadges(badgesArray);
+          AsyncStorage.setItem('@unlockedBadges', JSON.stringify(badgesArray));
+        }
+        
         setIsDataSynced(true);
       } else {
         console.log('📭 Aucune donnée couple trouvée sur Firebase');
