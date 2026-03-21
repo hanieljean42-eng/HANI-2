@@ -13,40 +13,41 @@ import {
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, onValue, push } from 'firebase/database';
 
-// ✅ STUN servers (gratuits, pas d'identifiants requis)
-const STUN_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
-  { urls: 'stun:stun4.l.google.com:19302' },
-];
-
-// ✅ TURN servers Metered.ca — REMPLACE par tes propres credentials
-// Créer un compte gratuit sur https://www.metered.ca/stun-turn
-// → Dashboard → TURN Server → Copier les credentials
-const METERED_API_KEY = ''; // ← Mettre ta clé API Metered ici
-
-// Fonction pour obtenir les ICE servers (STUN + TURN dynamiques)
-async function getIceServers() {
-  // Si clé API Metered disponible, récupérer TURN credentials dynamiquement
-  if (METERED_API_KEY) {
-    try {
-      const response = await fetch(
-        `https://hani2.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`
-      );
-      const turnServers = await response.json();
-      console.log('✅ TURN credentials récupérés de Metered');
-      return { iceServers: [...STUN_SERVERS, ...turnServers] };
-    } catch (e) {
-      console.log('⚠️ Erreur récup TURN:', e.message);
-    }
-  }
-
-  // Fallback: STUN uniquement (fonctionne sur même réseau ou NAT simple)
-  console.log('⚠️ Pas de TURN configuré — appels sur même réseau uniquement');
-  return { iceServers: STUN_SERVERS };
-}
+// ✅ Configuration ICE: STUN gratuits (Google) + TURN gratuits (Open Relay)
+// Les serveurs TURN permettent les appels entre réseaux différents (4G, WiFi)
+const ICE_SERVERS = {
+  iceServers: [
+    // STUN servers Google (découverte IP publique - gratuit)
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    // TURN servers Open Relay (gratuit, pas d'inscription requise)
+    // Relais du trafic quand connexion directe impossible (NAT restrictif)
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:80?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+  ],
+  iceCandidatePoolSize: 10,
+};
 
 class WebRTCService {
   constructor() {
@@ -89,10 +90,9 @@ class WebRTCService {
     }
   }
 
-  async createPeerConnection() {
+  createPeerConnection() {
     try {
-      const iceConfig = await getIceServers();
-      const pc = new RTCPeerConnection(iceConfig);
+      const pc = new RTCPeerConnection(ICE_SERVERS);
 
       // Ajouter les pistes locales
       if (this.localStream) {
