@@ -48,7 +48,7 @@ export default function HomeScreen({ navigation }) {
   const { user, couple, partner, isOnline, isSynced } = useAuth();
   const { loveMeter, challenges, memories, loveNotes, countdownEvents, addCountdownEvent, deleteCountdownEvent, unlockedBadges, checkBadges } = useData();
   const { notifyMissYou, notifyOnline, sendDailyReminder, sendSmartReminder } = useNotifyPartner();
-  const { notifyMilestone, notifyBadgeUnlocked, notifyLevelUp, scheduleCountdownReminder } = useNotifications();
+  const { notifyMilestone, notifyBadgeUnlocked, notifyLevelUp, scheduleCountdownReminder, notifyNewEvent } = useNotifications();
   const { messages: chatMessages, unreadCount, partnerTyping } = useChat();
   const [daysCount, setDaysCount] = useState(0);
   const [timeTogetherText, setTimeTogetherText] = useState('');
@@ -813,6 +813,8 @@ export default function HomeScreen({ navigation }) {
                       date: date.toISOString(),
                       emoji: newEventEmoji,
                     });
+                    // ✅ Notifier le partenaire du nouvel événement
+                    notifyNewEvent(newEventName.trim(), newEventEmoji);
                     setNewEventName('');
                     setNewEventDate('');
                     setNewEventEmoji('🎉');

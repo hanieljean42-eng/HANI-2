@@ -1234,14 +1234,46 @@ export function NotificationProvider({ children }) {
   const scheduleCountdownReminder = async (eventName, emoji, dateStr) => {
     try {
       const eventDate = new Date(dateStr);
+      const now = new Date();
+      
+      // ✅ Notification J-1 (veille)
       const reminderDate = new Date(eventDate);
       reminderDate.setDate(reminderDate.getDate() - 1);
-      if (reminderDate <= new Date()) return;
-      await Notifications.scheduleNotificationAsync({
-        content: { title: `${emoji} Demain : ${eventName}`, body: 'Préparez-vous pour demain ! 💕', sound: true },
-        trigger: { type: SchedulableTriggerInputTypes.DATE, date: reminderDate },
-      });
+      reminderDate.setHours(9, 0, 0, 0);
+      if (reminderDate > now) {
+        await Notifications.scheduleNotificationAsync({
+          content: { title: `${emoji} Demain : ${eventName}`, body: 'Préparez-vous pour demain ! 💕', sound: true },
+          trigger: { type: SchedulableTriggerInputTypes.DATE, date: reminderDate },
+        });
+      }
+      
+      // ✅ Notification Jour J (le matin)
+      const dayOfDate = new Date(eventDate);
+      dayOfDate.setHours(8, 0, 0, 0);
+      if (dayOfDate > now) {
+        await Notifications.scheduleNotificationAsync({
+          content: { title: `🎉 C'est aujourd'hui : ${eventName} !`, body: `${emoji} Le grand jour est arrivé ! Profitez-en ensemble 💕`, sound: true },
+          trigger: { type: SchedulableTriggerInputTypes.DATE, date: dayOfDate },
+        });
+      }
     } catch (e) { console.log('⚠️ scheduleCountdownReminder:', e.message); }
+  };
+
+  // ✅ Notifier le partenaire qu'un nouvel événement a été créé
+  const notifyNewEvent = async (eventName, emoji) => {
+    try {
+      // Notification locale
+      await Notifications.scheduleNotificationAsync({
+        content: { title: `${emoji} Nouvel événement`, body: `"${eventName}" a été ajouté au calendrier ! 📅`, sound: true },
+        trigger: null,
+      });
+      // Notification push au partenaire
+      await sendPushNotification(
+        `${emoji} Nouvel événement`,
+        `"${eventName}" a été ajouté ! Consultez la page d'accueil 📅`,
+        { type: 'new_event' }
+      );
+    } catch (e) { console.log('⚠️ notifyNewEvent:', e.message); }
   };
 
   const value = {
@@ -1283,6 +1315,7 @@ export function NotificationProvider({ children }) {
     notifyBadgeUnlocked,
     notifyLevelUp,
     scheduleCountdownReminder,
+    notifyNewEvent,
     // ChallengesScreen streaks
     notifyStreakDanger: async (streakCount, partnerName) => {
       try {

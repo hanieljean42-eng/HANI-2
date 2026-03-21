@@ -93,6 +93,9 @@ class WebRTCService {
     this.userId = userId;
     this._isMuted = false;
     this._isCameraOff = false;
+    this._pendingCandidates = [];
+    this._addedCandidates = new Set();
+    this._iceRestartCount = 0;
   }
 
   async getLocalStream(type = 'audio') {
