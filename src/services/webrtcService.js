@@ -45,6 +45,27 @@ const ICE_SERVERS = {
       username: 'openrelayproject',
       credential: 'openrelayproject',
     },
+    // ✅ TURN backup supplémentaires (Metered free public relay)
+    {
+      urls: 'turn:a.relay.metered.ca:80',
+      username: 'e8dd65b92f60de6e09db01a1',
+      credential: 'uWdJjsOT8vAiTMjy',
+    },
+    {
+      urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+      username: 'e8dd65b92f60de6e09db01a1',
+      credential: 'uWdJjsOT8vAiTMjy',
+    },
+    {
+      urls: 'turn:a.relay.metered.ca:443',
+      username: 'e8dd65b92f60de6e09db01a1',
+      credential: 'uWdJjsOT8vAiTMjy',
+    },
+    {
+      urls: 'turns:a.relay.metered.ca:443?transport=tcp',
+      username: 'e8dd65b92f60de6e09db01a1',
+      credential: 'uWdJjsOT8vAiTMjy',
+    },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -121,14 +142,32 @@ class WebRTCService {
         }
       };
 
-      // Suivre l'état de connexion ICE
+      // ✅ Suivre l'état de connexion ICE + ICE restart automatique si échec
+      this._iceRestartCount = 0;
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
         console.log('🧊 ICE state:', state);
         if (state === 'connected' || state === 'completed') {
+          this._iceRestartCount = 0; // Reset compteur
           if (this.onConnectionStateChange) this.onConnectionStateChange('connected');
-        } else if (state === 'failed' || state === 'disconnected') {
-          if (this.onConnectionStateChange) this.onConnectionStateChange('disconnected');
+        } else if (state === 'failed') {
+          // ✅ ICE restart automatique (max 3 tentatives)
+          if (this._iceRestartCount < 3 && this.peerConnection) {
+            this._iceRestartCount++;
+            console.log(`🔄 ICE restart tentative ${this._iceRestartCount}/3...`);
+            this.peerConnection.restartIce();
+          } else {
+            console.log('❌ ICE failed après 3 tentatives');
+            if (this.onConnectionStateChange) this.onConnectionStateChange('disconnected');
+          }
+        } else if (state === 'disconnected') {
+          // Attendre 3s avant de signaler — peut se reconnecter tout seul
+          setTimeout(() => {
+            if (this.peerConnection && this.peerConnection.iceConnectionState === 'disconnected') {
+              console.log('⚠️ ICE toujours déconnecté après 3s');
+              if (this.onConnectionStateChange) this.onConnectionStateChange('disconnected');
+            }
+          }, 3000);
         }
       };
 

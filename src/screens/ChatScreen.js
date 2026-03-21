@@ -1034,9 +1034,9 @@ export default function ChatScreen({ navigation, route }) {
 
       {/* Messages + Input wrapped in KeyboardAvoidingView */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        style={{ flex: 1, backgroundColor: '#fff' }}
       >
       {/* Messages */}
       <View style={styles.messagesContainer}>
@@ -1608,8 +1608,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 10,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 8,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',

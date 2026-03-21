@@ -13,13 +13,21 @@ const NotificationContext = createContext({});
 
 export const useNotifications = () => useContext(NotificationContext);
 
-// Configuration des notifications
+// ✅ Configuration des notifications — FORCER l'affichage dans tous les cas
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification?.request?.content?.data;
+    const isCall = data?.type === 'incoming_call' || data?.type === 'call';
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      // ✅ Priorité maximale pour les appels, haute pour le reste
+      priority: isCall
+        ? Notifications.AndroidNotificationPriority.MAX
+        : Notifications.AndroidNotificationPriority.HIGH,
+    };
+  },
 });
 
 export function NotificationProvider({ children }) {
