@@ -14,6 +14,7 @@ import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import { navigate } from '../navigation/navigationRef';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -23,7 +24,52 @@ export default function IncomingCallOverlay() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
-  // Animation d'entrée + pulsation
+  const ringIntervalRef = useRef(null);
+
+  // ✅ Jouer une sonnerie via notification locale (son système) répétée
+  const startRinging = async () => {
+    // Première sonnerie immédiate
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '📞 Appel entrant',
+          body: 'Quelqu\'un vous appelle...',
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          vibrate: [0, 500, 200, 500],
+        },
+        trigger: null,
+      });
+    } catch (e) {
+      console.log('⚠️ Erreur sonnerie:', e.message);
+    }
+    // Répéter toutes les 3 secondes
+    ringIntervalRef.current = setInterval(async () => {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '📞 Appel entrant',
+            body: 'Quelqu\'un vous appelle...',
+            sound: 'default',
+            priority: Notifications.AndroidNotificationPriority.MAX,
+            vibrate: [0, 500, 200, 500],
+          },
+          trigger: null,
+        });
+      } catch (e) { /* ignore */ }
+    }, 3000);
+  };
+
+  const stopRinging = async () => {
+    if (ringIntervalRef.current) {
+      clearInterval(ringIntervalRef.current);
+      ringIntervalRef.current = null;
+    }
+    // Supprimer les notifications de sonnerie affichées
+    await Notifications.dismissAllNotificationsAsync().catch(() => {});
+  };
+
+  // Animation d'entrée + pulsation + sonnerie
   useEffect(() => {
     if (incomingCall) {
       // Slide in
@@ -42,7 +88,8 @@ export default function IncomingCallOverlay() {
         ])
       ).start();
 
-      // Vibration continue
+      // ✅ Sonnerie audio + vibration
+      startRinging();
       Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800], true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } else {
@@ -53,15 +100,20 @@ export default function IncomingCallOverlay() {
         useNativeDriver: true,
       }).start();
       Vibration.cancel();
+      stopRinging();
       pulseAnim.setValue(1);
     }
 
-    return () => Vibration.cancel();
+    return () => {
+      Vibration.cancel();
+      stopRinging();
+    };
   }, [incomingCall]);
 
   // Accepter l'appel et naviguer vers Chat
   const handleAccept = async () => {
     Vibration.cancel();
+    await stopRinging();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await acceptCall();
     navigate('Chat', { fromCallOverlay: true });
@@ -70,6 +122,7 @@ export default function IncomingCallOverlay() {
   // Rejeter l'appel
   const handleReject = async () => {
     Vibration.cancel();
+    await stopRinging();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     await rejectCall();
   };
