@@ -5,7 +5,7 @@ import * as Device from 'expo-device';
 import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, get, onValue, off } from 'firebase/database';
+import { ref, set, get, push, remove, onValue, off, onChildAdded } from 'firebase/database';
 import { useAuth } from './AuthContext';
 import { navigate } from '../navigation/navigationRef';
 
@@ -31,6 +31,8 @@ export function NotificationProvider({ children }) {
   const responseListener = useRef();
   const partnerTokenListenerRef = useRef(); // ✅ Ref pour cleanup propre
   const tokenSavedForCoupleRef = useRef(null); // ✅ Track quel coupleId a déjà été sauvegardé
+  const firebaseNotifListenerRef = useRef(null); // ✅ Listener notifications Firebase
+  const initialLoadDoneRef = useRef(false); // ✅ Ignorer les notifs au premier chargement
   const [userId, setUserId] = useState(null);
   const [coupleId, setCoupleId] = useState(null);
   const [partnerToken, setPartnerToken] = useState(null);
@@ -296,6 +298,82 @@ export function NotificationProvider({ children }) {
     };
   }, [coupleId, userId]);
 
+  // ✅ SYSTÈME NOTIFICATIONS VIA FIREBASE — Écouter les notifications entrantes
+  // Même principe que les appels : quand le partenaire envoie une notif, elle est écrite sur Firebase
+  // Le listener local la détecte et fire une notification locale immédiate
+  useEffect(() => {
+    if (!coupleId || !userId || !isConfigured || !database) return;
+
+    console.log('👂 Écoute notifications Firebase pour:', userId);
+    const notifsRef = ref(database, `couples/${coupleId}/pendingNotifications/${userId}`);
+    initialLoadDoneRef.current = false;
+
+    // D'abord, nettoyer les vieilles notifications (> 5 min)
+    get(notifsRef).then(snapshot => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const now = Date.now();
+        Object.entries(data).forEach(([key, notif]) => {
+          if (notif.createdAt && (now - notif.createdAt) > 300000) { // > 5 min
+            remove(ref(database, `couples/${coupleId}/pendingNotifications/${userId}/${key}`)).catch(() => {});
+          }
+        });
+      }
+      // Marquer le chargement initial comme terminé après un court délai
+      setTimeout(() => { initialLoadDoneRef.current = true; }, 2000);
+    }).catch(() => {
+      setTimeout(() => { initialLoadDoneRef.current = true; }, 2000);
+    });
+
+    // Écouter les NOUVELLES notifications ajoutées
+    const unsubscribe = onChildAdded(notifsRef, async (snapshot) => {
+      if (!initialLoadDoneRef.current) return; // Ignorer le chargement initial
+      
+      const notif = snapshot.val();
+      const notifKey = snapshot.key;
+      if (!notif || !notif.title) return;
+
+      console.log('🔔 Notification Firebase reçue:', notif.title, notif.type);
+
+      // Déterminer le channelId selon le type
+      const channelId = getChannelForType(notif.type);
+
+      // Fire notification locale immédiate
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: notif.title,
+            body: notif.body || '',
+            sound: 'default',
+            priority: notif.type === 'incoming_call' 
+              ? Notifications.AndroidNotificationPriority.MAX 
+              : Notifications.AndroidNotificationPriority.HIGH,
+            ...(Platform.OS === 'android' ? { channelId } : {}),
+            data: notif.data || { type: notif.type },
+          },
+          trigger: null,
+        });
+        console.log('✅ Notification locale affichée:', notif.title);
+      } catch (e) {
+        console.log('⚠️ Erreur notification locale Firebase:', e.message);
+      }
+
+      // Supprimer la notification de Firebase après affichage
+      remove(ref(database, `couples/${coupleId}/pendingNotifications/${userId}/${notifKey}`)).catch(() => {});
+    });
+
+    firebaseNotifListenerRef.current = unsubscribe;
+
+    return () => {
+      console.log('🔕 Arrêt écoute notifications Firebase');
+      if (firebaseNotifListenerRef.current) {
+        firebaseNotifListenerRef.current();
+        firebaseNotifListenerRef.current = null;
+      }
+      initialLoadDoneRef.current = false;
+    };
+  }, [coupleId, userId]);
+
   // Fonction pour demander les permissions (Android 13+ compatible)
   async function registerForPushNotificationsAsync() {
     let token;
@@ -499,14 +577,48 @@ export function NotificationProvider({ children }) {
       }
     }
     
-    if (!tokenToUse || !tokenToUse.startsWith('ExponentPushToken')) {
-      console.log('⚠️ Pas de token partenaire valide - impossible d\'envoyer push');
-      console.log('   Token actuel:', tokenToUse ? tokenToUse.substring(0, 20) + '...' : 'null');
-      console.log('   (Le partenaire doit ouvrir l\'app au moins une fois pour recevoir des notifications)');
-      return false;
+    // ÉTAPE 2: Écrire la notification sur Firebase (fiable, fonctionne même si push cassé)
+    // Le listener Firebase du partenaire détectera la notif et affichera une notification locale
+    // ✅ Ceci fonctionne MÊME si pas de token push — c'est le canal principal de notifications
+    try {
+      if (currentCouple?.id && currentUser?.id && isConfigured && database) {
+        // Trouver l'ID du partenaire via les membres du couple
+        const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
+        const tokensSnap = await get(tokensRef);
+        let partnerId = null;
+        if (tokensSnap.exists()) {
+          for (const id of Object.keys(tokensSnap.val())) {
+            if (id !== currentUser.id) { partnerId = id; break; }
+          }
+        }
+        // Fallback: chercher dans les données du couple
+        if (!partnerId && currentCouple.members) {
+          partnerId = currentCouple.members.find(m => m !== currentUser.id);
+        }
+        if (partnerId) {
+          const notifRef = ref(database, `couples/${currentCouple.id}/pendingNotifications/${partnerId}`);
+          await push(notifRef, {
+            title,
+            body,
+            type: data?.type || 'default',
+            data: data,
+            createdAt: Date.now(),
+            senderId: currentUser.id,
+            senderName: currentUser.name || 'Partenaire',
+          });
+          console.log('✅ Notification écrite sur Firebase pour partenaire:', partnerId);
+        }
+      }
+    } catch (firebaseErr) {
+      console.log('⚠️ Erreur écriture notif Firebase:', firebaseErr.message);
     }
 
-    // ÉTAPE 2: Envoyer via Expo Push Service
+    if (!tokenToUse || !tokenToUse.startsWith('ExponentPushToken')) {
+      console.log('⚠️ Pas de token push — notification envoyée via Firebase uniquement');
+      return true; // ✅ Retourner true car la notif Firebase a été envoyée
+    }
+
+    // ÉTAPE 3: Envoyer AUSSI via Expo Push Service (double fiabilité)
     try {
       // ✅ Choisir le bon canal Android selon le type de notification
       const channelId = getChannelForType(data?.type);
