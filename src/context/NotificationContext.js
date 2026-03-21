@@ -350,6 +350,19 @@ export function NotificationProvider({ children }) {
         importance: Notifications.AndroidImportance.DEFAULT,
         sound: 'default',
       });
+
+      // ✅ Canal appels — priorité maximale, son fort, vibration longue
+      await Notifications.setNotificationChannelAsync('calls', {
+        name: 'Appels 📞',
+        description: 'Appels vocaux et vidéo entrants',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 800, 400, 800, 400, 800],
+        lightColor: '#10B981',
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+        lockscreenVisibility: 1,
+      });
     }
 
     if (Device.isDevice) {
@@ -418,6 +431,10 @@ export function NotificationProvider({ children }) {
   // ✅ Déterminer le channelId Android selon le type de notification
   const getChannelForType = (type) => {
     switch (type) {
+      case 'call':
+      case 'incoming_call':
+      case 'missed_call':
+        return 'calls';
       case 'game_invite':
       case 'game_win':
       case 'game_turn':

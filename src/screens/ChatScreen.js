@@ -286,9 +286,31 @@ export default function ChatScreen({ navigation, route }) {
 
   // La sonnerie et vibration des appels entrants sont gérées par IncomingCallOverlay (global)
 
-  // ✅ Helpers sonnerie côté appelant
-  const startCallerRinging = () => {
+  // ✅ Helpers sonnerie côté appelant (tonalité d'attente)
+  const callerSoundRef = useRef(null);
+
+  const startCallerRinging = async () => {
     stopCallerRinging(); // Sécurité
+
+    // 1. Audio en boucle via expo-av (tonalité d'attente continue)
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: false,
+      });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
+        { isLooping: true, volume: 0.7, shouldPlay: true }
+      );
+      callerSoundRef.current = sound;
+      console.log('🔔 Tonalité appelant démarrée');
+    } catch (e) {
+      console.log('⚠️ Audio appelant non dispo:', e.message);
+    }
+
+    // 2. Notifications de fallback avec canal 'calls'
     callerRingRef.current = setInterval(async () => {
       try {
         await Notifications.scheduleNotificationAsync({
@@ -297,11 +319,12 @@ export default function ChatScreen({ navigation, route }) {
             body: 'En attente de réponse...',
             sound: 'default',
             priority: Notifications.AndroidNotificationPriority.HIGH,
+            ...(Platform.OS === 'android' ? { channelId: 'calls' } : {}),
           },
           trigger: null,
         });
       } catch (e) { /* ignore */ }
-    }, 4000);
+    }, 5000);
   };
 
   const stopCallerRinging = async () => {
@@ -312,6 +335,14 @@ export default function ChatScreen({ navigation, route }) {
     if (callTimeoutRef.current) {
       clearTimeout(callTimeoutRef.current);
       callTimeoutRef.current = null;
+    }
+    // Arrêter le son audio
+    if (callerSoundRef.current) {
+      try {
+        await callerSoundRef.current.stopAsync();
+        await callerSoundRef.current.unloadAsync();
+      } catch (e) { /* ignore */ }
+      callerSoundRef.current = null;
     }
     await Notifications.dismissAllNotificationsAsync().catch(() => {});
   };

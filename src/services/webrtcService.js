@@ -13,35 +13,40 @@ import {
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, onValue, push } from 'firebase/database';
 
-const ICE_SERVERS = {
-  iceServers: [
-    // STUN servers (découverte IP publique)
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    // TURN servers (relais quand connexion directe impossible)
-    // ✅ Nécessaires pour que les appels fonctionnent entre réseaux différents (4G, WiFi)
-    {
-      urls: 'turn:a.relay.metered.ca:80',
-      username: 'e8dd65c692eb1a5f56811b82',
-      credential: 'pFwIrLaijg7Besm+',
-    },
-    {
-      urls: 'turn:a.relay.metered.ca:80?transport=tcp',
-      username: 'e8dd65c692eb1a5f56811b82',
-      credential: 'pFwIrLaijg7Besm+',
-    },
-    {
-      urls: 'turn:a.relay.metered.ca:443',
-      username: 'e8dd65c692eb1a5f56811b82',
-      credential: 'pFwIrLaijg7Besm+',
-    },
-    {
-      urls: 'turns:a.relay.metered.ca:443?transport=tcp',
-      username: 'e8dd65c692eb1a5f56811b82',
-      credential: 'pFwIrLaijg7Besm+',
-    },
-  ],
-};
+// ✅ STUN servers (gratuits, pas d'identifiants requis)
+const STUN_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
+];
+
+// ✅ TURN servers Metered.ca — REMPLACE par tes propres credentials
+// Créer un compte gratuit sur https://www.metered.ca/stun-turn
+// → Dashboard → TURN Server → Copier les credentials
+const METERED_API_KEY = ''; // ← Mettre ta clé API Metered ici
+
+// Fonction pour obtenir les ICE servers (STUN + TURN dynamiques)
+async function getIceServers() {
+  // Si clé API Metered disponible, récupérer TURN credentials dynamiquement
+  if (METERED_API_KEY) {
+    try {
+      const response = await fetch(
+        `https://hani2.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`
+      );
+      const turnServers = await response.json();
+      console.log('✅ TURN credentials récupérés de Metered');
+      return { iceServers: [...STUN_SERVERS, ...turnServers] };
+    } catch (e) {
+      console.log('⚠️ Erreur récup TURN:', e.message);
+    }
+  }
+
+  // Fallback: STUN uniquement (fonctionne sur même réseau ou NAT simple)
+  console.log('⚠️ Pas de TURN configuré — appels sur même réseau uniquement');
+  return { iceServers: STUN_SERVERS };
+}
 
 class WebRTCService {
   constructor() {
@@ -84,9 +89,10 @@ class WebRTCService {
     }
   }
 
-  createPeerConnection() {
+  async createPeerConnection() {
     try {
-      const pc = new RTCPeerConnection(ICE_SERVERS);
+      const iceConfig = await getIceServers();
+      const pc = new RTCPeerConnection(iceConfig);
 
       // Ajouter les pistes locales
       if (this.localStream) {

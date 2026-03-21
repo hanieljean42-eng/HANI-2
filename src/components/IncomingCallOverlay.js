@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { navigate } from '../navigation/navigationRef';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
+import { Audio } from 'expo-av';
 
 const { width } = Dimensions.get('window');
 
@@ -25,10 +26,11 @@ export default function IncomingCallOverlay() {
   const slideAnim = useRef(new Animated.Value(-300)).current;
 
   const ringIntervalRef = useRef(null);
+  const ringSoundRef = useRef(null);
 
-  // ✅ Jouer une sonnerie via notification locale (son système) répétée
+  // ✅ Jouer une sonnerie via notification locale (canal 'calls' + son) + Audio en boucle
   const startRinging = async () => {
-    // Première sonnerie immédiate
+    // 1. Notification locale avec canal 'calls' (priorité MAX, son activé)
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -36,14 +38,35 @@ export default function IncomingCallOverlay() {
           body: 'Quelqu\'un vous appelle...',
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
-          vibrate: [0, 500, 200, 500],
+          vibrate: [0, 800, 400, 800],
+          ...(Platform.OS === 'android' ? { channelId: 'calls' } : {}),
         },
         trigger: null,
       });
     } catch (e) {
-      console.log('⚠️ Erreur sonnerie:', e.message);
+      console.log('⚠️ Erreur notification sonnerie:', e.message);
     }
-    // Répéter toutes les 3 secondes
+
+    // 2. Audio en boucle via expo-av (sonnerie continue fiable)
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: false,
+      });
+      // Générer un son de sonnerie simple via une URL data
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: 'https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg' },
+        { isLooping: true, volume: 1.0, shouldPlay: true }
+      );
+      ringSoundRef.current = sound;
+      console.log('🔔 Sonnerie audio démarrée');
+    } catch (e) {
+      console.log('⚠️ Fallback: Audio sonnerie non dispo, utilisant notifications:', e.message);
+    }
+
+    // 3. Notifications répétées (fallback si audio échoue)
     ringIntervalRef.current = setInterval(async () => {
       try {
         await Notifications.scheduleNotificationAsync({
@@ -52,18 +75,26 @@ export default function IncomingCallOverlay() {
             body: 'Quelqu\'un vous appelle...',
             sound: 'default',
             priority: Notifications.AndroidNotificationPriority.MAX,
-            vibrate: [0, 500, 200, 500],
+            ...(Platform.OS === 'android' ? { channelId: 'calls' } : {}),
           },
           trigger: null,
         });
       } catch (e) { /* ignore */ }
-    }, 3000);
+    }, 4000);
   };
 
   const stopRinging = async () => {
     if (ringIntervalRef.current) {
       clearInterval(ringIntervalRef.current);
       ringIntervalRef.current = null;
+    }
+    // Arrêter le son audio
+    if (ringSoundRef.current) {
+      try {
+        await ringSoundRef.current.stopAsync();
+        await ringSoundRef.current.unloadAsync();
+      } catch (e) { /* ignore */ }
+      ringSoundRef.current = null;
     }
     // Supprimer les notifications de sonnerie affichées
     await Notifications.dismissAllNotificationsAsync().catch(() => {});

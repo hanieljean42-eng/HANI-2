@@ -315,7 +315,7 @@ export function ChatProvider({ children }) {
       webrtcService.onConnectionStateChange = (state) => setWebrtcState(state);
       
       await webrtcService.getLocalStream(type);
-      webrtcService.createPeerConnection();
+      await webrtcService.createPeerConnection();
       // L'offre SDP sera envoyée quand l'appel est accepté (status='accepted')
 
       return roomId;
@@ -349,7 +349,7 @@ export function ChatProvider({ children }) {
       webrtcService.onConnectionStateChange = (state) => setWebrtcState(state);
       
       await webrtcService.getLocalStream(incomingCall.type);
-      webrtcService.createPeerConnection();
+      await webrtcService.createPeerConnection();
 
       // Lire l'offre SDP du caller depuis Firebase
       const offerRef = ref(database, `couples/${couple.id}/calls/sdp/offer`);
