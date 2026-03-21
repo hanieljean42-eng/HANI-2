@@ -2523,7 +2523,7 @@ export default function GamesScreen() {
         </View>
       ) : (
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.quizOpenContainer}
         >
           <Text style={styles.quizOpenLabel}>
@@ -2913,7 +2913,7 @@ export default function GamesScreen() {
     
     return (
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.gameContainer}
         keyboardVerticalOffset={100}
       >

@@ -27,6 +27,7 @@ import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useNotifications } from '../context/NotificationContext';
 import AnimatedModal from '../components/AnimatedModal';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary';
+import { formatDateInput } from '../utils/dateFormat';
 
 const { width } = Dimensions.get('window');
 
@@ -1151,7 +1152,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowNoteModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💌 Love Note</Text>
@@ -1189,7 +1190,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowBucketModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>✨ Nouveau Rêve</Text>
@@ -1226,7 +1227,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditProfileModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>👤 Modifier le profil</Text>
@@ -1297,7 +1298,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditAnniversaryModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>📅 Date d'anniversaire</Text>
@@ -1306,11 +1307,12 @@ export default function ProfileScreen({ navigation }) {
             </Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="JJ/MM/AAAA (ex: 14/02/2024)"
+              placeholder="Tapez 14022024 → 14/02/2024"
               placeholderTextColor="#999"
               value={editAnniversary}
-              onChangeText={setEditAnniversary}
-              keyboardType="numbers-and-punctuation"
+              onChangeText={(text) => setEditAnniversary(formatDateInput(text))}
+              keyboardType="numeric"
+              maxLength={10}
             />
             <Text style={styles.modalHint}>
               💡 Cette date sera utilisée pour calculer le nombre de jours d'amour affiché sur l'écran d'accueil
@@ -1464,7 +1466,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditPartnerModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💕 Modifier le nom du partenaire</Text>
@@ -1504,7 +1506,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditCoupleNameModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>💑 Modifier le nom du couple</Text>
@@ -1544,7 +1546,7 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditBucketModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>✏️ Modifier le rêve</Text>
@@ -1640,7 +1642,7 @@ export default function ProfileScreen({ navigation }) {
           setPinStep(1);
         }}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🔐 Code PIN</Text>

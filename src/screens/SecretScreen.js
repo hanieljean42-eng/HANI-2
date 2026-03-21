@@ -175,7 +175,7 @@ export default function SecretScreen() {
 
   return (
     <LinearGradient colors={theme.primary} style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={[styles.title, { color: theme.text }]}>🔐 Espace Secret</Text>
         <Text style={[styles.subtitle, { color: theme.text }]}>Ici, tu peux écrire des notes intimes ou stocker des photos privées, protégées par ton code secret.</Text>
@@ -298,7 +298,7 @@ export default function SecretScreen() {
           setPinStep(1);
         }}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🔐 Créer ton code secret</Text>

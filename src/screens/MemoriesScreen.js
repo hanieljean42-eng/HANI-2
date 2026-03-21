@@ -26,6 +26,7 @@ import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useAuth } from '../context/AuthContext';
 import AnimatedModal from '../components/AnimatedModal';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary';
+import { formatDateInput } from '../utils/dateFormat';
 
 const { width, height } = Dimensions.get('window');
 
@@ -1111,7 +1112,7 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <TouchableOpacity 
           style={styles.modalOverlay} 
           activeOpacity={1} 
@@ -1150,10 +1151,12 @@ export default function MemoriesScreen() {
                 />
                 <TextInput
                   style={styles.modalInput}
-                  placeholder="Date de livraison (JJ/MM/AAAA)"
+                  placeholder="Date de livraison (ex: 14022025)"
                   placeholderTextColor="#999"
                   value={newLetter.deliveryDate}
-                  onChangeText={(text) => setNewLetter({ ...newLetter, deliveryDate: text })}
+                  onChangeText={(text) => setNewLetter({ ...newLetter, deliveryDate: formatDateInput(text) })}
+                  keyboardType="numeric"
+                  maxLength={10}
                 />
                 <TextInput
                   style={styles.modalInput}
@@ -1193,10 +1196,12 @@ export default function MemoriesScreen() {
                   <>
                     <TextInput
                       style={styles.modalInput}
-                      placeholder="Date d'ouverture (JJ/MM/AAAA)"
+                      placeholder="Date d'ouverture (ex: 14022025)"
                       placeholderTextColor="#999"
                       value={newMemory.date}
-                      onChangeText={(text) => setNewMemory({ ...newMemory, date: text })}
+                      onChangeText={(text) => setNewMemory({ ...newMemory, date: formatDateInput(text) })}
+                      keyboardType="numeric"
+                      maxLength={10}
                     />
                     <TextInput
                       style={styles.modalInput}
@@ -1489,7 +1494,7 @@ export default function MemoriesScreen() {
         animationType="slide"
         onRequestClose={() => setShowEditModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <TouchableOpacity 
           style={styles.modalOverlay} 
           activeOpacity={1} 

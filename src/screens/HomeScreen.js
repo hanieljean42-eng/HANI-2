@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useData, BADGES_LIST, getLevelInfo, MILESTONES, SPECIAL_DATES } from '../context/DataContext';
+import { formatDateInput } from '../utils/dateFormat';
 import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useNotifications } from '../context/NotificationContext';
 import { useChat } from '../context/ChatContext';
@@ -760,11 +761,12 @@ export default function HomeScreen({ navigation }) {
               />
               <TextInput
                 style={styles.modalInput}
-                placeholder="Date (JJ/MM/AAAA)"
+                placeholder="Date (ex: 14022025)"
                 value={newEventDate}
-                onChangeText={setNewEventDate}
+                onChangeText={(text) => setNewEventDate(formatDateInput(text))}
                 placeholderTextColor="#999"
                 keyboardType="numeric"
+                maxLength={10}
               />
               <View style={styles.emojiRow}>
                 {['🎉', '✈️', '🎂', '💍', '🏖️', '🎄', '💝', '🎓'].map(e => (

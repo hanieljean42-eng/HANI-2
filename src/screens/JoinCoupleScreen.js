@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { formatDateInput } from '../utils/dateFormat';
 
 export default function JoinCoupleScreen() {
   const { user, joinCouple, createCouple, logout } = useAuth();
@@ -159,7 +160,7 @@ export default function JoinCoupleScreen() {
         colors={['#FF6B9D', '#C44569', '#8B5CF6']}
         style={styles.container}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
             style={styles.backButton}
@@ -198,14 +199,15 @@ export default function JoinCoupleScreen() {
               <Text style={styles.inputIcon}>📅</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ex: 14/02/2024"
+                placeholder="Ex: 14022024"
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 value={formData.anniversary}
-                onChangeText={(text) => setFormData({ ...formData, anniversary: text })}
-                keyboardType="numbers-and-punctuation"
+                onChangeText={(text) => setFormData({ ...formData, anniversary: formatDateInput(text) })}
+                keyboardType="numeric"
+                maxLength={10}
               />
             </View>
-            <Text style={styles.dateHint}>💡 Entrez la date au format JJ/MM/AAAA</Text>
+            <Text style={styles.dateHint}>💡 Tapez les chiffres, les / s'ajoutent automatiquement</Text>
           </View>
 
           {generatedCode ? (
@@ -236,7 +238,7 @@ export default function JoinCoupleScreen() {
         colors={['#8B5CF6', '#C44569', '#FF6B9D']}
         style={styles.container}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
             style={styles.backButton}
@@ -279,14 +281,15 @@ export default function JoinCoupleScreen() {
               <Text style={styles.inputIcon}>📅</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ex: 14/02/2024"
+                placeholder="Ex: 14022024"
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 value={formData.anniversary}
-                onChangeText={(text) => setFormData({ ...formData, anniversary: text })}
-                keyboardType="numbers-and-punctuation"
+                onChangeText={(text) => setFormData({ ...formData, anniversary: formatDateInput(text) })}
+                keyboardType="numeric"
+                maxLength={10}
               />
             </View>
-            <Text style={styles.dateHint}>💡 Entrez la date au format JJ/MM/AAAA</Text>
+            <Text style={styles.dateHint}>💡 Tapez les chiffres, les / s'ajoutent automatiquement</Text>
           </View>
 
           <TouchableOpacity
