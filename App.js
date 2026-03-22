@@ -1,5 +1,4 @@
 import React from 'react';
-import { registerGlobals } from '@livekit/react-native-webrtc';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -14,9 +13,6 @@ import { ChatProvider } from './src/context/ChatContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, View, Text } from 'react-native';
 import IncomingCallOverlay from './src/components/IncomingCallOverlay';
-
-// ✅ CRITICAL: Initialiser WebRTC — SANS ÇA, les appels ne fonctionnent PAS
-registerGlobals();
 
 // Error Boundary pour capturer les erreurs globales
 class ErrorBoundary extends React.Component {

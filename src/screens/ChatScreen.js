@@ -25,7 +25,6 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
-import { RTCView } from '@livekit/react-native-webrtc';
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -1186,29 +1185,6 @@ export default function ChatScreen({ navigation, route }) {
           style={styles.callScreenContainer}
         >
           <StatusBar backgroundColor="#1a1a2e" barStyle="light-content" />
-
-          {/* Vidéo distante en plein écran */}
-          {(activeCall?.type || incomingCall?.type) === 'video' && remoteStream && (
-            <RTCView
-              streamURL={remoteStream.toURL()}
-              style={StyleSheet.absoluteFill}
-              objectFit="cover"
-              zOrder={0}
-            />
-          )}
-
-          {/* Vidéo locale en mini (pip) */}
-          {(activeCall?.type || incomingCall?.type) === 'video' && localStream && !isCameraOff && (
-            <View style={{ position: 'absolute', top: 60, right: 16, width: 120, height: 160, borderRadius: 12, overflow: 'hidden', zIndex: 10, elevation: 10, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' }}>
-              <RTCView
-                streamURL={localStream.toURL()}
-                style={{ flex: 1 }}
-                objectFit="cover"
-                mirror={true}
-                zOrder={1}
-              />
-            </View>
-          )}
 
           {/* Info partenaire */}
           <View style={styles.callPartnerInfo}>
