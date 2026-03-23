@@ -72,8 +72,7 @@
           "mode": "production"
         }
       ],
-      "expo-font",
-      "@config-plugins/react-native-webrtc"
+      "expo-font"
     ],
     "notification": {
       "icon": "./assets/icon.png",
