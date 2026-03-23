@@ -92,6 +92,7 @@ export default function ProfileScreen({ navigation }) {
   const [newBucketItem, setNewBucketItem] = useState('');
   const [showCoupleCode, setShowCoupleCode] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
+  const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [editPartnerName, setEditPartnerName] = useState(partner?.name || '');
   const [editCoupleName, setEditCoupleName] = useState(couple?.name || '');
   const [editAnniversary, setEditAnniversary] = useState(couple?.anniversary || '');
@@ -104,6 +105,9 @@ export default function ProfileScreen({ navigation }) {
   const [pinInput, setPinInput] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinStep, setPinStep] = useState(1);
+
+  // Regex pour valider le format de date JJ/MM/AAAA
+  const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 
   // Handlers pour thème et PIN
   // ✅ Fonction pour vérifier les paliers du Love Meter
