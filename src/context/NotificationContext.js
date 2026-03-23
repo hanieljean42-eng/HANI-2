@@ -40,7 +40,6 @@ export function NotificationProvider({ children }) {
   const partnerTokenListenerRef = useRef(); // ✅ Ref pour cleanup propre
   const tokenSavedForCoupleRef = useRef(null); // ✅ Track quel coupleId a déjà été sauvegardé
   const firebaseNotifListenerRef = useRef(null); // ✅ Listener notifications Firebase
-  const initialLoadDoneRef = useRef(false); // ✅ Ignorer les notifs au premier chargement
   const [userId, setUserId] = useState(null);
   const [coupleId, setCoupleId] = useState(null);
   const [partnerToken, setPartnerToken] = useState(null);
@@ -157,13 +156,29 @@ export function NotificationProvider({ children }) {
     }
   }, [authCouple?.id]);
 
-  // ✅ ÉTAPE 1: Obtenir le token push au démarrage (juste l'obtenir, pas le sauvegarder)
+  // ✅ ÉTAPE 1: Obtenir le token push au démarrage + rafraîchir à chaque retour au premier plan
   useEffect(() => {
-    registerForPushNotificationsAsync().then(token => {
-      if (token) {
-        console.log('🔔 Token obtenu au démarrage:', token.substring(0, 25) + '...');
-        setExpoPushToken(token);
-        setNotificationsEnabled(true);
+    const fetchToken = () => {
+      registerForPushNotificationsAsync().then(token => {
+        if (token) {
+          console.log('🔔 Token obtenu:', token.substring(0, 25) + '...');
+          setExpoPushToken(token);
+          setNotificationsEnabled(true);
+        }
+      });
+    };
+
+    // Obtenir le token au démarrage
+    fetchToken();
+
+    // ✅ Rafraîchir le token à chaque retour de l'app au premier plan
+    // Cela garantit que le token est toujours à jour (expiration, changement de device, etc.)
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        console.log('🔄 App revenue au premier plan — rafraîchissement token push');
+        fetchToken();
+        // ✅ Forcer resave sur Firebase au retour (token peut avoir changé)
+        tokenSavedForCoupleRef.current = null;
       }
     });
 
@@ -186,6 +201,7 @@ export function NotificationProvider({ children }) {
     });
 
     return () => {
+      appStateSubscription.remove();
       if (notificationListener.current) {
         Notifications.removeNotificationSubscription(notificationListener.current);
       }
@@ -314,32 +330,36 @@ export function NotificationProvider({ children }) {
 
     console.log('👂 Écoute notifications Firebase pour:', userId);
     const notifsRef = ref(database, `couples/${coupleId}/pendingNotifications/${userId}`);
-    initialLoadDoneRef.current = false;
+    
+    // ✅ Timestamp de démarrage du listener — seules les notifs APRÈS ce moment sont affichées
+    const listenerStartTime = Date.now();
 
-    // D'abord, nettoyer les vieilles notifications (> 5 min)
+    // Nettoyer les vieilles notifications (> 2 min) sans bloquer
     get(notifsRef).then(snapshot => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const now = Date.now();
         Object.entries(data).forEach(([key, notif]) => {
-          if (notif.createdAt && (now - notif.createdAt) > 300000) { // > 5 min
+          if (notif.createdAt && (now - notif.createdAt) > 120000) { // > 2 min
             remove(ref(database, `couples/${coupleId}/pendingNotifications/${userId}/${key}`)).catch(() => {});
           }
         });
       }
-      // Marquer le chargement initial comme terminé après un court délai
-      setTimeout(() => { initialLoadDoneRef.current = true; }, 2000);
-    }).catch(() => {
-      setTimeout(() => { initialLoadDoneRef.current = true; }, 2000);
-    });
+    }).catch(() => {});
 
     // Écouter les NOUVELLES notifications ajoutées
     const unsubscribe = onChildAdded(notifsRef, async (snapshot) => {
-      if (!initialLoadDoneRef.current) return; // Ignorer le chargement initial
-      
       const notif = snapshot.val();
       const notifKey = snapshot.key;
       if (!notif || !notif.title) return;
+
+      // ✅ Ignorer les notifs créées AVANT le démarrage du listener (chargement initial)
+      // Mais traiter celles créées dans les 10 dernières secondes (récentes non-vues)
+      if (notif.createdAt && notif.createdAt < (listenerStartTime - 10000)) {
+        // Notification ancienne → supprimer silencieusement
+        remove(ref(database, `couples/${coupleId}/pendingNotifications/${userId}/${notifKey}`)).catch(() => {});
+        return;
+      }
 
       console.log('🔔 Notification Firebase reçue:', notif.title, notif.type);
 
@@ -378,7 +398,6 @@ export function NotificationProvider({ children }) {
         firebaseNotifListenerRef.current();
         firebaseNotifListenerRef.current = null;
       }
-      initialLoadDoneRef.current = false;
     };
   }, [coupleId, userId]);
 
@@ -538,161 +557,131 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // ✅ Envoyer une notification push au partenaire via Expo Push API
+  // ✅ Envoyer une notification push au partenaire via Expo Push API + Firebase
   const sendPushNotification = async (title, body, data = {}) => {
     const currentPartnerToken = partnerTokenRef.current;
     const currentUser = authUserRef.current;
     const currentCouple = authCoupleRef.current;
     
-    console.log('📤 Tentative envoi notification push:', { title, body, type: data?.type, hasPartnerToken: !!currentPartnerToken });
+    console.log('📤 Envoi notification:', { title, type: data?.type });
     
-    // ÉTAPE 1: Vérifier si on a un token partenaire valide
+    if (!currentCouple?.id || !currentUser?.id || !isConfigured || !database) {
+      console.log('⚠️ Données manquantes pour envoyer la notification');
+      return false;
+    }
+
+    // ✅ Récupérer token partenaire + partnerId EN UNE SEULE lecture Firebase
     let tokenToUse = (currentPartnerToken && currentPartnerToken.startsWith('ExponentPushToken')) 
       ? currentPartnerToken 
       : null;
-    
-    if (!tokenToUse && currentCouple?.id && currentUser?.id && isConfigured && database) {
-      // Essayer jusqu'à 3 tentatives avec délai progressif
-      for (let attempt = 0; attempt < 3 && !tokenToUse; attempt++) {
-        if (attempt > 0) {
-          await new Promise(r => setTimeout(r, 1500 * attempt));
-        }
-        try {
-          console.log(`🔄 Récupération token partenaire depuis Firebase (tentative ${attempt + 1})...`);
-          const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
-          const snapshot = await get(tokensRef);
-          if (snapshot.exists()) {
-            const tokens = snapshot.val();
-            for (const [id, tokenData] of Object.entries(tokens)) {
-              if (id !== currentUser.id && tokenData?.token) {
-                if (tokenData.token.startsWith('ExponentPushToken')) {
-                  tokenToUse = tokenData.token;
-                  setPartnerToken(tokenToUse);
-                  partnerTokenRef.current = tokenToUse;
-                  console.log('✅ Token partenaire récupéré depuis Firebase:', tokenToUse.substring(0, 25) + '...');
-                } else {
-                  console.log('⚠️ Token invalide trouvé sur Firebase, ignoré:', tokenData.token.substring(0, 20));
-                  const badTokenRef = ref(database, `couples/${currentCouple.id}/pushTokens/${id}`);
-                  set(badTokenRef, null).catch(() => {});
-                }
-                break;
-              }
-            }
-          }
-        } catch (e) {
-          console.log('⚠️ Erreur récupération token partenaire:', e.message);
+    let partnerId = null;
+
+    // Chercher partnerId dans members (toujours fiable)
+    try {
+      const membersRef = ref(database, `couples/${currentCouple.id}/members`);
+      const membersSnap = await get(membersRef);
+      if (membersSnap.exists()) {
+        for (const id of Object.keys(membersSnap.val())) {
+          if (id !== currentUser.id) { partnerId = id; break; }
         }
       }
+    } catch (e) { /* ignore */ }
+
+    // Fallback local pour partnerId
+    if (!partnerId && currentCouple.members) {
+      partnerId = Array.isArray(currentCouple.members)
+        ? currentCouple.members.find(m => m !== currentUser.id)
+        : Object.keys(currentCouple.members).find(m => m !== currentUser.id);
     }
-    
-    // ÉTAPE 2: Écrire la notification sur Firebase (fiable, fonctionne même si push cassé)
-    // Le listener Firebase du partenaire détectera la notif et affichera une notification locale
-    // ✅ Ceci fonctionne MÊME si pas de token push — c'est le canal principal de notifications
-    try {
-      if (currentCouple?.id && currentUser?.id && isConfigured && database) {
-        let partnerId = null;
-        
-        // Méthode 1: Chercher dans pushTokens
-        try {
-          const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
-          const tokensSnap = await get(tokensRef);
-          if (tokensSnap.exists()) {
-            for (const id of Object.keys(tokensSnap.val())) {
-              if (id !== currentUser.id) { partnerId = id; break; }
+
+    // Si pas de token, une seule tentative rapide de récupération
+    if (!tokenToUse) {
+      try {
+        const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);
+        const snapshot = await get(tokensRef);
+        if (snapshot.exists()) {
+          const tokens = snapshot.val();
+          for (const [id, tokenData] of Object.entries(tokens)) {
+            if (id !== currentUser.id && tokenData?.token?.startsWith('ExponentPushToken')) {
+              tokenToUse = tokenData.token;
+              setPartnerToken(tokenToUse);
+              partnerTokenRef.current = tokenToUse;
+              if (!partnerId) partnerId = id;
+              break;
             }
           }
-        } catch (e) { console.log('⚠️ Erreur lecture pushTokens:', e.message); }
-        
-        // Méthode 2: Chercher dans Firebase members (FIABLE — toujours rempli)
-        if (!partnerId) {
-          try {
-            const membersRef = ref(database, `couples/${currentCouple.id}/members`);
-            const membersSnap = await get(membersRef);
-            if (membersSnap.exists()) {
-              for (const id of Object.keys(membersSnap.val())) {
-                if (id !== currentUser.id) { partnerId = id; break; }
-              }
-            }
-          } catch (e) { console.log('⚠️ Erreur lecture members:', e.message); }
         }
-        
-        // Méthode 3: Fallback local
-        if (!partnerId && currentCouple.members) {
-          partnerId = Array.isArray(currentCouple.members)
-            ? currentCouple.members.find(m => m !== currentUser.id)
-            : Object.keys(currentCouple.members).find(m => m !== currentUser.id);
-        }
-        
-        if (partnerId) {
-          const notifRef = ref(database, `couples/${currentCouple.id}/pendingNotifications/${partnerId}`);
-          await push(notifRef, {
-            title,
-            body,
-            type: data?.type || 'default',
-            data: data,
-            createdAt: Date.now(),
-            senderId: currentUser.id,
-            senderName: currentUser.name || 'Partenaire',
-          });
-          console.log('✅ Notification écrite sur Firebase pour partenaire:', partnerId);
-        } else {
-          console.log('⚠️ Impossible de trouver le partnerId — notification Firebase non envoyée');
-        }
-      }
-    } catch (firebaseErr) {
-      console.log('⚠️ Erreur écriture notif Firebase:', firebaseErr.message);
+      } catch (e) { /* ignore */ }
     }
 
-    if (!tokenToUse || !tokenToUse.startsWith('ExponentPushToken')) {
-      console.log('⚠️ Pas de token push — notification envoyée via Firebase uniquement');
-      return true; // ✅ Retourner true car la notif Firebase a été envoyée
+    // ✅ Lancer Firebase + Expo Push EN PARALLÈLE (pas séquentiellement)
+    const promises = [];
+
+    // Canal 1: Écrire sur Firebase pendingNotifications (fonctionne quand l'app est ouverte)
+    if (partnerId) {
+      promises.push(
+        push(ref(database, `couples/${currentCouple.id}/pendingNotifications/${partnerId}`), {
+          title,
+          body,
+          type: data?.type || 'default',
+          data: data,
+          createdAt: Date.now(),
+          senderId: currentUser.id,
+          senderName: currentUser.name || 'Partenaire',
+        }).then(() => {
+          console.log('✅ Notif Firebase écrite pour:', partnerId);
+        }).catch(e => {
+          console.log('⚠️ Erreur Firebase notif:', e.message);
+        })
+      );
     }
 
-    // ÉTAPE 3: Envoyer AUSSI via Expo Push Service (double fiabilité)
-    try {
-      // ✅ Choisir le bon canal Android selon le type de notification
+    // Canal 2: Envoyer via Expo Push Service (fonctionne en arrière-plan)
+    if (tokenToUse) {
       const channelId = getChannelForType(data?.type);
-
-      const message = {
-        to: tokenToUse,
-        sound: 'default',
-        title: title,
-        body: body,
-        data: data,
-        priority: 'high',
-        channelId: channelId,
-      };
-
-      console.log('🔗 Appel Expo Push Service... (canal:', channelId, ', token:', tokenToUse.substring(0, 25) + '...)');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-      
-      const response = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Accept-encoding': 'gzip, deflate',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      const result = await response.json();
-      
-      if (response.ok) {
-        console.log('✅ Notification push envoyée avec succès:', result);
-        return true;
-      } else {
-        console.error('❌ Expo répondu avec erreur:', result);
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Erreur envoi notification push:', error.message);
-      return false;
+      promises.push(
+        (async () => {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            
+            const response = await fetch('https://exp.host/--/api/v2/push/send', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Accept-encoding': 'gzip, deflate',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                to: tokenToUse,
+                sound: 'default',
+                title,
+                body,
+                data,
+                priority: 'high',
+                channelId,
+              }),
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            const result = await response.json();
+            if (response.ok) {
+              console.log('✅ Push Expo envoyé');
+            } else {
+              console.log('⚠️ Push Expo erreur:', result);
+            }
+          } catch (e) {
+            console.log('⚠️ Push Expo timeout/erreur:', e.message);
+          }
+        })()
+      );
+    } else {
+      console.log('⚠️ Pas de token push — Firebase uniquement');
     }
+
+    // Attendre les deux en parallèle
+    await Promise.allSettled(promises);
+    return true;
   };
 
   // Programmer une notification locale (pour test ou rappels)
