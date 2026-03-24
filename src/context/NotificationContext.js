@@ -501,7 +501,7 @@ export function NotificationProvider({ children }) {
       try {
         // Obtenir le token Expo Push avec le bon projectId
         // Le projectId doit correspondre à celui de app.json/eas.json
-        const projectId = '5d46427e-8133-41af-b0e3-1fde0d752d43'; // ID du projet EAS (app.json)
+        const projectId = 'c8c9bd08-506e-46ae-87fe-de09dacac100'; // ID du projet EAS (app.json)
         const tokenData = await Notifications.getExpoPushTokenAsync({
           projectId: projectId,
         });
