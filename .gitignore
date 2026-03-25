@@ -6,6 +6,10 @@ node_modules/
 dist/
 web-build/
 
+# IDE & CI (pas nécessaires pour le build)
+.vscode/
+.github/
+
 # Native
 *.orig.*
 *.jks
