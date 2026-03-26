@@ -263,19 +263,26 @@ export default function HomeScreen({ navigation }) {
     return () => clearInterval(interval);
   }, [couple?.anniversary, currentDate, calculateDaysTogether]);
 
-  // Écouter quand l'app revient au premier plan pour recalculer
+  // Écouter quand l'app revient au premier plan pour recalculer + notifier partenaire
+  const lastOnlineNotifRef = useRef(0);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         console.log('📱 App revenue au premier plan - recalcul des jours');
         calculateDaysTogether();
+        // ✅ Notifier le partenaire qu'on est de retour (cooldown 5 min)
+        const now = Date.now();
+        if (user?.id && couple?.id && (now - lastOnlineNotifRef.current) > 300000) {
+          lastOnlineNotifRef.current = now;
+          notifyOnline();
+        }
       }
     });
 
     return () => {
       subscription?.remove();
     };
-  }, [calculateDaysTogether]);
+  }, [calculateDaysTogether, user?.id, couple?.id]);
 
   // Recalculer quand la date anniversaire change
   useEffect(() => {

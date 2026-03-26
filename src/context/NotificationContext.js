@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, AppState } from 'react-native';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, get, push, remove, onValue, off, onChildAdded } from 'firebase/database';
@@ -501,7 +502,11 @@ export function NotificationProvider({ children }) {
       try {
         // Obtenir le token Expo Push avec le bon projectId
         // Le projectId doit correspondre à celui de app.json/eas.json
-        const projectId = 'c8c9bd08-506e-46ae-87fe-de09dacac100'; // ID du projet EAS (app.json)
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+        if (!projectId) {
+          console.log('⚠️ projectId manquant dans app.json extra.eas');
+          return null;
+        }
         const tokenData = await Notifications.getExpoPushTokenAsync({
           projectId: projectId,
         });
