@@ -1,15 +1,17 @@
 // ============================================================
 // Firebase Audio Relay Service — Appels audio via Firebase
-// Capture l'audio en chunks, envoie via Firebase Realtime DB
-// Le partenaire reçoit et joue les chunks en temps réel
+// Architecture HALF-DUPLEX : alterne enregistrement et lecture
+// pour contourner la limitation Android (expo-av ne peut pas
+// enregistrer et lire simultanément).
 // ============================================================
 
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, push, onChildAdded, off, remove } from 'firebase/database';
+import { ref, set, push, onChildAdded, off } from 'firebase/database';
 
-const CHUNK_DURATION_MS = 400; // Durée de chaque chunk audio (ms)
+const CHUNK_DURATION_MS = 500; // Durée de chaque chunk audio (ms)
+const MAX_QUEUE_SIZE = 4;      // Max chunks en attente (drop les vieux pour réduire la latence)
 
 class FirebaseCallService {
   constructor() {
@@ -19,12 +21,10 @@ class FirebaseCallService {
     this.isActive = false;
     this._isMuted = false;
     this._recording = null;
-    this._recordingLoop = null;
     this._playbackQueue = [];
-    this._isPlaying = false;
-    this._audioListener = null;
     this._chunkCounter = 0;
-    this._currentSound = null;
+    this._partnerListeners = [];
+    this._startTime = 0;
 
     // Callbacks
     this.onConnectionStateChange = null;
@@ -35,23 +35,9 @@ class FirebaseCallService {
     this.userId = userId;
     this._isMuted = false;
     this._playbackQueue = [];
-    this._isPlaying = false;
     this._chunkCounter = 0;
-  }
-
-  // ✅ Configurer le mode audio pour les appels
-  async _setupAudioMode() {
-    try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: false,
-      });
-    } catch (e) {
-      console.log('⚠️ Audio mode setup error:', e.message);
-    }
+    this._startTime = Date.now();
+    this._partnerListeners = [];
   }
 
   // ✅ Démarrer le streaming audio (appelé quand l'appel est accepté)
@@ -62,7 +48,9 @@ class FirebaseCallService {
     }
 
     this.isActive = true;
-    await this._setupAudioMode();
+    this._startTime = Date.now();
+
+    console.log('🎙️ Starting audio relay (half-duplex)...');
 
     // Nettoyer les anciens chunks audio
     try {
@@ -75,8 +63,8 @@ class FirebaseCallService {
     // Démarrer l'écoute des chunks du partenaire
     this._startListeningPartnerAudio();
 
-    // Démarrer l'enregistrement en boucle
-    this._startRecordingLoop();
+    // Démarrer la boucle principale (enregistrement + lecture alternés)
+    this._mainLoop();
 
     // Signaler la connexion
     if (this.onConnectionStateChange) {
@@ -86,157 +74,197 @@ class FirebaseCallService {
     console.log('🎙️ Audio relay streaming started');
   }
 
-  // ✅ Boucle d'enregistrement — enregistre en chunks continus
-  async _startRecordingLoop() {
+  // ============================================================
+  // BOUCLE PRINCIPALE : alterne ENREGISTREMENT et LECTURE
+  // Sur Android, expo-av bloque la lecture quand un Recording est
+  // actif. On doit donc : enregistrer → stopper → lire → répéter.
+  // ============================================================
+  async _mainLoop() {
     while (this.isActive) {
-      if (this._isMuted) {
-        // Si muté, attendre sans enregistrer
-        await this._delay(CHUNK_DURATION_MS);
-        continue;
-      }
+      // === PHASE 1 : ENREGISTREMENT ===
+      if (!this._isMuted) {
+        try {
+          // Activer le mode enregistrement
+          await this._setAudioMode(true);
 
-      try {
-        // Créer un nouvel enregistrement
-        const recording = new Audio.Recording();
-        await recording.prepareToRecordAsync({
-          isMeteringEnabled: false,
-          android: {
-            extension: '.m4a',
-            outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-            audioEncoder: Audio.AndroidAudioEncoder.AAC,
-            sampleRate: 16000,
-            numberOfChannels: 1,
-            bitRate: 32000,
-          },
-          ios: {
-            extension: '.m4a',
-            outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-            audioQuality: Audio.IOSAudioQuality.LOW,
-            sampleRate: 16000,
-            numberOfChannels: 1,
-            bitRate: 32000,
-          },
-          web: {},
-        });
-
-        this._recording = recording;
-        await recording.startAsync();
-
-        // Attendre la durée du chunk
-        await this._delay(CHUNK_DURATION_MS);
-
-        // Arrêter et récupérer le fichier
-        if (!this.isActive) break;
-
-        await recording.stopAndUnloadAsync();
-        const uri = recording.getURI();
-        this._recording = null;
-
-        if (uri) {
-          // Lire le fichier en base64
-          const base64 = await FileSystem.readAsStringAsync(uri, {
-            encoding: FileSystem.EncodingType.Base64,
+          const recording = new Audio.Recording();
+          await recording.prepareToRecordAsync({
+            isMeteringEnabled: false,
+            android: {
+              extension: '.m4a',
+              outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+              audioEncoder: Audio.AndroidAudioEncoder.AAC,
+              sampleRate: 16000,
+              numberOfChannels: 1,
+              bitRate: 32000,
+            },
+            ios: {
+              extension: '.m4a',
+              outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+              audioQuality: Audio.IOSAudioQuality.LOW,
+              sampleRate: 16000,
+              numberOfChannels: 1,
+              bitRate: 32000,
+            },
+            web: {},
           });
 
-          // Envoyer le chunk via Firebase
-          if (this.isActive && base64.length > 0) {
-            const streamRef = ref(database, `couples/${this.coupleId}/calls/audioStream/${this.userId}`);
-            this._chunkCounter++;
-            await push(streamRef, {
-              d: base64,
-              t: Date.now(),
-              n: this._chunkCounter,
-            });
+          this._recording = recording;
+          await recording.startAsync();
+          await this._delay(CHUNK_DURATION_MS);
+
+          if (!this.isActive) break;
+
+          await recording.stopAndUnloadAsync();
+          const uri = recording.getURI();
+          this._recording = null;
+
+          // Envoyer le chunk de manière non-bloquante
+          if (uri) {
+            this._sendChunkAsync(uri);
+          }
+        } catch (e) {
+          if (this.isActive) {
+            console.log('⚠️ Recording error:', e.message);
+            await this._delay(200);
+          }
+          continue;
+        }
+      } else {
+        // Muté : juste attendre et donner du temps à la lecture
+        await this._delay(CHUNK_DURATION_MS);
+      }
+
+      // === PHASE 2 : LECTURE des chunks reçus ===
+      if (this._playbackQueue.length > 0 && this.isActive) {
+        try {
+          // Désactiver l'enregistrement pour libérer le hardware audio
+          await this._setAudioMode(false);
+
+          // Drop les vieux chunks pour réduire la latence
+          while (this._playbackQueue.length > MAX_QUEUE_SIZE) {
+            this._playbackQueue.shift();
           }
 
-          // Supprimer le fichier temporaire
-          try {
-            await FileSystem.deleteAsync(uri, { idempotent: true });
-          } catch (e) { /* ignore */ }
-        }
-      } catch (e) {
-        if (this.isActive) {
-          console.log('⚠️ Recording chunk error:', e.message);
-          await this._delay(100); // Petite pause avant de réessayer
+          // Jouer les chunks en attente (un par un, de manière synchrone)
+          while (this._playbackQueue.length > 0 && this.isActive) {
+            const chunk = this._playbackQueue.shift();
+            await this._playChunkSync(chunk);
+          }
+        } catch (e) {
+          console.log('⚠️ Playback phase error:', e.message);
         }
       }
     }
+  }
+
+  // ✅ Changer le mode audio (enregistrement vs lecture)
+  async _setAudioMode(recording) {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: recording,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: !recording,
+        playThroughEarpieceAndroid: true, // Mode téléphone pour meilleure qualité appel
+      });
+    } catch (e) {
+      // Ignorer les erreurs non-critiques de changement de mode
+    }
+  }
+
+  // ✅ Envoyer un chunk audio vers Firebase (non-bloquant)
+  async _sendChunkAsync(uri) {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (this.isActive && base64.length > 0) {
+        this._chunkCounter++;
+        const streamRef = ref(database, `couples/${this.coupleId}/calls/audioStream/${this.userId}`);
+        // push non-bloquant — on n'attend pas la confirmation Firebase
+        push(streamRef, {
+          d: base64,
+          t: Date.now(),
+          n: this._chunkCounter,
+        }).catch(e => console.log('⚠️ Push chunk error:', e.message));
+      }
+
+      FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+    } catch (e) {
+      console.log('⚠️ Send chunk error:', e.message);
+    }
+  }
+
+  // ✅ Jouer un chunk audio de manière synchrone (attend la fin avant de continuer)
+  _playChunkSync(chunk) {
+    return new Promise(async (resolve) => {
+      const tempUri = FileSystem.cacheDirectory + `chunk_${Date.now()}_${chunk.n || 0}.m4a`;
+
+      // Timeout de sécurité : ne jamais bloquer plus de 2 secondes
+      const timeout = setTimeout(() => {
+        console.log('⚠️ Chunk playback timeout');
+        resolve();
+      }, CHUNK_DURATION_MS + 1500);
+
+      try {
+        await FileSystem.writeAsStringAsync(tempUri, chunk.d, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: tempUri },
+          { shouldPlay: true, volume: 1.0 }
+        );
+
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.didJustFinish || status.error) {
+            clearTimeout(timeout);
+            sound.unloadAsync().catch(() => {});
+            FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
+            resolve();
+          }
+        });
+      } catch (e) {
+        clearTimeout(timeout);
+        FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
+        resolve();
+      }
+    });
   }
 
   // ✅ Écouter les chunks audio du partenaire
   _startListeningPartnerAudio() {
     if (!this.coupleId || !this.userId || !database) return;
 
-    // Trouver le partnerId — écouter TOUS les streams sauf le mien
     const streamRef = ref(database, `couples/${this.coupleId}/calls/audioStream`);
+    const callStartTime = this._startTime;
 
     this._audioListener = onChildAdded(streamRef, (userSnapshot) => {
       const streamUserId = userSnapshot.key;
       if (streamUserId === this.userId) return; // Ignorer mes propres chunks
 
-      // Écouter les chunks de ce partenaire
+      console.log('🔊 Partner audio stream detected:', streamUserId);
+
+      // Écouter les NOUVEAUX chunks de ce partenaire
       const partnerStreamRef = ref(database, `couples/${this.coupleId}/calls/audioStream/${streamUserId}`);
-      
-      onChildAdded(partnerStreamRef, async (chunkSnapshot) => {
+
+      const chunkListener = onChildAdded(partnerStreamRef, (chunkSnapshot) => {
         if (!this.isActive) return;
-        
+
         const chunk = chunkSnapshot.val();
         if (!chunk?.d) return;
 
-        // Ajouter à la queue de lecture
+        // Ignorer les chunks trop vieux (avant le début de cet appel)
+        if (chunk.t && chunk.t < callStartTime - 2000) return;
+
         this._playbackQueue.push(chunk);
-
-        // Jouer si pas déjà en cours
-        if (!this._isPlaying) {
-          this._playNextChunk();
-        }
       });
+
+      // Sauvegarder la référence pour cleanup
+      this._partnerListeners.push(partnerStreamRef);
     });
-  }
-
-  // ✅ Jouer le prochain chunk audio
-  async _playNextChunk() {
-    if (this._playbackQueue.length === 0) {
-      this._isPlaying = false;
-      return;
-    }
-
-    this._isPlaying = true;
-    const chunk = this._playbackQueue.shift();
-
-    try {
-      // Écrire le chunk base64 dans un fichier temporaire
-      const tempUri = FileSystem.cacheDirectory + `audio_chunk_${chunk.t}_${chunk.n || 0}.m4a`;
-      await FileSystem.writeAsStringAsync(tempUri, chunk.d, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Jouer le fichier
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: tempUri },
-        { shouldPlay: true, volume: 1.0 }
-      );
-      this._currentSound = sound;
-
-      // Attendre la fin de la lecture
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          sound.unloadAsync().catch(() => {});
-          this._currentSound = null;
-          // Supprimer le fichier temporaire
-          FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
-          // Jouer le prochain chunk
-          this._playNextChunk();
-        }
-      });
-    } catch (e) {
-      console.log('⚠️ Playback chunk error:', e.message);
-      this._isPlaying = false;
-      // Essayer le prochain chunk
-      if (this._playbackQueue.length > 0) {
-        setTimeout(() => this._playNextChunk(), 50);
-      }
-    }
   }
 
   // ✅ Toggle mute
@@ -264,15 +292,6 @@ class FirebaseCallService {
       this._recording = null;
     }
 
-    // Arrêter le son en cours
-    if (this._currentSound) {
-      try {
-        await this._currentSound.stopAsync();
-        await this._currentSound.unloadAsync();
-      } catch (e) { /* ignore */ }
-      this._currentSound = null;
-    }
-
     // Retirer les listeners Firebase
     if (this._audioListener && this.coupleId) {
       try {
@@ -281,6 +300,12 @@ class FirebaseCallService {
       } catch (e) { /* ignore */ }
       this._audioListener = null;
     }
+
+    // Retirer les listeners de chunks partenaire
+    for (const listenerRef of this._partnerListeners) {
+      try { off(listenerRef); } catch (e) { /* ignore */ }
+    }
+    this._partnerListeners = [];
 
     // Nettoyer les données audio sur Firebase
     if (this.coupleId && database) {
@@ -301,7 +326,6 @@ class FirebaseCallService {
 
     // Reset state
     this._playbackQueue = [];
-    this._isPlaying = false;
     this._isMuted = false;
     this._chunkCounter = 0;
     this.callType = null;
