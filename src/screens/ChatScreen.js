@@ -918,7 +918,7 @@ export default function ChatScreen({ navigation, route }) {
           delayLongPress={500}
           activeOpacity={0.8}
         >
-          <View style={[styles.messageBubble, isMe ? [styles.bubbleMe, { backgroundColor: theme.secondary }] : styles.bubbleOther]}>
+          <View style={[styles.messageBubble, isMe ? [styles.bubbleMe, { backgroundColor: theme.bubbleMe || theme.secondary }] : [styles.bubbleOther, { backgroundColor: theme.bubbleOther || '#f0f0f0' }]]}>
             {/* Message cité (reply) */}
             {item.replyTo && (
               <View style={[styles.replyPreview, isMe ? styles.replyPreviewMe : styles.replyPreviewOther]}>
@@ -972,12 +972,12 @@ export default function ChatScreen({ navigation, route }) {
                 </View>
               </TouchableOpacity>
             ) : (
-              <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
+              <Text style={[styles.messageText, isMe ? { color: theme.bubbleMeText || '#fff' } : { color: theme.bubbleOtherText || '#333' }]}>
                 {item.content}
               </Text>
             )}
             
-            <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
+            <Text style={[styles.messageTime, isMe ? { color: `${theme.bubbleMeText || '#fff'}99` } : { color: '#999' }]}>
               {formatTime(item.timestamp)}
               {isMe && item.read && ' ✓✓'}
             </Text>
@@ -1045,10 +1045,10 @@ export default function ChatScreen({ navigation, route }) {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        style={{ flex: 1, backgroundColor: '#fff' }}
+        style={{ flex: 1, backgroundColor: theme.chatBg || '#fff' }}
       >
       {/* Messages */}
-      <View style={styles.messagesContainer}>
+      <View style={[styles.messagesContainer, { backgroundColor: theme.chatBg || 'rgba(255,255,255,0.95)' }]}>
         <FlatList
           ref={flatListRef}
           data={messages || []}

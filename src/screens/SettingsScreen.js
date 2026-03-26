@@ -389,7 +389,20 @@ export default function SettingsScreen({ navigation }) {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                   />
-                  <Text style={styles.themeName}>{t.name}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.themeName}>{t.name}</Text>
+                    {/* Aperçu bulles chat */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
+                      <View style={{ backgroundColor: t.chatBg || '#fff', borderRadius: 8, padding: 3, flexDirection: 'row', gap: 3 }}>
+                        <View style={{ backgroundColor: t.bubbleOther || '#f0f0f0', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 8, color: t.bubbleOtherText || '#333' }}>Salut</Text>
+                        </View>
+                        <View style={{ backgroundColor: t.bubbleMe || t.secondary, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 8, color: t.bubbleMeText || '#fff' }}>Coucou</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
                   {theme.id === t.id && <Text style={styles.themeCheck}>✓</Text>}
                 </TouchableOpacity>
               ))}
