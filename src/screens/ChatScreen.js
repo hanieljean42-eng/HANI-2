@@ -120,6 +120,7 @@ export default function ChatScreen({ navigation, route }) {
     remoteStream,
     webrtcState,
     toggleMute: webrtcToggleMute,
+    toggleSpeaker: webrtcToggleSpeaker,
     toggleCamera: webrtcToggleCamera,
     switchCamera,
     setChatActive,
@@ -369,6 +370,10 @@ export default function ChatScreen({ navigation, route }) {
           'call',
           { callType, status: 'missed', duration: 0 }
         );
+        // ✅ Envoyer une notification push "appel manqué" au partenaire
+        try {
+          await notifyCall('missed');
+        } catch (e) { console.log('⚠️ Notif appel manqué:', e.message); }
         setShowCallScreen(false);
         setCallTimer(0);
         if (callTimerRef.current) clearInterval(callTimerRef.current);
@@ -501,18 +506,26 @@ export default function ChatScreen({ navigation, route }) {
           : '';
         
         const iWasCaller = prev.callerId === user?.id;
+        const wasRejected = prev.status === 'rejected';
         let statusText;
+        let callStatus;
         if (wasAccepted) {
           statusText = `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} • ${durationStr}`;
+          callStatus = 'answered';
+        } else if (wasRejected) {
+          statusText = `📵 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} refusé`;
+          callStatus = 'rejected';
         } else if (iWasCaller) {
-          statusText = `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} manqué`;
+          statusText = `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} sans réponse`;
+          callStatus = 'missed';
         } else {
           statusText = `📞 Appel ${callType === 'video' ? 'vidéo' : 'vocal'} manqué`;
+          callStatus = 'missed';
         }
         
         sendMessage(statusText, 'call', {
           callType,
-          status: wasAccepted ? 'answered' : 'missed',
+          status: callStatus,
           duration,
         }).catch(() => {});
         callStartTimeRef.current = null;
@@ -1203,7 +1216,11 @@ export default function ChatScreen({ navigation, route }) {
                 styles.callAvatar,
                 (activeCall?.type || incomingCall?.type) === 'video' && styles.callAvatarVideo
               ]}>
-                <Text style={styles.callAvatarText}>{partner?.avatar || '💕'}</Text>
+                {partner?.profilePhoto ? (
+                  <Image source={{ uri: partner.profilePhoto }} style={styles.callAvatarImage} />
+                ) : (
+                  <Text style={styles.callAvatarText}>{partner?.avatar || '💕'}</Text>
+                )}
               </View>
               <Text style={styles.callPartnerName}>{partner?.name || 'Mon amour'}</Text>
               <Text style={styles.callStatus}>
@@ -1285,7 +1302,11 @@ export default function ChatScreen({ navigation, route }) {
             {(activeCall?.type !== 'video') && (
               <TouchableOpacity
                 style={[styles.callControlButton, isSpeaker && styles.callControlActive]}
-                onPress={() => { setIsSpeaker(!isSpeaker); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                onPress={() => { 
+                  const speaker = webrtcToggleSpeaker();
+                  setIsSpeaker(speaker); 
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); 
+                }}
               >
                 <Ionicons name={isSpeaker ? 'volume-high' : 'volume-medium'} size={26} color="#fff" />
                 <Text style={styles.callControlLabel}>{isSpeaker ? 'Écouteur' : 'HP'}</Text>
@@ -1933,6 +1954,11 @@ const styles = StyleSheet.create({
   },
   callAvatarText: {
     fontSize: 50,
+  },
+  callAvatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   callPartnerName: {
     fontSize: 28,

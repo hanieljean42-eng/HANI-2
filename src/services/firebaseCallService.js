@@ -10,8 +10,8 @@ import * as FileSystem from 'expo-file-system';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, push, onChildAdded, off } from 'firebase/database';
 
-const CHUNK_DURATION_MS = 500; // Durée de chaque chunk audio (ms)
-const MAX_QUEUE_SIZE = 4;      // Max chunks en attente (drop les vieux pour réduire la latence)
+const CHUNK_DURATION_MS = 350; // Durée de chaque chunk audio (ms) — plus court = moins de latence
+const MAX_QUEUE_SIZE = 3;      // Max chunks en attente (drop les vieux pour réduire la latence)
 
 class FirebaseCallService {
   constructor() {
@@ -20,6 +20,7 @@ class FirebaseCallService {
     this.callType = null;
     this.isActive = false;
     this._isMuted = false;
+    this._isSpeaker = false;
     this._recording = null;
     this._playbackQueue = [];
     this._chunkCounter = 0;
@@ -34,6 +35,7 @@ class FirebaseCallService {
     this.coupleId = coupleId;
     this.userId = userId;
     this._isMuted = false;
+    this._isSpeaker = false;
     this._playbackQueue = [];
     this._chunkCounter = 0;
     this._startTime = Date.now();
@@ -166,11 +168,31 @@ class FirebaseCallService {
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
         shouldDuckAndroid: !recording,
-        playThroughEarpieceAndroid: true, // Mode téléphone pour meilleure qualité appel
+        playThroughEarpieceAndroid: !this._isSpeaker, // Mode écouteur sauf si haut-parleur activé
       });
     } catch (e) {
       // Ignorer les erreurs non-critiques de changement de mode
     }
+  }
+
+  // ✅ Toggle haut-parleur (bascule entre écouteur et haut-parleur)
+  toggleSpeaker() {
+    this._isSpeaker = !this._isSpeaker;
+    console.log(`🔊 Haut-parleur ${this._isSpeaker ? 'activé' : 'désactivé'}`);
+    // Appliquer immédiatement le changement de mode audio
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: !this._isSpeaker,
+    }).catch(() => {});
+    return this._isSpeaker;
+  }
+
+  // ✅ Vérifier si haut-parleur actif
+  get isSpeaker() {
+    return this._isSpeaker;
   }
 
   // ✅ Envoyer un chunk audio vers Firebase (non-bloquant)
@@ -327,6 +349,7 @@ class FirebaseCallService {
     // Reset state
     this._playbackQueue = [];
     this._isMuted = false;
+    this._isSpeaker = false;
     this._chunkCounter = 0;
     this.callType = null;
 

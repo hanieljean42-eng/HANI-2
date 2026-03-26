@@ -134,7 +134,27 @@ export function ChatProvider({ children }) {
       if (snapshot.exists()) {
         const callData = snapshot.val();
         if (callData.status === 'ringing' && callData.callerId !== user.id) {
-          // Appel entrant pour moi
+          // ✅ Gestion appels simultanés : si j'ai aussi un appel 'ringing' en cours
+          // Le premier appel (createdAt le plus ancien) gagne
+          if (isCallerRef.current && activeCall?.status === 'ringing' && activeCall?.callerId === user.id) {
+            // Conflit ! Les deux ont appelé en même temps
+            const myCallTime = activeCall?.createdAt || new Date(activeCall?.timestamp).getTime();
+            const theirCallTime = callData.createdAt || new Date(callData.timestamp).getTime();
+            
+            if (theirCallTime <= myCallTime) {
+              // Le partenaire a appelé en premier → j'annule mon appel et j'accepte le sien
+              console.log('📞 Conflit appel simultané → le partenaire a appelé en premier, auto-accept');
+              isCallerRef.current = false;
+              setActiveCall(null);
+              setIncomingCall(callData);
+              return;
+            } else {
+              // J'ai appelé en premier → ignorer son appel (il verra mon appel entrant)
+              console.log('📞 Conflit appel simultané → j\'ai appelé en premier, j\'ignore son appel');
+              return;
+            }
+          }
+          // Appel entrant normal pour moi
           setIncomingCall(callData);
         } else if (callData.status === 'accepted') {
           // Appel accepté — mettre à jour activeCall pour les DEUX côtés
@@ -145,6 +165,15 @@ export function ChatProvider({ children }) {
           if (isCallerRef.current && callData.callerId === user.id) {
             firebaseCallService.startStreaming().catch(e => console.log('⚠️ Streaming start error:', e));
           }
+        } else if (callData.status === 'rejected') {
+          // Appel rejeté par le partenaire
+          console.log('📵 Appel rejeté par le partenaire');
+          setIncomingCall(null);
+          setActiveCall(prev => prev ? { ...prev, status: 'rejected' } : null);
+          setLocalStream(null);
+          setRemoteStream(null);
+          setWebrtcState(null);
+          firebaseCallService.cleanup();
         } else if (callData.status === 'ended') {
           setIncomingCall(null);
           setActiveCall(null);
@@ -324,6 +353,27 @@ export function ChatProvider({ children }) {
   // Lancer un appel audio via Firebase Relay
   const initiateCall = async (type) => {
     if (!couple?.id || !user?.id || !isConfigured || !database) return null;
+
+    // ✅ Vérifier s'il y a déjà un appel actif (évite les appels simultanés)
+    const callRef = ref(database, `couples/${couple.id}/calls/active`);
+    try {
+      const existingCall = await get(callRef);
+      if (existingCall.exists()) {
+        const existingData = existingCall.val();
+        // Si un appel est déjà en cours (ringing ou accepted), ne pas en créer un nouveau
+        if (existingData.status === 'ringing' || existingData.status === 'accepted') {
+          console.log('⚠️ Un appel est déjà en cours, impossible d\'en lancer un autre');
+          // Si c'est le partenaire qui appelle, traiter comme appel entrant
+          if (existingData.callerId !== user.id) {
+            setIncomingCall(existingData);
+          }
+          return null;
+        }
+      }
+    } catch (e) {
+      console.log('⚠️ Vérification appel existant échouée:', e.message);
+    }
+
     const roomId = `HANI2${couple.id.replace(/-/g, '')}${Date.now()}`;
     const callData = {
       callerId: user.id,
@@ -332,13 +382,13 @@ export function ChatProvider({ children }) {
       roomId,
       status: 'ringing',
       timestamp: new Date().toISOString(),
+      createdAt: Date.now(), // ✅ Timestamp numérique pour résoudre les conflits
     };
     try {
       // Nettoyer les anciennes données audio
       const audioStreamRef = ref(database, `couples/${couple.id}/calls/audioStream`);
       await set(audioStreamRef, null);
 
-      const callRef = ref(database, `couples/${couple.id}/calls/active`);
       await set(callRef, callData);
       setActiveCall(callData);
       isCallerRef.current = true;
@@ -385,7 +435,7 @@ export function ChatProvider({ children }) {
     }
   };
 
-  // Rejeter un appel entrant
+  // Rejeter un appel entrant — écrire 'rejected' puis supprimer pour que le caller soit notifié
   const rejectCall = async () => {
     if (!couple?.id) return;
     try {
@@ -394,6 +444,12 @@ export function ChatProvider({ children }) {
       setRemoteStream(null);
       setWebrtcState(null);
       const callRef = ref(database, `couples/${couple.id}/calls/active`);
+      // Écrire 'rejected' pour que le caller détecte le refus
+      if (incomingCall) {
+        await set(callRef, { ...incomingCall, status: 'rejected' });
+        // Petit délai pour que le caller puisse lire le status
+        await new Promise(r => setTimeout(r, 500));
+      }
       await set(callRef, null);
       setIncomingCall(null);
     } catch (error) {
@@ -422,6 +478,11 @@ export function ChatProvider({ children }) {
   // Toggle mute micro (Firebase Relay)
   const toggleMute = () => {
     return firebaseCallService.toggleMute();
+  };
+
+  // Toggle haut-parleur (Firebase Relay)
+  const toggleSpeaker = () => {
+    return firebaseCallService.toggleSpeaker();
   };
 
   // Toggle caméra (non supporté en mode relay audio)
@@ -477,6 +538,7 @@ export function ChatProvider({ children }) {
     rejectCall,
     endCall,
     toggleMute,
+    toggleSpeaker,
     toggleCamera,
     switchCamera,
     setChatActive,

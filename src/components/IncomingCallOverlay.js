@@ -9,6 +9,7 @@ import {
   Vibration,
   Dimensions,
   Platform,
+  Image,
 } from 'react-native';
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
@@ -177,7 +178,11 @@ export default function IncomingCallOverlay() {
       <View style={styles.container}>
         {/* Info appelant */}
         <View style={styles.callerInfo}>
-          <Text style={styles.callIcon}>{isVideo ? '🎥' : '📞'}</Text>
+          {partner?.profilePhoto ? (
+            <Image source={{ uri: partner.profilePhoto }} style={styles.callerPhoto} />
+          ) : (
+            <Text style={styles.callIcon}>{isVideo ? '🎥' : '📞'}</Text>
+          )}
           <View style={styles.callerTextContainer}>
             <Text style={styles.callLabel}>
               {isVideo ? 'Appel vidéo entrant' : 'Appel vocal entrant'}
@@ -234,6 +239,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 18,
+  },
+  callerPhoto: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 14,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 107, 157, 0.5)',
   },
   callIcon: {
     fontSize: 40,

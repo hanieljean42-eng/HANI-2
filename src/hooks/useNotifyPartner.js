@@ -291,11 +291,19 @@ export const useNotifyPartner = () => {
 
   const notifyCall = async (type) => {
     if (!notifications?.sendPushNotification || !user?.name) return;
-    await notifications.sendPushNotification(
-      type === 'video' ? '🎥 Appel vidéo entrant' : '📞 Appel vocal entrant',
-      `${user.name} vous appelle... Ouvrez l'application pour répondre 💕`,
-      { type: 'incoming_call', callType: type }
-    );
+    if (type === 'missed') {
+      await notifications.sendPushNotification(
+        '📵 Appel manqué',
+        `Vous avez manqué un appel de ${user.name}. Rappelez-le ! 💕`,
+        { type: 'missed_call' }
+      );
+    } else {
+      await notifications.sendPushNotification(
+        type === 'video' ? '🎥 Appel vidéo entrant' : '📞 Appel vocal entrant',
+        `${user.name} vous appelle... Ouvrez l'application pour répondre 💕`,
+        { type: 'incoming_call', callType: type }
+      );
+    }
   };
 
   return {
