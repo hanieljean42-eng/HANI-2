@@ -323,84 +323,55 @@ export function NotificationProvider({ children }) {
     };
   }, [coupleId, userId]);
 
-  // ✅ SYSTÈME NOTIFICATIONS VIA FIREBASE — Écouter les notifications entrantes
-  // Même principe que les appels : quand le partenaire envoie une notif, elle est écrite sur Firebase
-  // Le listener local la détecte et fire une notification locale immédiate
+  // 🔇 CANAL FIREBASE DÉSACTIVÉ — Notifications passent uniquement par Expo Push API
+  // Le listener Firebase pendingNotifications est en pause.
+  // Pour réactiver : décommenter le useEffect ci-dessous.
+  /*
   useEffect(() => {
     if (!coupleId || !userId || !isConfigured || !database) return;
-
     console.log('👂 Écoute notifications Firebase pour:', userId);
     const notifsRef = ref(database, `couples/${coupleId}/pendingNotifications/${userId}`);
-    
-    // ✅ Timestamp de démarrage du listener — seules les notifs APRÈS ce moment sont affichées
     const listenerStartTime = Date.now();
-
-    // Nettoyer les vieilles notifications (> 2 min) sans bloquer
     get(notifsRef).then(snapshot => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const now = Date.now();
         Object.entries(data).forEach(([key, notif]) => {
-          if (notif.createdAt && (now - notif.createdAt) > 120000) { // > 2 min
+          if (notif.createdAt && (now - notif.createdAt) > 120000) {
             remove(ref(database, `couples/${coupleId}/pendingNotifications/${userId}/${key}`)).catch(() => {});
           }
         });
       }
     }).catch(() => {});
-
-    // Écouter les NOUVELLES notifications ajoutées
     const unsubscribe = onChildAdded(notifsRef, async (snapshot) => {
       const notif = snapshot.val();
       const notifKey = snapshot.key;
       if (!notif || !notif.title) return;
-
-      // ✅ Ignorer les notifs créées AVANT le démarrage du listener (chargement initial)
-      // Mais traiter celles créées dans les 10 dernières secondes (récentes non-vues)
       if (notif.createdAt && notif.createdAt < (listenerStartTime - 10000)) {
-        // Notification ancienne → supprimer silencieusement
         remove(ref(database, `couples/${coupleId}/pendingNotifications/${userId}/${notifKey}`)).catch(() => {});
         return;
       }
-
       console.log('🔔 Notification Firebase reçue:', notif.title, notif.type);
-
-      // Déterminer le channelId selon le type
       const channelId = getChannelForType(notif.type);
-
-      // Fire notification locale immédiate
       try {
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: notif.title,
-            body: notif.body || '',
-            sound: 'default',
-            priority: notif.type === 'incoming_call' 
-              ? Notifications.AndroidNotificationPriority.MAX 
-              : Notifications.AndroidNotificationPriority.HIGH,
+            title: notif.title, body: notif.body || '', sound: 'default',
+            priority: notif.type === 'incoming_call' ? Notifications.AndroidNotificationPriority.MAX : Notifications.AndroidNotificationPriority.HIGH,
             ...(Platform.OS === 'android' ? { channelId } : {}),
             data: notif.data || { type: notif.type },
           },
           trigger: null,
         });
-        console.log('✅ Notification locale affichée:', notif.title);
-      } catch (e) {
-        console.log('⚠️ Erreur notification locale Firebase:', e.message);
-      }
-
-      // Supprimer la notification de Firebase après affichage
+      } catch (e) { console.log('⚠️ Erreur notification locale Firebase:', e.message); }
       remove(ref(database, `couples/${coupleId}/pendingNotifications/${userId}/${notifKey}`)).catch(() => {});
     });
-
     firebaseNotifListenerRef.current = unsubscribe;
-
     return () => {
-      console.log('🔕 Arrêt écoute notifications Firebase');
-      if (firebaseNotifListenerRef.current) {
-        firebaseNotifListenerRef.current();
-        firebaseNotifListenerRef.current = null;
-      }
+      if (firebaseNotifListenerRef.current) { firebaseNotifListenerRef.current(); firebaseNotifListenerRef.current = null; }
     };
   }, [coupleId, userId]);
+  */
 
   // Fonction pour demander les permissions (Android 13+ compatible)
   async function registerForPushNotificationsAsync() {
@@ -619,73 +590,45 @@ export function NotificationProvider({ children }) {
       } catch (e) { /* ignore */ }
     }
 
-    // ✅ Lancer Firebase + Expo Push EN PARALLÈLE (pas séquentiellement)
-    const promises = [];
-
-    // Canal 1: Écrire sur Firebase pendingNotifications (fonctionne quand l'app est ouverte)
-    if (partnerId) {
-      promises.push(
-        push(ref(database, `couples/${currentCouple.id}/pendingNotifications/${partnerId}`), {
-          title,
-          body,
-          type: data?.type || 'default',
-          data: data,
-          createdAt: Date.now(),
-          senderId: currentUser.id,
-          senderName: currentUser.name || 'Partenaire',
-        }).then(() => {
-          console.log('✅ Notif Firebase écrite pour:', partnerId);
-        }).catch(e => {
-          console.log('⚠️ Erreur Firebase notif:', e.message);
-        })
-      );
-    }
-
-    // Canal 2: Envoyer via Expo Push Service (fonctionne en arrière-plan)
+    // ✅ Envoi UNIQUEMENT via Expo Push API (Canal Firebase désactivé)
     if (tokenToUse) {
       const channelId = getChannelForType(data?.type);
-      promises.push(
-        (async () => {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-            
-            const response = await fetch('https://exp.host/--/api/v2/push/send', {
-              method: 'POST',
-              headers: {
-                Accept: 'application/json',
-                'Accept-encoding': 'gzip, deflate',
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                to: tokenToUse,
-                sound: 'default',
-                title,
-                body,
-                data,
-                priority: 'high',
-                channelId,
-              }),
-              signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
-            const result = await response.json();
-            if (response.ok) {
-              console.log('✅ Push Expo envoyé');
-            } else {
-              console.log('⚠️ Push Expo erreur:', result);
-            }
-          } catch (e) {
-            console.log('⚠️ Push Expo timeout/erreur:', e.message);
-          }
-        })()
-      );
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Accept-encoding': 'gzip, deflate',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: tokenToUse,
+            sound: 'default',
+            title,
+            body,
+            data,
+            priority: 'high',
+            channelId,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        const result = await response.json();
+        if (response.ok) {
+          console.log('✅ Push Expo envoyé');
+        } else {
+          console.log('⚠️ Push Expo erreur:', result);
+        }
+      } catch (e) {
+        console.log('⚠️ Push Expo timeout/erreur:', e.message);
+      }
     } else {
-      console.log('⚠️ Pas de token push — Firebase uniquement');
+      console.log('⚠️ Pas de token push partenaire — notification non envoyée');
     }
 
-    // Attendre les deux en parallèle
-    await Promise.allSettled(promises);
     return true;
   };
 
