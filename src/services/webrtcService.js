@@ -4,15 +4,20 @@
 // Signaling via Firebase Realtime Database
 // ============================================================
 
-import {
-  RTCPeerConnection,
-  RTCSessionDescription,
-  RTCIceCandidate,
-  mediaDevices,
-} from 'react-native-webrtc';
 import { Audio } from 'expo-av';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, get, push, onValue, onChildAdded, off } from 'firebase/database';
+
+let RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices;
+try {
+  const webrtc = require('react-native-webrtc');
+  RTCPeerConnection     = webrtc.RTCPeerConnection;
+  RTCSessionDescription = webrtc.RTCSessionDescription;
+  RTCIceCandidate       = webrtc.RTCIceCandidate;
+  mediaDevices          = webrtc.mediaDevices;
+} catch (e) {
+  console.warn('⚠️ react-native-webrtc non disponible:', e.message);
+}
 
 // ============================================================
 // Configuration TURN — OBLIGATOIRE pour appels entre réseaux
@@ -101,6 +106,7 @@ class WebRTCService {
   }
 
   async getLocalStream(type = 'audio') {
+    if (!mediaDevices) { console.warn('⚠️ WebRTC indisponible'); return null; }
     this.callType = type;
     try {
       // ✅ Demander la permission micro avant getUserMedia
@@ -142,6 +148,7 @@ class WebRTCService {
   }
 
   createPeerConnection() {
+    if (!RTCPeerConnection) { console.warn('⚠️ WebRTC indisponible'); return null; }
     try {
       const iceConfig = {
         iceServers: this._cachedIceServers || FALLBACK_ICE_SERVERS,
