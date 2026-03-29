@@ -3652,7 +3652,12 @@ export default function GamesScreen() {
               <View style={styles.todBottomBar}>
                 {/* Résumé du choix du partenaire */}
                 <Text style={styles.todBottomLabel}>
-                  {todPartnerResponse?.includes('passer') ? `😅 ${partnerName} a passé cette action` : `✅ ${partnerName} a fait l'action !`}
+                  {truthOrDare?.type === 'truth'
+                    ? `💬 ${partnerName} a répondu !`
+                    : (todPartnerResponse?.response?.includes('passer') || todPartnerResponse?.actionChoice === 'passe'
+                        ? `😅 ${partnerName} a passé cette action`
+                        : `✅ ${partnerName} a fait l'action !`)
+                  }
                 </Text>
 
                 {/* Zone discussion */}
