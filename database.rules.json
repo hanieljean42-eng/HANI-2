@@ -1,4 +1,4 @@
-﻿{
+{
     "rules":  {
                   "coupleCodes": {
                       ".read": "auth != null",
@@ -10,8 +10,8 @@
                   "couples":  {
                                   ".read": "auth != null",
                                   "$coupleId":  {
-                                                    ".read":  "auth != null",
-                                                    ".write":  "auth != null",
+                                                    ".read":  "auth != null && (data.child('members').child(auth.uid).exists() || !data.child('members').exists())",
+                                                    ".write":  "auth != null && (data.child('members').child(auth.uid).exists() || !data.child('members').exists())",
                                                     "code":  {
                                                                  ".validate":  "newData.isString() && newData.val().length >= 4 && newData.val().length <= 16"
                                                              },
@@ -87,13 +87,13 @@
                                                                                                      ".write":  "auth != null",
                                                                                                      ".validate":  "newData.hasChildren([\"senderId\",\"timestamp\",\"type\"])",
                                                                                                      "senderId":  {
-                                                                                                                      ".validate":  "newData.isString() && newData.val() == auth.uid"
+                                                                                                                      ".validate":  "newData.isString() && (newData.val() == auth.uid || newData.val() == data.val())"
                                                                                                                   },
                                                                                                      "senderName":  {
                                                                                                                         ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 100)"
                                                                                                                     },
                                                                                                      "type":  {
-                                                                                                                  ".validate":  "newData.isString() && newData.val().matches(/^(text|image|voice|sticker)$/)"
+                                                                                                                  ".validate":  "newData.isString() && newData.val().matches(/^(text|image|voice|sticker|call)$/)"
                                                                                                               },
                                                                                                      "content":  {
                                                                                                                      ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 10000)"
@@ -112,7 +112,16 @@
                                                                                                                  },
                                                                                                      "metadata":  {
                                                                                                                       ".validate":  "!newData.exists() || newData.hasChildren()"
-                                                                                                                  }
+                                                                                                                  },
+                                                                                                     "deleted":  {
+                                                                                                                     ".validate":  "!newData.exists() || newData.isBoolean()"
+                                                                                                                 },
+                                                                                                     "deletedAt":  {
+                                                                                                                       ".validate":  "!newData.exists() || (newData.isString() && newData.val().length <= 30)"
+                                                                                                                   },
+                                                                                                     "deletedBy":  {
+                                                                                                                       ".validate":  "!newData.exists() || (newData.isString() && newData.val() == auth.uid)"
+                                                                                                                   }
                                                                                                  }
                                                                               },
                                                                  "typing":  {
@@ -135,6 +144,10 @@
                                                                                  ".read":  "auth != null",
                                                                                  ".write":  "auth != null"
                                                                              },
+                                                                  "audioStream":  {
+                                                                                     ".read":  "auth != null",
+                                                                                     ".write":  "auth != null"
+                                                                                 },
                                                                   "sdp":  {
                                                                               ".read":  "auth != null",
                                                                               ".write":  "auth != null"

@@ -1098,7 +1098,7 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.deleteAccountButtonText}>🗑️ Supprimer mon compte</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>HANI 2 v2.5.0 (Build 26 mars 2026) - by Djeble Haniel Henoc 💕</Text>
+      <Text style={styles.version}>HANI 2 - Créé avec ❤️ par Djeble Haniel Henoc</Text>
     </View>
   );
 
@@ -1732,9 +1732,6 @@ export default function ProfileScreen({ navigation }) {
         gradientColors={['#8B5CF6', '#C44569']}
       >
         <View style={styles.aboutContent}>
-          <View style={styles.aboutVersionBadge}>
-            <Text style={styles.aboutVersionText}>Version 2.5.0</Text>
-          </View>
           
           <View style={styles.aboutSection}>
             <Text style={styles.aboutSectionTitle}>👨‍💻 Créateur</Text>

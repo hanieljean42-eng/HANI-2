@@ -428,7 +428,6 @@ export default function GuideScreen({ navigation }) {
               HANI 2 est fait avec amour pour votre couple. Si vous avez des questions, 
               n'hésitez pas à nous contacter via la section « À propos » dans les paramètres.
             </Text>
-            <Text style={styles.footerVersion}>HANI 2 v1.0.0</Text>
           </View>
 
           <View style={{ height: 100 }} />

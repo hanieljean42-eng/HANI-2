@@ -3,10 +3,10 @@ import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, onValue, off, push, query as fbQuery, limitToLast, get } from 'firebase/database';
+import { ref, set, onValue, off, push, query as fbQuery, limitToLast, get, update } from 'firebase/database';
 import { useAuth } from './AuthContext';
 import { encryptMessageObject, decryptMessageObject } from '../utils/encryption';
-import firebaseCallService from '../services/firebaseCallService';
+import webrtcService from '../services/webrtcService';
 
 const ChatContext = createContext({});
 
@@ -31,6 +31,43 @@ export function ChatProvider({ children }) {
   const pendingOfferListenerRef = useRef(null);
   const lastMessageTimestampRef = useRef(null); // Pour détecter les NOUVEAUX messages
   const isChatActiveRef = useRef(false); // true si l'utilisateur est sur l'écran chat
+
+  // ✅ Synchroniser les messages en attente (queue hors-ligne → Firebase)
+  const syncingRef = useRef(false);
+  const syncPendingMessages = async (coupleId) => {
+    if (syncingRef.current || !isConfigured || !database) return;
+    try {
+      const raw = await AsyncStorage.getItem('@pendingMessages');
+      const queue = raw ? JSON.parse(raw) : [];
+      if (queue.length === 0) return;
+
+      syncingRef.current = true;
+      console.log(`📤 Sync ${queue.length} messages en attente...`);
+      const remaining = [];
+
+      for (const item of queue) {
+        if (item.coupleId !== coupleId) { remaining.push(item); continue; }
+        try {
+          const messagesRef = ref(database, `couples/${coupleId}/chat/messages`);
+          const newRef = push(messagesRef);
+          await set(newRef, item.message);
+        } catch (e) {
+          remaining.push(item); // garder pour la prochaine sync
+        }
+      }
+
+      await AsyncStorage.setItem('@pendingMessages', JSON.stringify(remaining));
+      // Retirer les messages pending de la liste locale
+      if (remaining.length < queue.length) {
+        setMessages(prev => prev.filter(m => !m._pending));
+      }
+      console.log(`✅ Sync terminée, ${remaining.length} restants`);
+    } catch (e) {
+      console.log('⚠️ Erreur sync pending:', e.message);
+    } finally {
+      syncingRef.current = false;
+    }
+  };
 
   // Écouter les messages Firebase
   useEffect(() => {
@@ -100,6 +137,9 @@ export function ChatProvider({ children }) {
         
         // Sauvegarder localement
         AsyncStorage.setItem('@chatMessages', JSON.stringify(messagesArray));
+
+        // ✅ Synchroniser les messages en attente (queue hors-ligne)
+        syncPendingMessages(couple.id);
       }
     });
 
@@ -161,9 +201,18 @@ export function ChatProvider({ children }) {
           setActiveCall(callData);
           setIncomingCall(null);
           
-          // Si on est l'appelant, démarrer le streaming audio maintenant que l'appel est accepté
+          // Si on est l'appelant, initialiser WebRTC et créer l'offre
           if (isCallerRef.current && callData.callerId === user.id) {
-            firebaseCallService.startStreaming().catch(e => console.log('⚠️ Streaming start error:', e));
+            webrtcService.init(couple.id, user.id);
+            webrtcService.onConnectionStateChange = (state) => setWebrtcState(state);
+            webrtcService.onLocalStream = (stream) => setLocalStream(stream);
+            webrtcService.onRemoteStream = (stream) => setRemoteStream(stream);
+            webrtcService.getLocalStream(callData.type || 'audio').then(stream => {
+              if (stream) {
+                webrtcService.createPeerConnection();
+                webrtcService.createOffer();
+              }
+            }).catch(e => console.log('⚠️ WebRTC caller setup error:', e));
           }
         } else if (callData.status === 'rejected') {
           // Appel rejeté par le partenaire
@@ -173,14 +222,14 @@ export function ChatProvider({ children }) {
           setLocalStream(null);
           setRemoteStream(null);
           setWebrtcState(null);
-          firebaseCallService.cleanup();
+          webrtcService.cleanup().catch(() => {});
         } else if (callData.status === 'ended') {
           setIncomingCall(null);
           setActiveCall(null);
           setLocalStream(null);
           setRemoteStream(null);
           setWebrtcState(null);
-          firebaseCallService.cleanup();
+          webrtcService.cleanup().catch(() => {});
         }
       } else {
         // Noeud supprimé = appel terminé
@@ -189,7 +238,7 @@ export function ChatProvider({ children }) {
         setLocalStream(null);
         setRemoteStream(null);
         setWebrtcState(null);
-        firebaseCallService.cleanup();
+        webrtcService.cleanup().catch(() => {});
       }
     });
 
@@ -263,7 +312,21 @@ export function ChatProvider({ children }) {
           }
         };
 
-        return attemptSend();
+        try {
+          return await attemptSend();
+        } catch (sendError) {
+          // ✅ Sauvegarder en queue hors-ligne si l'envoi échoue
+          console.warn('📱 Sauvegarde du message en queue hors-ligne');
+          const localMessage = { id: 'pending_' + Date.now().toString(), ...message, _pending: true };
+          const updated = [...messages, localMessage];
+          setMessages(updated);
+          // Ajouter à la queue de messages en attente
+          const pendingQueue = JSON.parse(await AsyncStorage.getItem('@pendingMessages') || '[]');
+          pendingQueue.push({ coupleId: couple.id, message });
+          await AsyncStorage.setItem('@pendingMessages', JSON.stringify(pendingQueue));
+          await AsyncStorage.setItem('@chatMessages', JSON.stringify(updated));
+          return { success: true, id: localMessage.id, pending: true };
+        }
       } else {
         // Mode local (Firebase pas configuré)
         const localMessage = { id: Date.now().toString(), ...message };
@@ -279,7 +342,7 @@ export function ChatProvider({ children }) {
     }
   };
 
-  // Marquer les messages comme lus
+  // Marquer les messages comme lus (batch update — une seule écriture Firebase)
   const markAsRead = async () => {
     if (!couple?.id || !user?.id || !isConfigured || !database) return;
 
@@ -288,10 +351,14 @@ export function ChatProvider({ children }) {
         m => m.senderId !== user.id && !m.read
       );
 
-      for (const msg of unreadMessages) {
-        const msgRef = ref(database, `couples/${couple.id}/chat/messages/${msg.id}/read`);
-        await set(msgRef, true);
-      }
+      if (unreadMessages.length === 0) return;
+
+      // ✅ Batch update : une seule écriture Firebase au lieu de N
+      const updates = {};
+      unreadMessages.forEach(msg => {
+        updates[`couples/${couple.id}/chat/messages/${msg.id}/read`] = true;
+      });
+      await update(ref(database), updates);
       
       setUnreadCount(0);
     } catch (error) {
@@ -385,17 +452,15 @@ export function ChatProvider({ children }) {
       createdAt: Date.now(), // ✅ Timestamp numérique pour résoudre les conflits
     };
     try {
-      // Nettoyer les anciennes données audio
-      const audioStreamRef = ref(database, `couples/${couple.id}/calls/audioStream`);
-      await set(audioStreamRef, null);
+      // Nettoyer les anciennes données SDP/ICE
+      const sdpCleanRef = ref(database, `couples/${couple.id}/calls/sdp`);
+      const iceCleanRef = ref(database, `couples/${couple.id}/calls/ice`);
+      await set(sdpCleanRef, null);
+      await set(iceCleanRef, null);
 
       await set(callRef, callData);
       setActiveCall(callData);
       isCallerRef.current = true;
-
-      // Initialiser Firebase Call Service côté appelant
-      firebaseCallService.init(couple.id, user.id);
-      firebaseCallService.onConnectionStateChange = (state) => setWebrtcState(state);
 
       return roomId;
     } catch (error) {
@@ -421,12 +486,24 @@ export function ChatProvider({ children }) {
       setIncomingCall(null);
       isCallerRef.current = false;
 
-      // Initialiser Firebase Call Service côté appelé
-      firebaseCallService.init(couple.id, user.id);
-      firebaseCallService.onConnectionStateChange = (state) => setWebrtcState(state);
-      
-      // Démarrer le streaming audio (les 2 côtés)
-      await firebaseCallService.startStreaming();
+      // Initialiser WebRTC côté appelé
+      webrtcService.init(couple.id, user.id);
+      webrtcService.onConnectionStateChange = (state) => setWebrtcState(state);
+      webrtcService.onLocalStream = (stream) => setLocalStream(stream);
+      webrtcService.onRemoteStream = (stream) => setRemoteStream(stream);
+
+      const rtcStream = await webrtcService.getLocalStream(incomingCall.type || 'audio');
+      if (rtcStream) {
+        webrtcService.createPeerConnection();
+        // Attendre l'offre SDP de l'appelant
+        const offerRef = ref(database, `couples/${couple.id}/calls/sdp/offer`);
+        const unsubOffer = onValue(offerRef, async (snap) => {
+          if (snap.exists() && webrtcService.peerConnection && !webrtcService.peerConnection.remoteDescription) {
+            unsubOffer();
+            await webrtcService.handleOffer(snap.val()).catch(e => console.log('⚠️ handleOffer error:', e));
+          }
+        });
+      }
 
       return roomId;
     } catch (error) {
@@ -439,7 +516,7 @@ export function ChatProvider({ children }) {
   const rejectCall = async () => {
     if (!couple?.id) return;
     try {
-      await firebaseCallService.cleanup();
+      webrtcService.cleanup().catch(() => {});
       setLocalStream(null);
       setRemoteStream(null);
       setWebrtcState(null);
@@ -461,7 +538,7 @@ export function ChatProvider({ children }) {
   const endCall = async () => {
     if (!couple?.id) return;
     try {
-      await firebaseCallService.cleanup();
+      await webrtcService.cleanup();
       setLocalStream(null);
       setRemoteStream(null);
       setWebrtcState(null);
@@ -477,33 +554,43 @@ export function ChatProvider({ children }) {
 
   // Toggle mute micro (Firebase Relay)
   const toggleMute = () => {
-    return firebaseCallService.toggleMute();
+    return webrtcService.toggleMute();
   };
 
   // Toggle haut-parleur (Firebase Relay)
   const toggleSpeaker = () => {
-    return firebaseCallService.toggleSpeaker();
+    return webrtcService.toggleSpeaker();
   };
 
-  // Toggle caméra (non supporté en mode relay audio)
+  // Toggle caméra (WebRTC)
   const toggleCamera = () => {
-    return false;
+    return webrtcService.toggleCamera();
   };
 
-  // Basculer caméra (non supporté en mode relay audio)
+  // Basculer caméra avant/arrière (WebRTC)
   const switchCamera = async () => {
-    // Non supporté
+    return webrtcService.switchCamera();
   };
 
-  // Supprimer un message
+  // Supprimer un message (soft delete — le partenaire voit "Message supprimé")
   const deleteMessage = async (messageId) => {
-    if (!couple?.id || !isConfigured || !database) return;
+    if (!couple?.id || !user?.id || !isConfigured || !database) return;
 
     try {
+      // ✅ Soft delete : marquer comme supprimé au lieu d'effacer
       const msgRef = ref(database, `couples/${couple.id}/chat/messages/${messageId}`);
-      await set(msgRef, null);
+      await update(ref(database), {
+        [`couples/${couple.id}/chat/messages/${messageId}/deleted`]: true,
+        [`couples/${couple.id}/chat/messages/${messageId}/deletedAt`]: new Date().toISOString(),
+        [`couples/${couple.id}/chat/messages/${messageId}/deletedBy`]: user.id,
+      });
       
-      const updated = messages.filter(m => m.id !== messageId);
+      // Mettre à jour localement
+      const updated = messages.map(m => 
+        m.id === messageId 
+          ? { ...m, deleted: true, deletedAt: new Date().toISOString(), deletedBy: user.id }
+          : m
+      );
       setMessages(updated);
       await AsyncStorage.setItem('@chatMessages', JSON.stringify(updated));
     } catch (error) {

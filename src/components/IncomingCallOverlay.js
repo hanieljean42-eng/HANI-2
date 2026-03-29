@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
@@ -53,7 +54,21 @@ export default function IncomingCallOverlay() {
       console.log('⚠️ Erreur notification sonnerie:', e.message);
     }
 
-    // 2. Audio en boucle via expo-av (sonnerie continue fiable)
+    // 2. Notification immédiate avec son (fonctionne toujours, même hors-ligne)
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '📞 Appel entrant',
+          body: 'Quelqu\'un vous appelle...',
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          ...(Platform.OS === 'android' ? { channelId: 'calls' } : {}),
+        },
+        trigger: null,
+      });
+    } catch (e) { /* ignore */ }
+
+    // 3. Audio en boucle via expo-av (sonnerie continue — amélioration)
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -61,7 +76,6 @@ export default function IncomingCallOverlay() {
         staysActiveInBackground: true,
         shouldDuckAndroid: false,
       });
-      // Générer un son de sonnerie simple via une URL data
       const { sound } = await Audio.Sound.createAsync(
         { uri: 'https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg' },
         { isLooping: true, volume: 1.0, shouldPlay: true }
@@ -69,11 +83,19 @@ export default function IncomingCallOverlay() {
       ringSoundRef.current = sound;
       console.log('🔔 Sonnerie audio démarrée');
     } catch (e) {
-      console.log('⚠️ Fallback: Audio sonnerie non dispo, utilisant notifications:', e.message);
+      console.log('⚠️ Audio sonnerie non dispo (hors-ligne?), notifications utilisées:', e.message);
     }
 
-    // 3. Notifications répétées (fallback si audio échoue)
+    // 3. Notifications répétées (fallback si audio échoue) — max 5 pour éviter le spam
+    let ringNotifCount = 0;
+    const MAX_RING_NOTIFS = 5;
     ringIntervalRef.current = setInterval(async () => {
+      if (ringNotifCount >= MAX_RING_NOTIFS) {
+        clearInterval(ringIntervalRef.current);
+        ringIntervalRef.current = null;
+        return;
+      }
+      ringNotifCount++;
       try {
         await Notifications.scheduleNotificationAsync({
           content: {
@@ -154,6 +176,14 @@ export default function IncomingCallOverlay() {
   const handleAccept = async () => {
     Vibration.cancel();
     await stopRinging();
+    // ✅ Demander la permission micro avant d'accepter (callee)
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('🎤 Permission requise', 'L\'accès au microphone est nécessaire pour répondre à l\'appel.');
+        return;
+      }
+    } catch (e) { /* continue */ }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await acceptCall();
     navigate('Chat', { fromCallOverlay: true });

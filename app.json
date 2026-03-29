@@ -2,7 +2,7 @@
   "expo": {
     "name": "HANI 2",
     "slug": "loveapp2026",
-    "version": "2.5.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -19,7 +19,12 @@
       "bundleIdentifier": "com.loveapp.couple2026",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSUserNotificationsUsageDescription": "Nous utilisons les notifications pour vous alerter des messages de votre partenaire."
+        "NSUserNotificationsUsageDescription": "Nous utilisons les notifications pour vous alerter des messages de votre partenaire.",
+        "NSMicrophoneUsageDescription": "L'accès au microphone est nécessaire pour les appels vocaux et les messages vocaux.",
+        "NSCameraUsageDescription": "L'accès à la caméra est nécessaire pour les appels vidéo et envoyer des preuves photo/vidéo.",
+        "NSPhotoLibraryUsageDescription": "L'accès à vos photos est nécessaire pour envoyer des images et des vidéos à votre partenaire.",
+        "NSPhotoLibraryAddUsageDescription": "L'accès à votre photothèque est nécessaire pour sauvegarder vos souvenirs.",
+        "UIBackgroundModes": ["audio", "voip"]
       },
       "bitcode": false
     },
@@ -38,6 +43,7 @@
         "android.permission.WAKE_LOCK",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA",
@@ -46,7 +52,8 @@
         "android.permission.INTERNET",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.BLUETOOTH"
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT"
       ],
       "newArchEnabled": true
     },
@@ -59,8 +66,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "L'application a besoin d'accéder à vos photos pour ajouter des souvenirs et des images.",
-          "cameraPermission": "L'application a besoin d'accéder à votre caméra pour prendre des photos."
+          "photosPermission": "L'application a besoin d'accéder à vos photos et vidéos pour les envoyer à votre partenaire.",
+          "cameraPermission": "L'application a besoin d'accéder à votre caméra pour prendre des photos et vidéos.",
+          "microphonePermission": "L'application a besoin du microphone pour enregistrer des vidéos."
         }
       ],
       [
@@ -72,7 +80,8 @@
           "mode": "production"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "notification": {
       "icon": "./assets/icon.png",

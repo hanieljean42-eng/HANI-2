@@ -30,11 +30,18 @@ export function GameProvider({ children }) {
   const [pendingGameInvite, setPendingGameInvite] = useState(null);
   const [hasActiveSession, setHasActiveSession] = useState(false);
 
-  // Charger le playerId et vérifier Firebase au démarrage
+  // ✅ Utiliser user.id comme playerId (cohérent entre appareils)
   useEffect(() => {
-    generatePlayerId();
+    if (user?.id) {
+      setMyPlayerId(user.id);
+      // Migrer l'ancien playerId random vers user.id dans AsyncStorage
+      AsyncStorage.setItem('@playerId', user.id).catch(() => {});
+    } else {
+      // Fallback si pas encore connecté
+      generatePlayerId();
+    }
     setIsFirebaseReady(isConfigured && database !== null);
-  }, []);
+  }, [user?.id]);
   
   // Écouter automatiquement les sessions de jeu quand on a un coupleId
   useEffect(() => {
@@ -107,6 +114,12 @@ export function GameProvider({ children }) {
 
   const generatePlayerId = async () => {
     try {
+      // ✅ Utiliser user.id en priorité, sinon fallback sur l'ancien système
+      if (user?.id) {
+        setMyPlayerId(user.id);
+        await AsyncStorage.setItem('@playerId', user.id);
+        return;
+      }
       let playerId = await AsyncStorage.getItem('@playerId');
       if (!playerId) {
         playerId = 'player_' + Date.now().toString(36) + Math.random().toString(36).substr(2);

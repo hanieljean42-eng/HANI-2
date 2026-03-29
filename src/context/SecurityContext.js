@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { hashPin, verifyPin as verifyPinHash } from '../utils/encryption';
 
@@ -32,7 +33,20 @@ export function SecurityProvider({ children }) {
 
   const loadSecuritySettings = async () => {
     try {
-      const savedPin = await AsyncStorage.getItem('@pinCode');
+      // ✅ Lire le PIN depuis SecureStore (chiffré par l'OS)
+      let savedPin = await SecureStore.getItemAsync('pinCode');
+      
+      // Migration : si le PIN est encore dans AsyncStorage, le déplacer vers SecureStore
+      if (!savedPin) {
+        const legacyPin = await AsyncStorage.getItem('@pinCode');
+        if (legacyPin) {
+          await SecureStore.setItemAsync('pinCode', legacyPin);
+          await AsyncStorage.removeItem('@pinCode');
+          savedPin = legacyPin;
+          console.log('🔐 PIN migré vers SecureStore');
+        }
+      }
+
       const savedBiometrics = await AsyncStorage.getItem('@useBiometrics');
       const savedPrivateContent = await AsyncStorage.getItem('@privateContent');
       
@@ -54,7 +68,8 @@ export function SecurityProvider({ children }) {
   const setupPin = async (newPin) => {
     try {
       const hashedPin = hashPin(newPin);
-      await AsyncStorage.setItem('@pinCode', hashedPin);
+      // ✅ Stocker dans SecureStore (chiffré par l'OS)
+      await SecureStore.setItemAsync('pinCode', hashedPin);
       setPinCode(hashedPin);
       setIsSecretModeEnabled(true);
       return { success: true };
@@ -65,7 +80,9 @@ export function SecurityProvider({ children }) {
 
   const removePin = async () => {
     try {
-      await AsyncStorage.removeItem('@pinCode');
+      await SecureStore.deleteItemAsync('pinCode');
+      // Nettoyage legacy au cas où
+      await AsyncStorage.removeItem('@pinCode').catch(() => {});
       setPinCode(null);
       setIsSecretModeEnabled(false);
       setIsUnlocked(false);
@@ -83,7 +100,7 @@ export function SecurityProvider({ children }) {
       // Migrer silencieusement l'ancien PIN en clair vers le hash sécurisé
       if (!pinCode?.startsWith('p2:')) {
         const hashed = hashPin(inputPin);
-        AsyncStorage.setItem('@pinCode', hashed).catch(() => {});
+        SecureStore.setItemAsync('pinCode', hashed).catch(() => {});
         setPinCode(hashed);
       }
       return true;

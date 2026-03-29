@@ -12,9 +12,14 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { Audio, Video as AvVideo, ResizeMode } from 'expo-av';
+import { CLOUDINARY_CONFIG } from '../config/cloudinary';
 import { useGame } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -371,6 +376,122 @@ const TRUTH_OR_DARE = {
     "Guide ma main où tu veux.",
   ],
 };
+
+const DISTANCE_DARES = [
+  // ── SELFIES & EXPRESSIONS ──
+  "Fais ta plus belle grimace et envoie le selfie ! 📸",
+  "Selfie avec ton plus grand sourire, les yeux plissés ! 📸",
+  "Prends un selfie en faisant semblant d'embrasser ton téléphone ! 📸",
+  "Selfie avec ton regard le plus séducteur possible ! 📸",
+  "Fais une photo de toi avec tes cheveux tous ébouriffés ! 📸",
+  "Selfie en imitant la tête d'un emoji au choix ! 📸",
+  "Prends un selfie avec quelque chose de rouge sur le bout du nez ! 📸",
+  "Photo de toi en train de faire les yeux doux à l'objectif ! 📸",
+  "Selfie en faisant la pose la plus ridicule possible ! 📸",
+  "Selfie avec tes mains formant un cœur devant ton visage ! 📸",
+  "Fais semblant de pleurer de rire et prends le selfie ! 📸",
+  "Selfie avec une couronne improvisée avec ce que tu as sous la main ! 📸",
+  "Prends un selfie les yeux écarquillés comme si tu me voyais ! 📸",
+  "Selfie en soufflant un bisou vers la caméra ! 📸",
+  "Photo de toi avec ta plus belle tête de quelqu'un amoureux ! 📸",
+  "Selfie avec quelque chose de bleu visible sur toi ! 📸",
+  "Fais la pose d'une statue et prends un selfie ! 📸",
+  "Selfie en te cachant à moitié derrière un coussin ou oreiller ! 📸",
+  "Prends un selfie en imitant la jaquette d'un album musical ! 📸",
+  "Selfie les pouces levés comme si tu validais notre relation ! 📸",
+
+  // ── TEXTES & DESSINS ──
+  "Écris 'je t'aime' sur ton bras et prends-le en photo ! 📸",
+  "Dessine notre portrait de couple et envoie la photo ! 📸",
+  "Écris 3 raisons pour lesquelles tu m'aimes sur un papier et envoie la photo ! 📸",
+  "Dessine un cœur avec nos initiales et envoie la photo ! 📸",
+  "Écris mon prénom de la plus belle façon possible et envoie la photo ! 📸",
+  "Écris une promesse pour moi sur un papier et envoie la photo ! 📸",
+  "Écris 'tu es à moi' en grand sur un papier et envoie la photo ! 📸",
+  "Crée une liste de 5 choses que tu adorerais faire avec moi et prends-la en photo ! 📸",
+  "Écris un haïku (3 lignes) sur nous et envoie la photo ! 📸",
+  "Dessine ce que tu imagines qu'on ferait ensemble ce soir et envoie la photo ! 📸",
+  "Écris la date de notre premier rendez-vous sur un papier et prends-le en photo ! 📸",
+  "Dessine notre animal préféré avec nos prénoms et envoie la photo ! 📸",
+  "Écris 'tu me manques' en autant de langues que possible sur un papier ! 📸",
+  "Fais un dessin qui représente nos 5 ans ensemble (rêvé ou réel) ! 📸",
+  "Écris ton plat préféré qu'on doit cuisiner ensemble, illustré ! 📸",
+
+  // ── DANSES & MOUVEMENTS ──
+  "Envoie une vidéo de 15 secondes en dansant ta danse préférée ! 🎥",
+  "Fais une vidéo de toi qui danse sur notre chanson coup de cœur ! 🎥",
+  "Vidéo de 10 secondes : danse en pyjama ou tenue de maison ! 🎥",
+  "Imite un danseur professionnel pendant 15 secondes en vidéo ! 🎥",
+  "Invente une danse spéciale dédiée à moi et envoie la vidéo ! 🎥",
+  "Fais 10 secondes de ta danse la plus ridicule en vidéo ! 🎥",
+  "Danse sur une musique classique pendant 15 secondes en vidéo ! 🎥",
+  "Fais une chorégraphie de 20 secondes sur la chanson de ton choix ! 🎥",
+  "Imite un robot qui danse pendant 15 secondes en vidéo ! 🎥",
+
+  // ── CHANT & MUSIQUE ──
+  "Chante le refrain d'une chanson qui te fait penser à moi en vidéo ! 🎥",
+  "Siffle ou fredonne notre mélodie préférée en vidéo ! 🎥",
+  "Chante 'je t'aime' dans 3 langues différentes en vidéo ! 🎥",
+  "Invente une chanson sur nous de 20 secondes et envoie la vidéo ! 🎥",
+  "Bats un rythme sur la table et chante quelque chose pour moi ! 🎥",
+  "Imite ta chanteuse ou ton chanteur préféré en vidéo de 15 secondes ! 🎥",
+  "Chante 'happy birthday' à notre relation en vidéo ! 🎥",
+
+  // ── DÉCLARATIONS VIDÉO ──
+  "Fais une vidéo de 20 secondes pour me dire pourquoi tu m'aimes ! 🎥",
+  "Vidéo : raconte notre plus beau souvenir ensemble en 30 secondes ! 🎥",
+  "Dis-moi en vidéo ce que tu ferais si j'étais là maintenant ! 🎥",
+  "Envoie une vidéo de toi en train de me faire une déclaration d'amour ! 🎥",
+  "Fais une vidéo de 15 secondes : parle-moi comme si tu me voyais pour la première fois ! 🎥",
+  "Vidéo de 20 secondes : dis-moi ce qui me rend unique à tes yeux ! 🎥",
+  "Fais une vidéo de 15 secondes en imitant ma façon de parler ! 🎥",
+  "Vidéo : dis-moi ton endroit de rêve pour partir en vacances avec moi ! 🎥",
+  "Fais une vidéo de 20 secondes pour me dire ce que tu ferais si tu avais une baguette magique ! 🎥",
+  "Envoie une vidéo de toi en train de m'expliquer pourquoi tu es la/le meilleur(e) partenaire ! 🎥",
+  "Raconte en vidéo ce que tu ressentais le jour où tu as compris que tu m'aimais ! 🎥",
+
+  // ── DÉFIS CHEZ SOI ──
+  "Prends en photo la vue depuis ta fenêtre pour moi ! 📸",
+  "Photo de l'endroit le plus confortable de chez toi ! 📸",
+  "Prends en photo ton plat ou boisson du moment ! 📸",
+  "Photo de ton objet préféré chez toi ! 📸",
+  "Prends en photo quelque chose qui te fait penser à moi chez toi ! 📸",
+  "Photo d'un objet en forme de cœur que tu trouves autour de toi ! 📸",
+  "Prends en photo la chose la plus mignonne que tu as chez toi ! 📸",
+  "Photo de ta tasse ou verre préféré(e) ! 📸",
+  "Prends en photo un objet qui a une valeur sentimentale pour toi ! 📸",
+  "Selfie dans la pièce la plus lumineuse de chez toi ! 📸",
+  "Photo de tes pieds dans ta position la plus confortable ! 📸",
+  "Prends en photo ce que tu vois depuis là où tu es en ce moment ! 📸",
+  "Photo du coin le plus sympa de ta chambre ou salon ! 📸",
+
+  // ── DÉFIS CRÉATIFS ──
+  "Arrange des objets pour former le mot AMOUR et prends une photo ! 📸",
+  "Fais un bonhomme ou personnage avec de la nourriture et prends-le en photo ! 📸",
+  "Fais une œuvre d'art avec ce que tu as autour de toi et envoie la photo ! 📸",
+  "Crée un mini-autel avec des objets chez toi en mon honneur et prends-le en photo 😂 📸",
+  "Range des objets de 5 couleurs différentes côte à côte et prends-les en photo ! 📸",
+  "Fais une sculpture ou une tour avec tout ce que tu as à portée de main ! 📸",
+  "Écris mon prénom avec des objets du quotidien et prends-le en photo ! 📸",
+  "Crée un cadre photo imaginaire avec tes mains autour de quelque chose de beau ! 📸",
+
+  // ── TENDRESSE VIRTUELLE ──
+  "Enlace ton oreiller en t'imaginant que c'est moi et prends un selfie ! 📸",
+  "Fais semblant que le téléphone c'est moi et souffles-lui un bisou en vidéo ! 🎥",
+  "Prends un selfie au lit avec les couvertures remontées jusqu'au nez ! 📸",
+  "Vidéo de 15 secondes : dis-moi comment tu m'imaginais avant qu'on se rencontre ! 🎥",
+  "Fais la démonstration de comment tu réagirais si j'arrivais chez toi par surprise ! 🎥",
+
+  // ── AMUSANTS & RIGOLOS ──
+  "Imite un animal pendant 15 secondes en vidéo ! 🎥",
+  "Fais semblant d'être un présentateur de journal télévisé et parle de notre couple ! 🎥",
+  "Imite comment tu agis quand tu veux me convaincre de quelque chose en vidéo ! 🎥",
+  "Raconte une blague qui te fait mourir de rire en vidéo ! 🎥",
+  "Fais la démonstration de ta plus grande maladresse en 15 secondes de vidéo ! 🎥",
+  "Imite le meilleur acteur ou actrice que tu connais en vidéo de 15 secondes ! 🎥",
+  "Fais une publicité de 20 secondes pour notre couple comme si c'était un produit ! 🎥",
+  "Imite comment tu réagirais si je t'annonçais que je suis en bas de chez toi là maintenant ! 🎥",
+];
 
 const WHO_IS_MORE = [
   "Qui est le/la plus romantique ?",
@@ -795,7 +916,7 @@ export default function GamesScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { user, couple, partner } = useAuth();
-  const { notifyGame, notifyGameAnswer, notifyGameWin } = useNotifyPartner();
+  const { notifyGame, notifyGameAnswer, notifyGameWin, notifyProofSent, notifyProofReaction } = useNotifyPartner();
   const { recordInteraction } = useData();
 
   // Quiz: utiliser TOUTES les questions disponibles (mélangées aléatoirement)
@@ -879,8 +1000,6 @@ export default function GamesScreen() {
   const [isCreatingGame, setIsCreatingGame] = useState(false);
   const [isJoiningGame, setIsJoiningGame] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-
-  // Version 3.1.0 - 100% Online
 
   // Synchroniser le coupleId avec le couple de l'AuthContext
   useEffect(() => {
@@ -977,6 +1096,7 @@ export default function GamesScreen() {
     setOnlineWaitingNextPartner(false);
     processedOnlineKeys.current = new Set();
     advancingRef.current = false;
+    setDiscussEmoji(null);
   };
 
   // ═══════════════════════════════════════════════════════
@@ -992,6 +1112,21 @@ export default function GamesScreen() {
   // ✅ DÉDUPLICATION: Éviter de re-traiter les mêmes données
   const processedOnlineKeys = useRef(new Set());
   const advancingRef = useRef(false); // Guard contre double-avance
+  const [discussEmoji, setDiscussEmoji] = useState(null); // Réaction émoji dans les phases de révélation
+  const [discussOpen, setDiscussOpen] = useState(false);
+  const [discussInput, setDiscussInput] = useState('');
+  const [discussMessages, setDiscussMessages] = useState([]);
+  const [discussIsRecording, setDiscussIsRecording] = useState(false);
+  const [discussUploading, setDiscussUploading] = useState(false);
+  const discussRecordingRef = useRef(null);
+  const [todProofUploading, setTodProofUploading] = useState(false);
+  const [todProofSent, setTodProofSent] = useState(false);
+  const [fullScreenImg, setFullScreenImg] = useState(null);
+  const [playingAudioUri, setPlayingAudioUri] = useState(null);
+  const discussPlaybackRef = useRef(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef(null);
+  const discussScrollRef = useRef(null);
 
   // ✅ Auto-scoring pour questions choice online (sorti du render pour éviter side-effects)
   useEffect(() => {
@@ -1221,6 +1356,40 @@ export default function GamesScreen() {
     setTimeout(() => { advancingRef.current = false; }, 500);
   }, [activeGame, notifyGameWin]);
 
+  // Reset la zone discussion quand on change de question ou de jeu
+  useEffect(() => {
+    setDiscussEmoji(null);
+    setDiscussOpen(false);
+    setDiscussInput('');
+    setDiscussMessages([]);
+    setDiscussIsRecording(false);
+  }, [currentQuestion, activeGame]);
+
+  // Reset preuves TOD quand on change de round
+  useEffect(() => {
+    setTodProofSent(false);
+    setTodProofUploading(false);
+  }, [todRound]);
+
+  // Écouter les messages de discussion du partenaire (mode online)
+  useEffect(() => {
+    if (!activeGame || gameMode !== 'online' || !isFirebaseReady || !gameData?.answers) return;
+    const myName = user?.name || 'Moi';
+    const prefix = `discuss_q${currentQuestion}_`;
+    Object.entries(gameData.answers).forEach(([key, val]) => {
+      if (!key.startsWith(prefix) || typeof val !== 'object') return;
+      Object.entries(val).forEach(([pid, data]) => {
+        if (pid === myPlayerId) return;
+        if (!data?.player || data.player === myName) return;
+        const msgId = `${key}_${pid}`;
+        setDiscussMessages(prev => {
+          if (prev.find(m => m._id === msgId)) return prev;
+          return [...prev, { ...data, _id: msgId }];
+        });
+      });
+    });
+  }, [activeGame, gameMode, isFirebaseReady, gameData, currentQuestion, myPlayerId]);
+
   // Helper: Signaler que je suis prêt pour la question suivante (envoie signal Firebase + attend partenaire)
   const signalReadyForNext = async () => {
     const readyKey = `ready_next_${activeGame}_${currentQuestion}`;
@@ -1249,6 +1418,173 @@ export default function GamesScreen() {
     setOnlineWaitingNextPartner(false);
     processedOnlineKeys.current = new Set();
     advancingRef.current = false;
+  };
+
+  // ══════ CLOUDINARY + DISCUSSION + PREUVE HELPERS ══════
+
+  // Insère des paramètres de transformation Cloudinary pour alléger les médias affichés
+  const optimizeCloudinaryUrl = (url, type = 'image') => {
+    if (!url || !url.includes('cloudinary.com')) return url;
+    const parts = url.split('/upload/');
+    if (parts.length !== 2) return url;
+    const transform = type === 'video'
+      ? 'w_640,h_480,c_limit,q_auto:good,vc_auto,f_mp4'
+      : 'w_800,h_800,c_limit,q_auto:good,f_auto';
+    return `${parts[0]}/upload/${transform}/${parts[1]}`;
+  };
+
+  const uploadToCloudinary = async (uri, resourceType = 'image') => {
+    const raw = uri.split('?')[0];
+    const ext = raw.split('.').pop().toLowerCase() || 'jpg';
+    let mimeType;
+    if (resourceType === 'video') {
+      mimeType = ext === 'mov' ? 'video/quicktime' : ext === 'webm' ? 'video/webm' : 'video/mp4';
+    } else if (resourceType === 'audio') {
+      mimeType = ext === 'caf' ? 'audio/x-caf' : ext === '3gp' ? 'audio/3gpp' : 'audio/m4a';
+    } else {
+      mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
+    }
+    const cloudExt = resourceType === 'audio' ? (ext || 'm4a') : (ext || (resourceType === 'video' ? 'mp4' : 'jpg'));
+    const data = new FormData();
+    data.append('file', { uri, type: mimeType, name: `upload.${cloudExt}` });
+    data.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    const cloudEndpoint = resourceType === 'image' ? 'image' : 'video';
+    const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/${cloudEndpoint}/upload`;
+    const res = await fetch(endpoint, { method: 'POST', body: data });
+    const json = await res.json();
+    if (!json.secure_url) throw new Error(`Upload Cloudinary échoué: ${json.error?.message || 'inconnu'}`);
+    return json.secure_url;
+  };
+
+  const sendDiscussMessage = async () => {
+    if (!discussInput.trim()) return;
+    const myName = user?.name || 'Moi';
+    const ts = Date.now();
+    const msg = { _id: `local_${ts}`, player: myName, type: 'text', text: discussInput.trim(), timestamp: ts };
+    setDiscussMessages(prev => [...prev, msg]);
+    setDiscussInput('');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (gameMode === 'online' && isFirebaseReady) {
+      await submitAnswer(`discuss_q${currentQuestion}_${ts}`, { player: myName, type: 'text', text: msg.text, timestamp: ts }, myName);
+    }
+  };
+
+  const pickDiscussImage = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission refusée', "Autorise l'accès aux photos."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.4,
+      exif: false,
+      base64: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const myName = user?.name || 'Moi';
+      const ts = Date.now();
+      setDiscussUploading(true);
+      try {
+        const url = await uploadToCloudinary(result.assets[0].uri, 'image');
+        const displayUrl = optimizeCloudinaryUrl(url, 'image');
+        const msg = { _id: `local_${ts}`, player: myName, type: 'image', uri: displayUrl, timestamp: ts };
+        setDiscussMessages(prev => [...prev, msg]);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        if (gameMode === 'online' && isFirebaseReady) {
+          await submitAnswer(`discuss_q${currentQuestion}_${ts}`, { player: myName, type: 'image', uri: displayUrl, timestamp: ts }, myName);
+        }
+      } catch (e) { Alert.alert('Erreur', "Impossible d'envoyer la photo"); }
+      finally { setDiscussUploading(false); }
+    }
+  };
+
+  const startDiscussRecording = async () => {
+    try {
+      const { granted } = await Audio.requestPermissionsAsync();
+      if (!granted) { Alert.alert('Permission refusée', 'Autorise le micro pour enregistrer.'); return; }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      discussRecordingRef.current = recording;
+      setDiscussIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (e) { console.log('Erreur record discuss:', e); }
+  };
+
+  const stopDiscussRecording = async () => {
+    if (!discussRecordingRef.current) return;
+    setDiscussIsRecording(false);
+    clearInterval(recordingTimerRef.current);
+    setRecordingSeconds(0);
+    const myName = user?.name || 'Moi';
+    const ts = Date.now();
+    try {
+      await discussRecordingRef.current.stopAndUnloadAsync();
+      const uri = discussRecordingRef.current.getURI();
+      discussRecordingRef.current = null;
+      setDiscussUploading(true);
+      const url = await uploadToCloudinary(uri, 'video');
+      const msg = { _id: `local_${ts}`, player: myName, type: 'audio', uri: url, timestamp: ts };
+      setDiscussMessages(prev => [...prev, msg]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (gameMode === 'online' && isFirebaseReady) {
+        await submitAnswer(`discuss_q${currentQuestion}_${ts}`, { player: myName, type: 'audio', uri: url, timestamp: ts }, myName);
+      }
+    } catch (e) { Alert.alert('Erreur', "Impossible d'envoyer le vocal"); }
+    finally { setDiscussUploading(false); }
+  };
+
+  const playDiscussAudio = async (uri) => {
+    try {
+      if (discussPlaybackRef.current) {
+        await discussPlaybackRef.current.unloadAsync();
+        discussPlaybackRef.current = null;
+      }
+      if (playingAudioUri === uri) { setPlayingAudioUri(null); return; }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
+      discussPlaybackRef.current = sound;
+      setPlayingAudioUri(uri);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) { setPlayingAudioUri(null); sound.unloadAsync(); }
+      });
+    } catch (e) { console.log('Erreur lecture audio:', e); }
+  };
+
+  const sendTodProof = async (useCamera = true) => {
+    try {
+      const perm = useCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) { Alert.alert('Permission refusée', "Autorise l'accès à la caméra/photos."); return; }
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            quality: 0.4,
+            videoMaxDuration: 15,
+            exif: false,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            quality: 0.4,
+            exif: false,
+            base64: false,
+          });
+      if (!result.canceled && result.assets[0]) {
+        const myName = user?.name || 'Moi';
+        const isVideo = result.assets[0].type === 'video';
+        setTodProofUploading(true);
+        const url = await uploadToCloudinary(result.assets[0].uri, isVideo ? 'video' : 'image');
+        const displayUrl = optimizeCloudinaryUrl(url, isVideo ? 'video' : 'image');
+        setTodProofSent(true);
+        addToThread({ type: 'proof', player: myName, proofType: isVideo ? 'video' : 'image', uri: displayUrl, round: todRound });
+        if (gameMode === 'online' && isFirebaseReady) {
+          await submitAnswer(`tod_proof_${todRound}`, { proofType: isVideo ? 'video' : 'image', uri: displayUrl, sentBy: myName, round: todRound, timestamp: Date.now() }, myName);
+        }
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        if (gameMode === 'online') await notifyProofSent();
+      }
+    } catch (e) { Alert.alert('Erreur', "Impossible d'envoyer la preuve"); }
+    finally { setTodProofUploading(false); }
   };
 
   // ✅ LISTENER ROBUSTE: Écouter les données du partenaire en Action/Vérité
@@ -1384,12 +1720,24 @@ export default function GamesScreen() {
     const readyKey = `ready_next_tod_${todRound}`;
     const readyData = findPartnerData(readyKey);
     if (readyData) {
-      // ✅ Ne marquer comme traité QUE si on est en attente de sync
-      // Sinon le signal sera re-traité quand todWaitingNextSync deviendra true
       if (todWaitingNextSync && !alreadyProcessed(`ready_${todRound}`)) {
         console.log('✅ Partenaire prêt pour le tour suivant → on avance');
         advanceToNextTodRound();
       }
+    }
+
+    // 6. Écouter la preuve envoyée par le partenaire
+    const proofKey = `tod_proof_${todRound}`;
+    const proofData = findPartnerData(proofKey);
+    if (proofData && !alreadyProcessed(`proof_${todRound}`)) {
+      console.log('📸 Preuve partenaire reçue:', proofData.proofType);
+      addToThread({
+        type: 'proof',
+        player: proofData.sentBy || partnerName,
+        proofType: proofData.proofType,
+        uri: proofData.uri,
+        round: todRound,
+      });
     }
   }, [activeGame, gameMode, isFirebaseReady, gameData, todRound, todPhase, myPlayerId, user?.name, truthOrDare, todGameMode, todWaitingReaction, todWaitingNextSync]);
 
@@ -1550,7 +1898,8 @@ export default function GamesScreen() {
       }
     } else {
       // MODE CLASSIQUE: Question aléatoire
-      const items = type === 'truth' ? TRUTH_OR_DARE.truths : TRUTH_OR_DARE.dares;
+      const items = type === 'truth' ? TRUTH_OR_DARE.truths
+        : (gameMode === 'online' && isFirebaseReady ? DISTANCE_DARES : TRUTH_OR_DARE.dares);
       const random = items[Math.floor(Math.random() * items.length)];
       const selection = { type, text: random, round: todRound };
       setTruthOrDare(selection);
@@ -1734,7 +2083,7 @@ export default function GamesScreen() {
     if (gameMode === 'online' && isFirebaseReady) {
       // ✅ Set waiting AVANT d'envoyer à Firebase pour éviter la race condition
       setTodWaitingNextSync(true);
-      
+      await notifyProofReaction(emoji === '✅' || emoji === '👍' ? 'approved' : 'rejected');
       await submitAnswer(`tod_reaction_${todRound}`, {
         reaction: emoji,
         reactedBy: myName,
@@ -1986,6 +2335,48 @@ export default function GamesScreen() {
                     <Text style={styles.wimDisagree}>🤔 Goûts différents !</Text>
                   )}
                 </View>
+
+                {/* ══════ ZONE DISCUSSION ══════ */}
+                {!discussOpen ? (
+                  <TouchableOpacity style={styles.discussBanner} onPress={() => { setDiscussOpen(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}>
+                    <Text style={styles.discussBannerText}>💬 Discuter avant de continuer ?</Text>
+                    <Text style={styles.discussBannerArrow}>▾</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.discussPanel}>
+                    <View style={styles.discussPanelHeader}>
+                      <Text style={styles.discussPanelTitle}>💬 Discussion</Text>
+                      <TouchableOpacity onPress={() => setDiscussOpen(false)}><Text style={styles.discussPanelClose}>✕ Fermer</Text></TouchableOpacity>
+                    </View>
+                    <ScrollView ref={discussScrollRef} style={styles.discussMsgList} contentContainerStyle={{ paddingBottom: 6 }} nestedScrollEnabled onContentSizeChange={() => discussScrollRef.current?.scrollToEnd({ animated: true })}>
+                      {discussMessages.length === 0 && <Text style={styles.discussMsgEmpty}>Dites quelque chose... 💕</Text>}
+                      {discussMessages.map((msg, i) => (
+                        <View key={msg._id || i} style={[styles.discussMsgBubble, msg.player === (user?.name || 'Moi') ? styles.discussMsgMine : styles.discussMsgTheirs]}>
+                          <Text style={styles.discussMsgName}>{msg.player}</Text>
+                          {msg.type === 'text' && <Text style={styles.discussMsgText}>{msg.text}</Text>}
+                          {msg.type === 'image' && (
+                            <Pressable onPress={() => setFullScreenImg(msg.uri)} style={styles.discussMsgImgWrapper}>
+                              <Image source={{ uri: msg.uri }} style={styles.discussMsgImg} resizeMode="cover" />
+                              <View style={styles.discussMsgImgBadge}><Text style={styles.discussMsgImgBadgeText}>🔍</Text></View>
+                            </Pressable>
+                          )}
+                          {msg.type === 'audio' && (
+                            <TouchableOpacity style={styles.discussAudioBtn} onPress={() => playDiscussAudio(msg.uri)}>
+                              <Text style={styles.discussAudioBtnText}>{playingAudioUri === msg.uri ? '⏹ Stop' : '▶ Écouter le vocal'}</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))}
+                    </ScrollView>
+                    <View style={styles.discussInputBar}>
+                      <TextInput style={styles.discussTextInput} value={discussInput} onChangeText={setDiscussInput} placeholder="Écris quelque chose..." placeholderTextColor="rgba(255,255,255,0.5)" multiline maxLength={300} />
+                      <TouchableOpacity style={styles.discussSendBtn} onPress={sendDiscussMessage} disabled={!discussInput.trim() || discussUploading}><Text style={styles.discussSendBtnText}>→</Text></TouchableOpacity>
+                      <TouchableOpacity style={[styles.discussVoiceBtn, discussIsRecording && styles.discussVoiceBtnRec]} onPress={discussIsRecording ? stopDiscussRecording : startDiscussRecording} disabled={discussUploading}><Text style={styles.discussVoiceBtnText}>{discussIsRecording ? `⏹ ${recordingSeconds}s` : '🎤'}</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.discussImgBtn} onPress={pickDiscussImage} disabled={discussUploading}><Text style={styles.discussImgBtnText}>📸</Text></TouchableOpacity>
+                    </View>
+                    {discussUploading && <ActivityIndicator size="small" color="#fff" style={{ marginVertical: 4 }} />}
+                  </View>
+                )}
 
                 <TouchableOpacity
                   style={[styles.quizNextButton, { marginTop: 20 }]}
@@ -2768,6 +3159,50 @@ export default function GamesScreen() {
                     )}
                   </View>
 
+                  {/* ══════ ZONE DISCUSSION ══════ */}
+                  {(question.type === 'choice' || quizValidated) && (
+                    !discussOpen ? (
+                      <TouchableOpacity style={styles.discussBanner} onPress={() => { setDiscussOpen(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}>
+                        <Text style={styles.discussBannerText}>💬 Discuter avant de continuer ?</Text>
+                        <Text style={styles.discussBannerArrow}>▾</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.discussPanel}>
+                        <View style={styles.discussPanelHeader}>
+                          <Text style={styles.discussPanelTitle}>💬 Discussion</Text>
+                          <TouchableOpacity onPress={() => setDiscussOpen(false)}><Text style={styles.discussPanelClose}>✕ Fermer</Text></TouchableOpacity>
+                        </View>
+                        <ScrollView ref={discussScrollRef} style={styles.discussMsgList} contentContainerStyle={{ paddingBottom: 6 }} nestedScrollEnabled onContentSizeChange={() => discussScrollRef.current?.scrollToEnd({ animated: true })}>
+                          {discussMessages.length === 0 && <Text style={styles.discussMsgEmpty}>Dites quelque chose... 💕</Text>}
+                          {discussMessages.map((msg, i) => (
+                            <View key={msg._id || i} style={[styles.discussMsgBubble, msg.player === (user?.name || 'Moi') ? styles.discussMsgMine : styles.discussMsgTheirs]}>
+                              <Text style={styles.discussMsgName}>{msg.player}</Text>
+                              {msg.type === 'text' && <Text style={styles.discussMsgText}>{msg.text}</Text>}
+                              {msg.type === 'image' && (
+                                <Pressable onPress={() => setFullScreenImg(msg.uri)} style={styles.discussMsgImgWrapper}>
+                                  <Image source={{ uri: msg.uri }} style={styles.discussMsgImg} resizeMode="cover" />
+                                  <View style={styles.discussMsgImgBadge}><Text style={styles.discussMsgImgBadgeText}>🔍</Text></View>
+                                </Pressable>
+                              )}
+                              {msg.type === 'audio' && (
+                                <TouchableOpacity style={styles.discussAudioBtn} onPress={() => playDiscussAudio(msg.uri)}>
+                                  <Text style={styles.discussAudioBtnText}>{playingAudioUri === msg.uri ? '⏹ Stop' : '▶ Écouter le vocal'}</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          ))}
+                        </ScrollView>
+                        <View style={styles.discussInputBar}>
+                          <TextInput style={styles.discussTextInput} value={discussInput} onChangeText={setDiscussInput} placeholder="Écris quelque chose..." placeholderTextColor="rgba(255,255,255,0.5)" multiline maxLength={300} />
+                          <TouchableOpacity style={styles.discussSendBtn} onPress={sendDiscussMessage} disabled={!discussInput.trim() || discussUploading}><Text style={styles.discussSendBtnText}>→</Text></TouchableOpacity>
+                          <TouchableOpacity style={[styles.discussVoiceBtn, discussIsRecording && styles.discussVoiceBtnRec]} onPress={discussIsRecording ? stopDiscussRecording : startDiscussRecording} disabled={discussUploading}><Text style={styles.discussVoiceBtnText}>{discussIsRecording ? `⏹ ${recordingSeconds}s` : '🎤'}</Text></TouchableOpacity>
+                          <TouchableOpacity style={styles.discussImgBtn} onPress={pickDiscussImage} disabled={discussUploading}><Text style={styles.discussImgBtnText}>📸</Text></TouchableOpacity>
+                        </View>
+                        {discussUploading && <ActivityIndicator size="small" color="#fff" style={{ marginVertical: 4 }} />}
+                      </View>
+                    )
+                  )}
+
                   {/* Bouton suivant : visible seulement après validation */}
                   {(question.type === 'choice' || quizValidated) && (
                     <TouchableOpacity style={styles.quizNextButton} onPress={handleQuizNext}>
@@ -2907,7 +3342,35 @@ export default function GamesScreen() {
           </View>
         );
       }
-      
+
+      if (item.type === 'proof') {
+        return (
+          <View key={item.id || index} style={[styles.todBubbleRow, isMe ? styles.todBubbleRowRight : styles.todBubbleRowLeft]}>
+            <View style={styles.todBubbleName}><Text style={styles.todBubbleNameText}>{item.player}</Text></View>
+            <View style={[styles.todBubble, styles.todBubbleProof]}>
+              <Text style={styles.todBubbleProofLabel}>📸 Preuve envoyée !</Text>
+              {item.proofType === 'image' && (
+                <Pressable onPress={() => setFullScreenImg(item.uri)} style={styles.todProofImgWrapper}>
+                  <Image source={{ uri: item.uri }} style={styles.todProofImage} resizeMode="cover" />
+                  <View style={styles.todProofImgOverlay}><Text style={styles.todProofImgOverlayText}>🔍 Agrandir</Text></View>
+                </Pressable>
+              )}
+              {item.proofType === 'video' && (
+                <View style={styles.todProofVideoWrapper}>
+                  <AvVideo
+                    source={{ uri: item.uri }}
+                    style={styles.todProofVideo}
+                    useNativeControls
+                    resizeMode={ResizeMode.CONTAIN}
+                    shouldPlay={false}
+                  />
+                </View>
+              )}
+            </View>
+          </View>
+        );
+      }
+
       return null;
     };
     
@@ -3210,6 +3673,31 @@ export default function GamesScreen() {
                     En attente de la réaction de {partnerName}... 🎭
                   </Text>
                 </View>
+                {/* Boutons preuve (action à distance) */}
+                {truthOrDare?.type === 'dare' && !todProofSent && (
+                  <View style={styles.todProofContainer}>
+                    <Text style={styles.todProofLabel}>📸 Envoie une preuve !</Text>
+                    <View style={styles.todProofButtons}>
+                      <TouchableOpacity
+                        style={styles.todProofBtn}
+                        onPress={() => sendTodProof(true)}
+                        disabled={todProofUploading}
+                      >
+                        {todProofUploading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.todProofBtnText}>📷 Prendre</Text>}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.todProofBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+                        onPress={() => sendTodProof(false)}
+                        disabled={todProofUploading}
+                      >
+                        <Text style={styles.todProofBtnText}>🖼️ Galerie</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+                {todProofSent && (
+                  <Text style={styles.todProofSentText}>✅ Preuve envoyée !</Text>
+                )}
               </View>
             )}
 
@@ -3443,6 +3931,48 @@ export default function GamesScreen() {
                   )}
                 </View>
 
+                {/* ══════ ZONE DISCUSSION ══════ */}
+                {!discussOpen ? (
+                  <TouchableOpacity style={styles.discussBanner} onPress={() => { setDiscussOpen(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}>
+                    <Text style={styles.discussBannerText}>💬 Discuter avant de continuer ?</Text>
+                    <Text style={styles.discussBannerArrow}>▾</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.discussPanel}>
+                    <View style={styles.discussPanelHeader}>
+                      <Text style={styles.discussPanelTitle}>💬 Discussion</Text>
+                      <TouchableOpacity onPress={() => setDiscussOpen(false)}><Text style={styles.discussPanelClose}>✕ Fermer</Text></TouchableOpacity>
+                    </View>
+                    <ScrollView ref={discussScrollRef} style={styles.discussMsgList} contentContainerStyle={{ paddingBottom: 6 }} nestedScrollEnabled onContentSizeChange={() => discussScrollRef.current?.scrollToEnd({ animated: true })}>
+                      {discussMessages.length === 0 && <Text style={styles.discussMsgEmpty}>Dites quelque chose... 💕</Text>}
+                      {discussMessages.map((msg, i) => (
+                        <View key={msg._id || i} style={[styles.discussMsgBubble, msg.player === (user?.name || 'Moi') ? styles.discussMsgMine : styles.discussMsgTheirs]}>
+                          <Text style={styles.discussMsgName}>{msg.player}</Text>
+                          {msg.type === 'text' && <Text style={styles.discussMsgText}>{msg.text}</Text>}
+                          {msg.type === 'image' && (
+                            <Pressable onPress={() => setFullScreenImg(msg.uri)} style={styles.discussMsgImgWrapper}>
+                              <Image source={{ uri: msg.uri }} style={styles.discussMsgImg} resizeMode="cover" />
+                              <View style={styles.discussMsgImgBadge}><Text style={styles.discussMsgImgBadgeText}>🔍</Text></View>
+                            </Pressable>
+                          )}
+                          {msg.type === 'audio' && (
+                            <TouchableOpacity style={styles.discussAudioBtn} onPress={() => playDiscussAudio(msg.uri)}>
+                              <Text style={styles.discussAudioBtnText}>{playingAudioUri === msg.uri ? '⏹ Stop' : '▶ Écouter le vocal'}</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))}
+                    </ScrollView>
+                    <View style={styles.discussInputBar}>
+                      <TextInput style={styles.discussTextInput} value={discussInput} onChangeText={setDiscussInput} placeholder="Écris quelque chose..." placeholderTextColor="rgba(255,255,255,0.5)" multiline maxLength={300} />
+                      <TouchableOpacity style={styles.discussSendBtn} onPress={sendDiscussMessage} disabled={!discussInput.trim() || discussUploading}><Text style={styles.discussSendBtnText}>→</Text></TouchableOpacity>
+                      <TouchableOpacity style={[styles.discussVoiceBtn, discussIsRecording && styles.discussVoiceBtnRec]} onPress={discussIsRecording ? stopDiscussRecording : startDiscussRecording} disabled={discussUploading}><Text style={styles.discussVoiceBtnText}>{discussIsRecording ? `⏹ ${recordingSeconds}s` : '🎤'}</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.discussImgBtn} onPress={pickDiscussImage} disabled={discussUploading}><Text style={styles.discussImgBtnText}>📸</Text></TouchableOpacity>
+                    </View>
+                    {discussUploading && <ActivityIndicator size="small" color="#fff" style={{ marginVertical: 4 }} />}
+                  </View>
+                )}
+
                 <View style={styles.quizRevealButtons}>
                   {wimPlayer1Answer === partnerAnswer ? (
                     <TouchableOpacity
@@ -3584,6 +4114,19 @@ export default function GamesScreen() {
       
       {/* Modal Invitation */}
       {renderInviteModal()}
+
+      {/* Modal Plein écran image */}
+      <Modal visible={!!fullScreenImg} transparent animationType="fade" onRequestClose={() => setFullScreenImg(null)}>
+        <View style={styles.fsOverlay}>
+          <Pressable style={styles.fsImageArea} onPress={() => setFullScreenImg(null)}>
+            <Image source={{ uri: fullScreenImg || '' }} style={styles.fsImage} resizeMode="contain" />
+          </Pressable>
+          <TouchableOpacity style={styles.fsCloseBtn} onPress={() => setFullScreenImg(null)}>
+            <Text style={styles.fsCloseBtnText}>✕</Text>
+          </TouchableOpacity>
+          <Text style={styles.fsTapHint}>Appuie pour fermer</Text>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -5125,4 +5668,203 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  // ===== ZONE DISCUSSION INTERACTIVE =====
+  discussBanner: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  discussBannerText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  discussBannerArrow: { color: '#fff', fontSize: 18 },
+  discussPanel: {
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderRadius: 14,
+    marginVertical: 10,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  discussPanelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  discussPanelTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  discussPanelClose: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
+  discussMsgList: { maxHeight: 220, paddingHorizontal: 10 },
+  discussMsgEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center', paddingVertical: 10, fontStyle: 'italic' },
+  discussMsgBubble: {
+    maxWidth: '80%',
+    borderRadius: 10,
+    padding: 8,
+    marginVertical: 3,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  discussMsgMine: { alignSelf: 'flex-end', backgroundColor: 'rgba(255,107,157,0.4)' },
+  discussMsgTheirs: { alignSelf: 'flex-start' },
+  discussMsgName: { color: 'rgba(255,255,255,0.6)', fontSize: 10, marginBottom: 2 },
+  discussMsgText: { color: '#fff', fontSize: 13 },
+  discussMsgImgWrapper: {
+    position: 'relative',
+    marginTop: 6,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  discussMsgImg: { width: 160, height: 120, borderRadius: 8 },
+  discussMsgImgBadge: {
+    position: 'absolute',
+    bottom: 4, right: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 8,
+    paddingHorizontal: 5, paddingVertical: 2,
+  },
+  discussMsgImgBadgeText: { fontSize: 12 },
+  discussAudioBtn: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  discussAudioBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  discussInputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  discussTextInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    color: '#fff',
+    fontSize: 13,
+    maxHeight: 80,
+  },
+  discussSendBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#FF6B9D',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  discussSendBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  discussVoiceBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  discussVoiceBtnRec: { backgroundColor: '#EF4444' },
+  discussVoiceBtnText: { fontSize: 18 },
+  discussImgBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  discussImgBtnText: { fontSize: 18 },
+  // ===== TOD PROOF =====
+  todBubbleProof: { backgroundColor: 'rgba(255,107,157,0.2)', borderWidth: 1.5, borderColor: 'rgba(255,107,157,0.6)', borderRadius: 14, padding: 10 },
+  todBubbleProofLabel: { color: '#fff', fontSize: 13, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  todProofImgWrapper: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,107,157,0.7)',
+    shadowColor: '#FF6B9D',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  todProofImage: { width: 220, height: 165, borderRadius: 10 },
+  todProofImgOverlay: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingVertical: 5,
+    alignItems: 'center',
+  },
+  todProofImgOverlayText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  todProofVideoWrapper: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,107,157,0.7)',
+    shadowColor: '#FF6B9D',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  todProofVideo: { width: 220, height: 165, borderRadius: 10, backgroundColor: '#000' },
+  todProofContainer: {
+    marginTop: 10,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  todProofLabel: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  todProofButtons: { flexDirection: 'row', gap: 10 },
+  todProofBtn: {
+    backgroundColor: '#FF6B9D',
+    borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 20,
+  },
+  todProofBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  todProofSentText: { color: '#10B981', fontSize: 13, fontWeight: '600', marginTop: 8, textAlign: 'center' },
+  // ===== FULLSCREEN IMAGE MODAL =====
+  fsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.93)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  fsImageArea: {
+    width: '95%',
+    height: '75%',
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,107,157,0.55)',
+    shadowColor: '#FF6B9D',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 18,
+    elevation: 18,
+  },
+  fsImage: { width: '100%', height: '100%' },
+  fsCloseBtn: {
+    marginTop: 20,
+    width: 52, height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  fsCloseBtnText: { color: '#fff', fontSize: 22, fontWeight: '700' },
+  fsTapHint: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 10 },
 });

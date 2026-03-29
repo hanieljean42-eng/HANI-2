@@ -27,14 +27,14 @@ const generateCoupleKey = (coupleId) => {
 // ─── Hachage des mots de passe ───────────────────────────────────────────────
 
 /**
- * Hache un mot de passe avec PBKDF2 (10 000 itérations).
+ * Hache un mot de passe avec PBKDF2 (100 000 itérations).
  * Le résultat est préfixé par "v2:" pour identifier le format.
  */
 export const hashPassword = (password) => {
   if (!password) return '';
   const hash = CryptoJS.PBKDF2(password, _PWD_SALT, {
     keySize: 8,        // 256 bits
-    iterations: 10000,
+    iterations: 100000,
   }).toString();
   return PWD_HASH_PREFIX + hash;
 };
@@ -63,7 +63,7 @@ export const hashPin = (pin) => {
   if (!pin) return '';
   const hash = CryptoJS.PBKDF2(pin, _PIN_SALT, {
     keySize: 4,        // 128 bits (suffisant pour PIN court)
-    iterations: 5000,
+    iterations: 50000,
   }).toString();
   return PIN_HASH_PREFIX + hash;
 };

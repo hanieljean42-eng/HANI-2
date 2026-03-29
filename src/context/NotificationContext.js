@@ -533,7 +533,7 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // ✅ Envoyer une notification push au partenaire via Expo Push API + Firebase
+  // ✅ Envoyer une notification push au partenaire via Expo Push API
   const sendPushNotification = async (title, body, data = {}) => {
     const currentPartnerToken = partnerTokenRef.current;
     const currentUser = authUserRef.current;
@@ -546,31 +546,20 @@ export function NotificationProvider({ children }) {
       return false;
     }
 
-    // ✅ Récupérer token partenaire + partnerId EN UNE SEULE lecture Firebase
+    // ✅ Utiliser le token en cache d'abord (évite les lectures Firebase inutiles)
     let tokenToUse = (currentPartnerToken && currentPartnerToken.startsWith('ExponentPushToken')) 
       ? currentPartnerToken 
       : null;
+
+    // ✅ Récupérer partnerId depuis les données locales en priorité (pas de lecture Firebase)
     let partnerId = null;
-
-    // Chercher partnerId dans members (toujours fiable)
-    try {
-      const membersRef = ref(database, `couples/${currentCouple.id}/members`);
-      const membersSnap = await get(membersRef);
-      if (membersSnap.exists()) {
-        for (const id of Object.keys(membersSnap.val())) {
-          if (id !== currentUser.id) { partnerId = id; break; }
-        }
-      }
-    } catch (e) { /* ignore */ }
-
-    // Fallback local pour partnerId
-    if (!partnerId && currentCouple.members) {
+    if (currentCouple.members) {
       partnerId = Array.isArray(currentCouple.members)
         ? currentCouple.members.find(m => m !== currentUser.id)
         : Object.keys(currentCouple.members).find(m => m !== currentUser.id);
     }
 
-    // Si pas de token, une seule tentative rapide de récupération
+    // ✅ UNE SEULE lecture Firebase si pas de token en cache (pushTokens contient aussi les IDs)
     if (!tokenToUse) {
       try {
         const tokensRef = ref(database, `couples/${currentCouple.id}/pushTokens`);

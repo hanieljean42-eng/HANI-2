@@ -146,11 +146,16 @@ export default function HomeScreen({ navigation }) {
   }, [todayMilestone]);
 
   // Notifier le partenaire qu'on est en ligne + programmer les rappels quotidiens
+  // ✅ Cooldown 30 min pour éviter de spammer le partenaire
+  const onlineCooldownRef = useRef(0);
   useEffect(() => {
     if (user?.id && couple?.id) {
-      // ✅ Notifier immédiatement via Firebase (pas besoin d'attendre le token push)
-      // sendPushNotification écrit sur Firebase pendingNotifications en parallèle du push Expo
-      notifyOnline();
+      const now = Date.now();
+      // Notifier "en ligne" max 1 fois toutes les 30 min
+      if ((now - onlineCooldownRef.current) > 1800000) {
+        onlineCooldownRef.current = now;
+        notifyOnline();
+      }
       sendDailyReminder();
       const hasPendingChallenge = challenges?.some(c => !c.completed);
       sendSmartReminder(hasPendingChallenge);
@@ -167,11 +172,15 @@ export default function HomeScreen({ navigation }) {
   }, [levelInfo.level]);
 
   // Programmer les rappels de countdown pour les événements futurs
+  // ✅ Éviter les doublons en traçant les événements déjà programmés
+  const scheduledCountdownsRef = useRef(new Set());
   useEffect(() => {
     if (countdownEvents && countdownEvents.length > 0) {
       countdownEvents.forEach(ev => {
+        const evKey = `${ev.name}_${ev.date}`;
         const evDate = new Date(ev.date);
-        if (evDate > new Date()) {
+        if (evDate > new Date() && !scheduledCountdownsRef.current.has(evKey)) {
+          scheduledCountdownsRef.current.add(evKey);
           scheduleCountdownReminder(ev.name, ev.emoji || '📅', ev.date);
         }
       });

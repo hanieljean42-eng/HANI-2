@@ -95,6 +95,27 @@ export const useNotifyPartner = () => {
     await notifications.notifyGameInvite(user.name, gameName);
   };
 
+  // Preuve photo/vidéo envoyée en TOD (partenaire doit réagir)
+  const notifyProofSent = async () => {
+    if (!notifications?.sendPushNotification || !user?.name) return;
+    await notifications.sendPushNotification(
+      '📸 Preuve envoyée !',
+      `${user.name} a envoyé${accord} sa preuve ! Viens réagir 🎯`,
+      { type: 'game_proof' }
+    );
+  };
+
+  // Réaction du questioner à la preuve (responder est notifié)
+  const notifyProofReaction = async (reaction) => {
+    if (!notifications?.sendPushNotification || !user?.name) return;
+    const emoji = reaction === 'approved' ? '✅' : '❌';
+    await notifications.sendPushNotification(
+      `${emoji} Réaction reçue !`,
+      `${user.name} a ${reaction === 'approved' ? 'validé' : 'refusé'} ta preuve ${emoji}`,
+      { type: 'game_reaction' }
+    );
+  };
+
   // Fin de partie (résultats disponibles)
   const notifyGameWin = async (gameName) => {
     if (!notifications?.sendPushNotification || !user?.name) return;
@@ -324,6 +345,8 @@ export const useNotifyPartner = () => {
     notifyGame,
     notifyGameWin,
     notifyGameAnswer,
+    notifyProofSent,
+    notifyProofReaction,
     // Profil & Couple
     notifyOnline,
     notifyProfileUpdate,

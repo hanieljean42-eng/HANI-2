@@ -315,8 +315,16 @@ export default function ChatScreen({ navigation, route }) {
       console.log('⚠️ Audio appelant non dispo:', e.message);
     }
 
-    // 2. Notifications de fallback avec canal 'calls'
+    // 2. Notifications de fallback avec canal 'calls' — max 4 pour éviter le spam
+    let callerNotifCount = 0;
+    const MAX_CALLER_NOTIFS = 4;
     callerRingRef.current = setInterval(async () => {
+      if (callerNotifCount >= MAX_CALLER_NOTIFS) {
+        clearInterval(callerRingRef.current);
+        callerRingRef.current = null;
+        return;
+      }
+      callerNotifCount++;
       try {
         await Notifications.scheduleNotificationAsync({
           content: {
@@ -394,6 +402,14 @@ export default function ChatScreen({ navigation, route }) {
   // Lancer un appel audio in-app via Firebase Relay
   const handleCall = async (type) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    // Demander la permission micro avant de lancer l'appel
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('🎤 Permission requise', 'L\'accès au microphone est nécessaire pour passer un appel.');
+        return;
+      }
+    } catch (e) { /* continue */ }
     const roomId = await initiateCall(type);
     if (!roomId) {
       Alert.alert('Erreur', "Impossible de lancer l'appel. Vérifiez votre connexion.");
@@ -547,16 +563,24 @@ export default function ChatScreen({ navigation, route }) {
 
   // Lancer un vrai appel téléphonique via le numéro du partenaire
   const launchPhoneCall = () => {
+    const phoneNumber = partner?.phone;
+    if (!phoneNumber) {
+      Alert.alert(
+        '📞 Numéro manquant',
+        'Le numéro de téléphone de votre partenaire n\'est pas renseigné. Demandez-lui de l\'ajouter dans son profil.',
+        [{ text: 'Compris' }]
+      );
+      return;
+    }
     Alert.alert(
       '📞 Appel téléphonique',
-      'Voulez-vous appeler votre partenaire via le téléphone ?',
+      `Voulez-vous appeler ${partner?.name || 'votre partenaire'} via le téléphone ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         { 
           text: '📞 Appeler', 
           onPress: () => {
-            // Ouvrir le dialer nativement
-            Linking.openURL('tel:');
+            Linking.openURL(`tel:${phoneNumber}`);
           }
         },
       ]
@@ -880,6 +904,26 @@ export default function ChatScreen({ navigation, route }) {
 
     const reactions = item.reactions ? Object.values(item.reactions) : [];
 
+    // ✅ Message supprimé (soft delete)
+    if (item.deleted) {
+      return (
+        <>
+          {showDate && (
+            <View style={styles.dateContainer}>
+              <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
+            </View>
+          )}
+          <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
+            <View style={[styles.messageBubble, { backgroundColor: 'rgba(0,0,0,0.05)', paddingVertical: 8 }]}>
+              <Text style={{ color: '#999', fontStyle: 'italic', fontSize: 14 }}>
+                🚫 Message supprimé
+              </Text>
+            </View>
+          </View>
+        </>
+      );
+    }
+
     return (
       <>
         {showDate && (
@@ -979,7 +1023,9 @@ export default function ChatScreen({ navigation, route }) {
             
             <Text style={[styles.messageTime, isMe ? { color: `${theme.bubbleMeText || '#fff'}99` } : { color: '#999' }]}>
               {formatTime(item.timestamp)}
-              {isMe && item.read && ' ✓✓'}
+              {isMe && item._pending && ' 🕐'}
+              {isMe && !item._pending && item.read && ' ✓✓'}
+              {isMe && !item._pending && !item.read && ' ✓'}
             </Text>
 
             {reactions.length > 0 && (
@@ -1014,7 +1060,10 @@ export default function ChatScreen({ navigation, route }) {
             ) : null;
           })()}
         </View>
-        {/* Bouton appel audio in-app */}
+        {/* Boutons appel audio + vidéo */}
+        <TouchableOpacity style={styles.callButton} onPress={() => handleCall('video')}>
+          <Ionicons name="videocam-outline" size={22} color="#fff" />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.callButton} onPress={() => handleCall('audio')}>
           <Ionicons name="call-outline" size={22} color="#fff" />
         </TouchableOpacity>
@@ -1058,6 +1107,11 @@ export default function ChatScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="none"
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={15}
+          windowSize={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={20}
           ListEmptyComponent={
             <View style={styles.emptyChat}>
               <Text style={styles.emptyChatEmoji}>💬</Text>

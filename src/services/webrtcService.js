@@ -9,66 +9,64 @@ import {
   RTCSessionDescription,
   RTCIceCandidate,
   mediaDevices,
-} from '@livekit/react-native-webrtc';
+} from 'react-native-webrtc';
+import { Audio } from 'expo-av';
 import { database, isConfigured } from '../config/firebase';
 import { ref, set, get, push, onValue, onChildAdded, off } from 'firebase/database';
 
-// ✅ Configuration ICE: STUN gratuits (Google) + TURN gratuits (Open Relay)
-// Les serveurs TURN permettent les appels entre réseaux différents (4G, WiFi)
-const ICE_SERVERS = {
-  iceServers: [
-    // STUN servers Google (découverte IP publique - gratuit)
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    // TURN servers Open Relay (gratuit, pas d'inscription requise)
-    // Relais du trafic quand connexion directe impossible (NAT restrictif)
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:80?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    // ✅ TURN backup supplémentaires (Metered free public relay)
-    {
-      urls: 'turn:a.relay.metered.ca:80',
-      username: 'e8dd65b92f60de6e09db01a1',
-      credential: 'uWdJjsOT8vAiTMjy',
-    },
-    {
-      urls: 'turn:a.relay.metered.ca:80?transport=tcp',
-      username: 'e8dd65b92f60de6e09db01a1',
-      credential: 'uWdJjsOT8vAiTMjy',
-    },
-    {
-      urls: 'turn:a.relay.metered.ca:443',
-      username: 'e8dd65b92f60de6e09db01a1',
-      credential: 'uWdJjsOT8vAiTMjy',
-    },
-    {
-      urls: 'turns:a.relay.metered.ca:443?transport=tcp',
-      username: 'e8dd65b92f60de6e09db01a1',
-      credential: 'uWdJjsOT8vAiTMjy',
-    },
-  ],
-  iceCandidatePoolSize: 10,
-};
+// ============================================================
+// Configuration TURN — OBLIGATOIRE pour appels entre réseaux
+// différents (4G ↔ WiFi, deux opérateurs différents).
+//
+// ⚠️  Pour activer le TURN dynamique (recommandé) :
+//  1. Créer un compte GRATUIT sur https://www.metered.ca/stun-turn
+//  2. Créer une app (ex: "hani2")
+//  3. Copier l'API key depuis le dashboard
+//  4. Renseigner METERED_APP et METERED_API_KEY ci-dessous
+// ============================================================
+
+const METERED_APP = 'hani-2';                          // Nom de l'app sur Metered.ca
+const METERED_API_KEY = '69c9499c6a209cb238ff409d';    // API key Metered.ca
+
+// Serveurs STUN Google (toujours disponibles, gratuits)
+// + freestun.net (TURN public gratuit, supporte les NAT symétriques)
+const FALLBACK_ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
+  // FreeTURN — serveur TURN public gratuit (freestun.net)
+  { urls: 'stun:freestun.net:3478' },
+  { urls: 'turn:freestun.net:3478',  username: 'free', credential: 'free' },
+  { urls: 'turn:freestun.net:3479',  username: 'free', credential: 'free' },
+  { urls: 'turns:freestun.net:5349', username: 'free', credential: 'free' },
+];
+
+// Récupère des credentials TURN frais depuis Metered.ca (ne jamais expirer)
+async function fetchIceServers() {
+  if (!METERED_API_KEY) {
+    console.log('⚠️  TURN: utilisation du fallback freestun.net (configurez Metered.ca pour plus de fiabilité)');
+    return FALLBACK_ICE_SERVERS;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const response = await fetch(
+      `https://${METERED_APP}.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    const servers = await response.json();
+    if (Array.isArray(servers) && servers.length > 0) {
+      console.log('✅ TURN credentials Metered.ca obtenus (' + servers.length + ' serveurs)');
+      return [...FALLBACK_ICE_SERVERS.slice(0, 5), ...servers];
+    }
+  } catch (e) {
+    console.log('⚠️  Metered.ca indisponible, fallback freestun.net');
+  }
+  return FALLBACK_ICE_SERVERS;
+}
 
 class WebRTCService {
   constructor() {
@@ -83,9 +81,11 @@ class WebRTCService {
     this.onConnectionStateChange = null;
     this._isMuted = false;
     this._isCameraOff = false;
+    this._isSpeaker = true;  // ✅ Haut-parleur par défaut
     this._iceCandidateListener = null;
     this._pendingCandidates = []; // ✅ Buffer ICE candidates avant remoteDescription
     this._addedCandidates = new Set(); // ✅ Éviter les doublons
+    this._cachedIceServers = null; // ✅ Cache des serveurs ICE (chargés avant l'appel)
   }
 
   init(coupleId, userId) {
@@ -93,6 +93,8 @@ class WebRTCService {
     this.userId = userId;
     this._isMuted = false;
     this._isCameraOff = false;
+    this._isSpeaker = true;  // ✅ Haut-parleur par défaut
+    this._cachedIceServers = null;
     this._pendingCandidates = [];
     this._addedCandidates = new Set();
     this._iceRestartCount = 0;
@@ -101,8 +103,31 @@ class WebRTCService {
   async getLocalStream(type = 'audio') {
     this.callType = type;
     try {
+      // ✅ Demander la permission micro avant getUserMedia
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        console.error('❌ Permission micro refusée');
+        return null;
+      }
+
+      // ✅ Pré-charger les serveurs ICE (TURN) pendant qu'on attend getUserMedia
+      this._cachedIceServers = await fetchIceServers();
+
+      // ✅ Configurer le mode audio pour un appel (haut-parleur)
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false, // Haut-parleur
+      }).catch(() => {});
+
       const constraints = {
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
         video: type === 'video' ? { facingMode: 'user', width: 640, height: 480 } : false,
       };
       const stream = await mediaDevices.getUserMedia(constraints);
@@ -118,7 +143,11 @@ class WebRTCService {
 
   createPeerConnection() {
     try {
-      const pc = new RTCPeerConnection(ICE_SERVERS);
+      const iceConfig = {
+        iceServers: this._cachedIceServers || FALLBACK_ICE_SERVERS,
+        iceCandidatePoolSize: 10,
+      };
+      const pc = new RTCPeerConnection(iceConfig);
 
       // Ajouter les pistes locales
       if (this.localStream) {
@@ -312,7 +341,16 @@ class WebRTCService {
   }
 
   toggleSpeaker() {
-    return true;
+    this._isSpeaker = !this._isSpeaker;
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: !this._isSpeaker, // false = speaker, true = écouteur
+    }).catch(() => {});
+    console.log(`🔊 Speaker ${this._isSpeaker ? 'ON' : 'OFF'}`);
+    return this._isSpeaker;
   }
 
   async switchCamera() {
@@ -334,6 +372,17 @@ class WebRTCService {
 
   async cleanup() {
     console.log('🧹 WebRTC cleanup');
+    // ✅ Réinitialiser le mode audio
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: false,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+    } catch (e) { /* ignore */ }
+
     if (this._iceCandidateListener) {
       this._iceCandidateListener();
       this._iceCandidateListener = null;
