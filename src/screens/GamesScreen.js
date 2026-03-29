@@ -916,7 +916,7 @@ export default function GamesScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { user, couple, partner } = useAuth();
-  const { notifyGame, notifyGameAnswer, notifyGameWin, notifyProofSent, notifyProofReaction } = useNotifyPartner();
+  const { notifyGame, notifyGameAnswer, notifyGameWin, notifyProofSent, notifyProofReaction, notifyDiscussMessage } = useNotifyPartner();
   const { recordInteraction } = useData();
 
   // Quiz: utiliser TOUTES les questions disponibles (mélangées aléatoirement)
@@ -1467,6 +1467,7 @@ export default function GamesScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (gameMode === 'online' && isFirebaseReady) {
       await submitAnswer(`discuss_q${currentQuestion}_${ts}`, { player: myName, type: 'text', text: msg.text, timestamp: ts }, myName);
+      notifyDiscussMessage('text').catch(() => {});
     }
   };
 
@@ -1491,6 +1492,7 @@ export default function GamesScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         if (gameMode === 'online' && isFirebaseReady) {
           await submitAnswer(`discuss_q${currentQuestion}_${ts}`, { player: myName, type: 'image', uri: displayUrl, timestamp: ts }, myName);
+          notifyDiscussMessage('image').catch(() => {});
         }
       } catch (e) { Alert.alert('Erreur', "Impossible d'envoyer la photo"); }
       finally { setDiscussUploading(false); }
@@ -1529,6 +1531,7 @@ export default function GamesScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (gameMode === 'online' && isFirebaseReady) {
         await submitAnswer(`discuss_q${currentQuestion}_${ts}`, { player: myName, type: 'audio', uri: url, timestamp: ts }, myName);
+        notifyDiscussMessage('audio').catch(() => {});
       }
     } catch (e) { Alert.alert('Erreur', "Impossible d'envoyer le vocal"); }
     finally { setDiscussUploading(false); }
@@ -2404,6 +2407,12 @@ export default function GamesScreen() {
                 <Text style={styles.onlineWaitingText}>
                   En attente de {partnerName} pour continuer...
                 </Text>
+                <TouchableOpacity
+                  style={styles.backToDiscussBtn}
+                  onPress={() => { setWyrPhase('reveal'); setOnlineReadyForNext(false); setOnlineWaitingNextPartner(false); setDiscussOpen(true); }}
+                >
+                  <Text style={styles.backToDiscussBtnText}>💬 Retour à la discussion</Text>
+                </TouchableOpacity>
               </View>
             )}
           </>
@@ -3230,6 +3239,12 @@ export default function GamesScreen() {
                 <Text style={styles.onlineWaitingText}>
                   En attente de {partnerName} pour continuer...
                 </Text>
+                <TouchableOpacity
+                  style={styles.backToDiscussBtn}
+                  onPress={() => { setQuizPhase('reveal'); setOnlineReadyForNext(false); setOnlineWaitingNextPartner(false); setDiscussOpen(true); }}
+                >
+                  <Text style={styles.backToDiscussBtnText}>💬 Retour à la discussion</Text>
+                </TouchableOpacity>
               </View>
             )}
           </ScrollView>
@@ -3764,6 +3779,12 @@ export default function GamesScreen() {
                     En attente de {partnerName} pour le tour suivant... ⏳
                   </Text>
                 </View>
+                <TouchableOpacity
+                  style={styles.backToDiscussBtn}
+                  onPress={() => { setTodWaitingNextSync(false); setTodPhase('react'); setDiscussOpen(true); }}
+                >
+                  <Text style={styles.backToDiscussBtnText}>💬 Retour à la discussion</Text>
+                </TouchableOpacity>
               </View>
             )}
           </>
@@ -4058,6 +4079,12 @@ export default function GamesScreen() {
                 <Text style={styles.onlineWaitingText}>
                   En attente de {partnerName} pour continuer...
                 </Text>
+                <TouchableOpacity
+                  style={styles.backToDiscussBtn}
+                  onPress={() => { setWimPhase('reveal'); setOnlineReadyForNext(false); setOnlineWaitingNextPartner(false); setDiscussOpen(true); }}
+                >
+                  <Text style={styles.backToDiscussBtnText}>💬 Retour à la discussion</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -5721,6 +5748,21 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  backToDiscussBtn: {
+    marginTop: 16,
+    backgroundColor: 'rgba(255,107,157,0.25)',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,157,0.5)',
+  },
+  backToDiscussBtnText: {
+    color: '#FF6B9D',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   // ===== ZONE DISCUSSION INTERACTIVE =====
   discussBanner: {

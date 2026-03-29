@@ -116,6 +116,17 @@ export const useNotifyPartner = () => {
     );
   };
 
+  // Message dans le panneau discussion d'un jeu
+  const notifyDiscussMessage = async (msgType = 'text') => {
+    if (!notifications?.sendPushNotification || !user?.name) return;
+    const label = msgType === 'image' ? '📸 une photo' : msgType === 'audio' ? '🎤 un vocal' : '💬 un message';
+    await notifications.sendPushNotification(
+      '💬 Message dans le jeu',
+      `${user.name} t'a envoyé${accord} ${label} ! Ouvre le jeu pour répondre 🎮`,
+      { type: 'game_discuss' }
+    );
+  };
+
   // Fin de partie (résultats disponibles)
   const notifyGameWin = async (gameName) => {
     if (!notifications?.sendPushNotification || !user?.name) return;
@@ -347,6 +358,7 @@ export const useNotifyPartner = () => {
     notifyGameAnswer,
     notifyProofSent,
     notifyProofReaction,
+    notifyDiscussMessage,
     // Profil & Couple
     notifyOnline,
     notifyProfileUpdate,
