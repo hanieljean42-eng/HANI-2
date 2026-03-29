@@ -3737,6 +3737,13 @@ export default function GamesScreen() {
                     <Text style={{ fontSize: 28 }}>😅</Text>
                     <Text style={styles.todBottomWaitText}>{`Tu as passé cette action\nEn attente de la réaction de ${partnerName}...`}</Text>
                   </View>
+                ) : truthOrDare?.type === 'truth' ? (
+                  <View style={styles.todBottomWait}>
+                    <ActivityIndicator size="small" color="#FF6B9D" />
+                    <Text style={styles.todBottomWaitText}>
+                      {`💬 Ta réponse est envoyée !\nEn attente de la réaction de ${partnerName}...`}
+                    </Text>
+                  </View>
                 ) : (
                   <View style={styles.todBottomWait}>
                     <ActivityIndicator size="small" color="#FF6B9D" />
