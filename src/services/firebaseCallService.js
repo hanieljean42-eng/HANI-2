@@ -346,6 +346,22 @@ class FirebaseCallService {
     return this._isMuted;
   }
 
+  // ✅ Toggle haut-parleur
+  async toggleSpeaker() {
+    this._isSpeaker = !this._isSpeaker;
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: !this._isSpeaker,
+      });
+    } catch (e) { console.log('⚠️ toggleSpeaker error:', e.message); }
+    console.log(`🔊 Haut-parleur ${this._isSpeaker ? 'activé' : 'désactivé'}`);
+    return this._isSpeaker;
+  }
+
   // ✅ Vérifier si muté
   get isMuted() {
     return this._isMuted;
