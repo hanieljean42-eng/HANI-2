@@ -1121,6 +1121,7 @@ export default function GamesScreen() {
   const discussRecordingRef = useRef(null);
   const [todProofUploading, setTodProofUploading] = useState(false);
   const [todProofSent, setTodProofSent] = useState(false);
+  const [todActionChoice, setTodActionChoice] = useState(null); // 'fait' | 'passe' | null
   const [fullScreenImg, setFullScreenImg] = useState(null);
   const [playingAudioUri, setPlayingAudioUri] = useState(null);
   const discussPlaybackRef = useRef(null);
@@ -2029,10 +2030,10 @@ export default function GamesScreen() {
     
     setTodSubmitted(true);
     setTodResponse(responseText);
+    setTodActionChoice('fait');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     if (gameMode === 'online' && isFirebaseReady) {
-      // En mode online, le répondeur attend la réaction du questioner
       setTodWaitingReaction(true);
       setTodPhase('waitReaction');
       await submitAnswer(`tod_response_${todRound}`, {
@@ -2040,6 +2041,7 @@ export default function GamesScreen() {
         respondedBy: myName,
         question: truthOrDare,
         round: todRound,
+        actionChoice: 'fait',
         timestamp: Date.now()
       }, myName);
       await notifyGameAnswer();
@@ -2060,6 +2062,10 @@ export default function GamesScreen() {
     setTodPartnerResponse(null);
     setTodWaitingReaction(false);
     setTodWaitingNextSync(false);
+    setTodActionChoice(null);
+    setDiscussOpen(false);
+    setDiscussMessages([]);
+    setDiscussInput('');
     // isMyTurnToAsk sera recalculé automatiquement par le useEffect basé sur todRound
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
@@ -2914,7 +2920,7 @@ export default function GamesScreen() {
         </View>
       ) : (
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.quizOpenContainer}
         >
           <Text style={styles.quizOpenLabel}>
@@ -3376,9 +3382,9 @@ export default function GamesScreen() {
     
     return (
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.gameContainer}
-        keyboardVerticalOffset={100}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 80}
       >
         {/* Header */}
         <View style={styles.todTurnIndicator}>
@@ -3596,16 +3602,17 @@ export default function GamesScreen() {
                       <TouchableOpacity
                         style={[styles.todBottomBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
                         onPress={async () => {
-                          const responseText = '❌ Action passée...';
+                          const responseText = '😅 A choisi de passer cette action';
                           addToThread({ type: 'response', player: myName, text: responseText, round: todRound });
                           setTodSubmitted(true);
                           setTodResponse(responseText);
+                          setTodActionChoice('passe');
                           if (gameMode === 'online' && isFirebaseReady) {
                             setTodWaitingReaction(true);
                             setTodPhase('waitReaction');
                             await submitAnswer(`tod_response_${todRound}`, {
                               response: responseText, respondedBy: myName,
-                              question: truthOrDare, round: todRound, timestamp: Date.now()
+                              question: truthOrDare, round: todRound, actionChoice: 'passe', timestamp: Date.now()
                             }, myName);
                           } else {
                             setTodPhase('react');
@@ -3640,25 +3647,63 @@ export default function GamesScreen() {
               </View>
             )}
 
-            {/* PHASE: REACT — Réactions emoji (questioner seulement en online) */}
+            {/* PHASE: REACT — Discussion + Réactions emoji */}
             {todPhase === 'react' && !todWaitingNextSync && (
               <View style={styles.todBottomBar}>
-                <Text style={styles.todBottomLabel}>Réagis ! 👇</Text>
+                {/* Résumé du choix du partenaire */}
+                <Text style={styles.todBottomLabel}>
+                  {todPartnerResponse?.includes('passer') ? `😅 ${partnerName} a passé cette action` : `✅ ${partnerName} a fait l'action !`}
+                </Text>
+
+                {/* Zone discussion */}
+                {!discussOpen ? (
+                  <TouchableOpacity style={styles.discussBanner} onPress={() => { setDiscussOpen(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}>
+                    <Text style={styles.discussBannerText}>💬 Discuter avant de réagir ?</Text>
+                    <Text style={styles.discussBannerArrow}>▾</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={[styles.discussPanel, { marginBottom: 8 }]}>
+                    <View style={styles.discussPanelHeader}>
+                      <Text style={styles.discussPanelTitle}>💬 Discussion</Text>
+                      <TouchableOpacity onPress={() => setDiscussOpen(false)}><Text style={styles.discussPanelClose}>✕</Text></TouchableOpacity>
+                    </View>
+                    <ScrollView ref={discussScrollRef} style={styles.discussMsgList} contentContainerStyle={{ paddingBottom: 6 }} nestedScrollEnabled onContentSizeChange={() => discussScrollRef.current?.scrollToEnd({ animated: true })}>
+                      {discussMessages.length === 0 && <Text style={styles.discussMsgEmpty}>Dites quelque chose... 💕</Text>}
+                      {discussMessages.map((msg, i) => (
+                        <View key={msg._id || i} style={[styles.discussMsgBubble, msg.player === (user?.name || 'Moi') ? styles.discussMsgMine : styles.discussMsgTheirs]}>
+                          <Text style={styles.discussMsgName}>{msg.player}</Text>
+                          {msg.type === 'text' && <Text style={styles.discussMsgText}>{msg.text}</Text>}
+                          {msg.type === 'image' && (
+                            <Pressable onPress={() => setFullScreenImg(msg.uri)} style={styles.discussMsgImgWrapper}>
+                              <Image source={{ uri: msg.uri }} style={styles.discussMsgImg} resizeMode="cover" />
+                            </Pressable>
+                          )}
+                          {msg.type === 'audio' && (
+                            <TouchableOpacity style={styles.discussAudioBtn} onPress={() => playDiscussAudio(msg.uri)}>
+                              <Text style={styles.discussAudioBtnText}>{playingAudioUri === msg.uri ? '⏹ Stop' : '▶ Écouter'}</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))}
+                    </ScrollView>
+                    <View style={styles.discussInputBar}>
+                      <TextInput style={styles.discussTextInput} value={discussInput} onChangeText={setDiscussInput} placeholder="Écris quelque chose..." placeholderTextColor="rgba(255,255,255,0.5)" multiline maxLength={300} />
+                      <TouchableOpacity style={styles.discussSendBtn} onPress={sendDiscussMessage} disabled={!discussInput.trim() || discussUploading}><Text style={styles.discussSendBtnText}>→</Text></TouchableOpacity>
+                      <TouchableOpacity style={[styles.discussVoiceBtn, discussIsRecording && styles.discussVoiceBtnRec]} onPress={discussIsRecording ? stopDiscussRecording : startDiscussRecording} disabled={discussUploading}><Text style={styles.discussVoiceBtnText}>{discussIsRecording ? `⏹ ${recordingSeconds}s` : '🎤'}</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.discussImgBtn} onPress={pickDiscussImage} disabled={discussUploading}><Text style={styles.discussImgBtnText}>📸</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* Réactions emoji */}
                 <View style={styles.todReactionRow}>
                   {['👍', '😂', '😱', '🥰', '🔥', '💀', '👏', '😏'].map((emoji) => (
-                    <TouchableOpacity
-                      key={emoji}
-                      style={styles.todReactionBtn}
-                      onPress={() => reactAndNextRound(emoji)}
-                    >
+                    <TouchableOpacity key={emoji} style={styles.todReactionBtn} onPress={() => { setDiscussOpen(false); reactAndNextRound(emoji); }}>
                       <Text style={styles.todReactionEmoji}>{emoji}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
-                <TouchableOpacity
-                  style={styles.todSkipReactBtn}
-                  onPress={nextTodRound}
-                >
+                <TouchableOpacity style={styles.todSkipReactBtn} onPress={() => { setDiscussOpen(false); nextTodRound(); }}>
                   <Text style={styles.todSkipReactText}>➡️ Tour suivant</Text>
                 </TouchableOpacity>
               </View>
@@ -3667,14 +3712,21 @@ export default function GamesScreen() {
             {/* PHASE: WAIT REACTION — Le répondeur attend la réaction du questioner (online) */}
             {todPhase === 'waitReaction' && (
               <View style={styles.todBottomBar}>
-                <View style={styles.todBottomWait}>
-                  <ActivityIndicator size="small" color="#FF6B9D" />
-                  <Text style={styles.todBottomWaitText}>
-                    En attente de la réaction de {partnerName}... 🎭
-                  </Text>
-                </View>
-                {/* Boutons preuve (action à distance) */}
-                {truthOrDare?.type === 'dare' && !todProofSent && (
+                {todActionChoice === 'passe' ? (
+                  <View style={styles.todBottomWait}>
+                    <Text style={{ fontSize: 28 }}>😅</Text>
+                    <Text style={styles.todBottomWaitText}>{`Tu as passé cette action\nEn attente de la réaction de ${partnerName}...`}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.todBottomWait}>
+                    <ActivityIndicator size="small" color="#FF6B9D" />
+                    <Text style={styles.todBottomWaitText}>
+                      {todProofSent ? '✅ Preuve envoyée ! En attente de la réaction...' : `💪 Envoie la preuve de ton action !`}
+                    </Text>
+                  </View>
+                )}
+                {/* Boutons preuve (action à distance — uniquement si FAIT) */}
+                {truthOrDare?.type === 'dare' && !todProofSent && todActionChoice === 'fait' && (
                   <View style={styles.todProofContainer}>
                     <Text style={styles.todProofLabel}>📸 Envoie une preuve !</Text>
                     <View style={styles.todProofButtons}>
@@ -3694,9 +3746,6 @@ export default function GamesScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                )}
-                {todProofSent && (
-                  <Text style={styles.todProofSentText}>✅ Preuve envoyée !</Text>
                 )}
               </View>
             )}
