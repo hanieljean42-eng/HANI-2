@@ -439,6 +439,188 @@ const QUIZ_QUESTIONS = [
     question: "Quel est le moment où tu me trouves le plus irrésistible ?",
     type: "open",
   },
+  // ── Simples & romantiques (distance) ──
+  {
+    id: 81,
+    question: "Quel est mon côté préféré du lit pour dormir ?",
+    type: "choice",
+    options: ["À gauche", "À droite", "Au milieu", "Je m'adapte selon toi"],
+  },
+  {
+    id: 82,
+    question: "Quelle est ma façon préférée de te montrer que je t'aime à distance ?",
+    type: "open",
+  },
+  {
+    id: 83,
+    question: "Quel est le premier mot ou emoji que je t'envoie généralement le matin ?",
+    type: "open",
+  },
+  {
+    id: 84,
+    question: "Quelle est la chose que tu fais à distance qui me rassure le plus ?",
+    type: "open",
+  },
+  {
+    id: 85,
+    question: "Quel film ou série me fait toujours penser à toi ?",
+    type: "open",
+  },
+  {
+    id: 86,
+    question: "Quelle est ma plus grande crainte dans notre relation à distance ?",
+    type: "open",
+  },
+  {
+    id: 87,
+    question: "À quelle heure est-ce que je pense le plus à toi dans la journée ?",
+    type: "choice",
+    options: ["Le matin au réveil", "L'après-midi quand je m'ennuie", "Le soir avant de dormir", "En permanence"],
+  },
+  {
+    id: 88,
+    question: "Quel est l'endroit de ta maison qui me manquerait le plus ?",
+    type: "open",
+  },
+  // ── Très intimes (adultes, sans label) ──
+  {
+    id: 89,
+    question: "Quelle partie de ton corps est-ce que j'adore regarder en secret ?",
+    type: "open",
+  },
+  {
+    id: 90,
+    question: "Est-ce que je préfère initier ou être celui/celle qui reçoit dans l'intimité ?",
+    type: "choice",
+    options: ["J'adore initier", "Je préfère recevoir", "Les deux selon l'humeur", "J'aime quand tu décides"],
+  },
+  {
+    id: 91,
+    question: "Quel moment de la journée je préfère pour nos moments intimes ?",
+    type: "choice",
+    options: ["Le matin au réveil", "L'après-midi", "Le soir avant de dormir", "En pleine nuit"],
+  },
+  {
+    id: 92,
+    question: "Est-ce que j'aime qu'on se chuchote des choses à l'oreille pendant nos moments intimes ?",
+    type: "choice",
+    options: ["Oui, ça me rend fou/folle", "Non, je préfère le silence", "Parfois oui", "Toujours, c'est ce qui me fait craquer"],
+  },
+  {
+    id: 93,
+    question: "Quelle tenue tu portes qui m'excite le plus ?",
+    type: "open",
+  },
+  {
+    id: 94,
+    question: "Est-ce que je préfère des préliminaires longs ou aller droit au but ?",
+    type: "choice",
+    options: ["Préliminaires longs", "Aller droit au but", "Un équilibre parfait", "Ça dépend entièrement de toi"],
+  },
+  {
+    id: 95,
+    question: "Quel geste de ta part me fait perdre le contrôle immédiatement ?",
+    type: "open",
+  },
+  {
+    id: 96,
+    question: "Dans nos moments intimes, est-ce que je préfère la lumière tamisée ou l'obscurité ?",
+    type: "choice",
+    options: ["Lumière tamisée", "Totalement dans le noir", "Lumière normale", "Je veux te voir clairement"],
+  },
+  {
+    id: 97,
+    question: "Quelle est la phrase ou le mot que tu prononces qui me trouble le plus ?",
+    type: "open",
+  },
+  {
+    id: 98,
+    question: "Est-ce que je pense à nos moments intimes passés quand on est séparés ?",
+    type: "choice",
+    options: ["Tout le temps", "Souvent", "Parfois", "À chaque fois que je ferme les yeux"],
+  },
+  {
+    id: 99,
+    question: "Quel endroit (hors de la chambre) est-ce que j'imagine le plus pour qu'on soit intimes ?",
+    type: "open",
+  },
+  {
+    id: 100,
+    question: "Est-ce que je préfère qu'on soit tendres et lents ou intenses et passionnés ?",
+    type: "choice",
+    options: ["Tendres et lents", "Intenses et passionnés", "Les deux selon l'envie", "Je veux que tu décides pour moi"],
+  },
+  {
+    id: 101,
+    question: "Quelle tenue me rend le plus séduisant(e) à tes yeux ?",
+    type: "open",
+  },
+  {
+    id: 102,
+    question: "Est-ce que j'aime recevoir des messages ou photos coquins de ta part sans prévenir ?",
+    type: "choice",
+    options: ["Oui, j'adore les surprises", "Oui si on est seuls", "Ça dépend du moment", "Toujours, ne te retiens jamais"],
+  },
+  {
+    id: 103,
+    question: "Qu'est-ce que tu fais avec ta bouche qui me fait le plus craquer ?",
+    type: "open",
+  },
+  {
+    id: 104,
+    question: "Quand j'ai envie de toi à distance, est-ce que je préfère t'appeler ou t'écrire ?",
+    type: "choice",
+    options: ["Appel vocal", "Message vocal (vocal)", "SMS/message coquin", "Appel vidéo pour te voir"],
+  },
+  {
+    id: 105,
+    question: "Quelle est la chose qu'on n'a pas encore osé faire et que j'ai secrètement envie d'essayer ?",
+    type: "open",
+  },
+  {
+    id: 106,
+    question: "Est-ce que je serais à l'aise pour t'envoyer une photo intime si tu me le demandais ?",
+    type: "choice",
+    options: ["Oui sans hésiter", "Oui si tu me mets à l'aise", "Peut-être selon l'humeur", "Je l'ai déjà fait pour toi"],
+  },
+  {
+    id: 107,
+    question: "Quel est le souvenir intime avec toi que je revois le plus souvent dans ma tête ?",
+    type: "open",
+  },
+  {
+    id: 108,
+    question: "Pour nos retrouvailles, est-ce que je préfèrerais un hôtel romantique ou rester chez toi ?",
+    type: "choice",
+    options: ["Hôtel romantique", "Chez toi dans ton lit", "Peu importe si c'est avec toi", "Une surprise totale"],
+  },
+  {
+    id: 109,
+    question: "Quelle partie de ton corps est-ce que je touche le plus instinctivement ?",
+    type: "open",
+  },
+  {
+    id: 110,
+    question: "Est-ce que j'aime qu'on parle ouvertement de nos fantasmes ?",
+    type: "choice",
+    options: ["Oui j'adore ça", "Oui mais seulement à l'oral", "Parfois par écrit", "Toujours, sans tabou entre nous"],
+  },
+  {
+    id: 111,
+    question: "Quelle est la chose la plus coquine que j'aie jamais faite pour toi ?",
+    type: "open",
+  },
+  {
+    id: 112,
+    question: "Est-ce que j'aurais plus envie de toi dans un moment de tendresse ou après une dispute ?",
+    type: "choice",
+    options: ["Dans un moment de tendresse", "Après une dispute (réconciliation)", "Les deux me donnent envie", "En permanence peu importe le contexte"],
+  },
+  {
+    id: 113,
+    question: "Quelle est la partie de mon corps dont je suis le plus fier/fière et que tu adores ?",
+    type: "open",
+  },
 ];
 
 const TRUTH_OR_DARE = {
@@ -508,6 +690,26 @@ const TRUTH_OR_DARE = {
     "Quelle est la chose que j'ai portée (tenue, parfum...) qui t'a le plus excité(e) ?",
     "C'est quoi le souvenir intime avec moi que tu revois le plus souvent dans ta tête ?",
     "Qu'est-ce que tu murmures ou penses quand tu es à deux doigts de perdre le contrôle avec moi ?",
+    // ── Vérités pour couples à distance (simples) ──
+    "Comment tu gères le manque physique quand on est loin l'un de l'autre ?",
+    "Qu'est-ce qui te fait sourire en secret quand tu penses à moi ?",
+    "Quel souvenir de nous deux tu revois quand tu veux te sentir mieux ?",
+    "Qu'est-ce que tu fais en premier quand tu reçois un message de moi ?",
+    "Quelle est la chose qui te manque le plus de moi physiquement ?",
+    // ── Vérités très intimes distance (adultes, sans label) ──
+    "Qu'est-ce que tu penses en secret quand je t'envoie un selfie sensuel ?",
+    "Décris exactement ce que tu ferais si j'arrivais chez toi là maintenant sans prévenir.",
+    "Quelle est la chose intime que tu n'as jamais osé me demander à distance mais qui t'obsède ?",
+    "Qu'est-ce que tu imagines en détail quand tu es seul(e) la nuit et tu penses à moi ?",
+    "Quel est le message le plus coquin que tu aurais envie de m'envoyer mais que tu n'oses pas ?",
+    "Si on avait une heure de temps libre ensemble en appel vidéo sans aucune limite, tu ferais quoi ?",
+    "Qu'est-ce que tu ressens physiquement quand j'envoie ma voix dans un vocal intime ?",
+    "Quelle est la tenue dans laquelle tu voudrais me voir la prochaine fois qu'on se retrouve ?",
+    "Qu'est-ce que tu gardes en tête comme image de moi qui t'excite le plus ?",
+    "Si tu devais me décrire notre prochaine nuit ensemble de A à Z, ce serait comment exactement ?",
+    "Qu'est-ce que je pourrais dire ou écrire qui te ferait complètement perdre le contrôle ?",
+    "Est-ce que tu te souviens de la dernière fois que tu as pensé à moi de façon vraiment intense la nuit ? C'était quoi ?",
+    "Quelle est la chose que tu adores dans notre intimité et que tu n'oserais jamais dire à voix haute normalement ?",
   ],
   dares: [
     // Actions Classiques Couple
@@ -809,6 +1011,28 @@ const WHO_IS_MORE = [
   "Qui est le plus susceptible de pleurer de bonheur pendant un moment fort entre nous ?",
   "Qui est le plus tactile dans les moments de tendresse ?",
   "Qui est le plus curieux/curieuse des préférences intimes de l'autre ?",
+  // ── Simples & romantiques ──
+  "Qui dit 'je t'aime' le plus souvent ?",
+  "Qui est le plus patient(e) dans notre relation ?",
+  "Qui envoie le plus de messages dans la journée ?",
+  "Qui s'endort le plus vite après les câlins ?",
+  "Qui est le plus protecteur/protectrice de l'autre ?",
+  // ── Très intimes (adultes, sans label) ──
+  "Qui a les plus belles lèvres selon l'autre ?",
+  "Qui ose le plus envoyer des messages coquins en pleine journée ?",
+  "Qui est le plus à l'initiative dans l'intimité ?",
+  "Qui a le regard le plus séducteur ?",
+  "Qui est le plus difficile à résister quand il/elle veut quelque chose ?",
+  "Qui donne les meilleurs baisers ?",
+  "Qui a le plus de fantasmes secrets non avoués ?",
+  "Qui est le plus expressif/expressive dans les moments intimes ?",
+  "Qui devient le plus nostalgique de nos moments intimes quand on est séparés ?",
+  "Qui est le plus à l'aise pour dire ouvertement ce qu'il/elle veut au lit ?",
+  "Qui pense le plus à l'autre de façon intime pendant la journée ?",
+  "Qui enverrait une photo intime en premier sans hésiter ?",
+  "Qui est le plus capable de faire craquer l'autre avec un seul regard ?",
+  "Qui aurait le plus du mal à se retenir lors d'un appel vidéo sensuel ?",
+  "Qui a le plus de patience lors de longs préliminaires ?",
 ];
 
 const WOULD_YOU_RATHER = [
@@ -1161,6 +1385,68 @@ const WOULD_YOU_RATHER = [
   {
     option1: "Que notre première fois ait été encore plus mémorable",
     option2: "Que notre prochaine fois soit la plus belle qu'on ait jamais vécue",
+  },
+  // ── Simples & romantiques (distance) ──
+  {
+    option1: "Qu'on s'endorme ensemble au téléphone chaque soir",
+    option2: "Qu'on se réveille ensemble en appel vidéo chaque matin",
+  },
+  {
+    option1: "Que tu m'envoies un vocal chaque jour en te levant",
+    option2: "Que tu m'envoies une photo de toi chaque soir avant de dormir",
+  },
+  {
+    option1: "Qu'on se retrouve dans 1 semaine pour une soirée romantique",
+    option2: "Qu'on ait une semaine entière ensemble sans contraintes",
+  },
+  {
+    option1: "Qu'on se fasse une date virtuelle avec dîner aux chandelles chacun chez soi",
+    option2: "Qu'on se fasse une soirée film synchronisée ensemble",
+  },
+  {
+    option1: "Que tu m'écrives une lettre manuscrite et que tu me l'envoies",
+    option2: "Que tu m'enregistres un long vocal de 5 minutes en parlant de nous",
+  },
+  // ── Très intimes (adultes, sans label) ──
+  {
+    option1: "Qu'on s'envoie des photos intimes par surprise",
+    option2: "Qu'on fasse un appel vidéo sensuel quand l'envie se fait sentir",
+  },
+  {
+    option1: "Qu'on se chuchote nos fantasmes au téléphone dans le noir",
+    option2: "Qu'on se les écrive en détail dans un long message",
+  },
+  {
+    option1: "Une nuit entière de tendresse et de câlins sans rien d'autre",
+    option2: "Une heure intense et inoubliable de passion pure",
+  },
+  {
+    option1: "Que je sois dominant(e) lors de notre prochaine nuit",
+    option2: "Que tu sois dominant(e) et que je me laisse guider complètement",
+  },
+  {
+    option1: "Me voir arriver chez toi à l'improviste en tenue séduisante",
+    option2: "Recevoir une surprise intime par message que tu n'attendais pas",
+  },
+  {
+    option1: "Que notre prochaine nuit commence par un massage sensuel",
+    option2: "Qu'elle commence par un long baiser sans rien dire",
+  },
+  {
+    option1: "Qu'on explore ensemble quelque chose qu'on n'a jamais osé essayer",
+    option2: "Qu'on revive notre meilleur souvenir intime à l'identique",
+  },
+  {
+    option1: "Que je te déshabille lentement moi-même",
+    option2: "Que tu arrives déjà dans la tenue minimale",
+  },
+  {
+    option1: "Que j'enregistre un vocal intime juste pour toi ce soir",
+    option2: "Que je t'envoie une photo que personne d'autre ne verra jamais",
+  },
+  {
+    option1: "Qu'on se dise exactement ce qu'on veut faire l'un à l'autre lors des retrouvailles",
+    option2: "Que tout reste une surprise et qu'on improvise au moment où on se voit",
   },
 ];
 
