@@ -576,146 +576,91 @@ const TRUTH_OR_DARE = {
 };
 
 const DISTANCE_DARES = [
-  // ── SELFIES & EXPRESSIONS ──
-  "Fais ta plus belle grimace et envoie le selfie ! 📸",
-  "Selfie avec ton plus grand sourire, les yeux plissés ! 📸",
-  "Prends un selfie en faisant semblant d'embrasser ton téléphone ! 📸",
-  "Selfie avec ton regard le plus séducteur possible ! 📸",
-  "Fais une photo de toi avec tes cheveux tous ébouriffés ! 📸",
-  "Selfie en imitant la tête d'un emoji au choix ! 📸",
-  "Prends un selfie avec quelque chose de rouge sur le bout du nez ! 📸",
-  "Photo de toi en train de faire les yeux doux à l'objectif ! 📸",
-  "Selfie en faisant la pose la plus ridicule possible ! 📸",
-  "Selfie avec tes mains formant un cœur devant ton visage ! 📸",
-  "Fais semblant de pleurer de rire et prends le selfie ! 📸",
-  "Selfie avec une couronne improvisée avec ce que tu as sous la main ! 📸",
-  "Prends un selfie les yeux écarquillés comme si tu me voyais ! 📸",
-  "Selfie en soufflant un bisou vers la caméra ! 📸",
-  "Photo de toi avec ta plus belle tête de quelqu'un amoureux ! 📸",
-  "Selfie avec quelque chose de bleu visible sur toi ! 📸",
-  "Fais la pose d'une statue et prends un selfie ! 📸",
-  "Selfie en te cachant à moitié derrière un coussin ou oreiller ! 📸",
-  "Prends un selfie en imitant la jaquette d'un album musical ! 📸",
-  "Selfie les pouces levés comme si tu validais notre relation ! 📸",
+  // ── SELFIES SÉDUISANTS & INTIMES ──
+  "Selfie avec ton regard le plus séducteur — celui que tu me fais quand tu me veux ! 📸",
+  "Photo de tes lèvres légèrement entrouvertes, comme si tu allais m'embrasser ! 📸",
+  "Selfie allongé(e) sur ton lit, draps froissés, regard ensommeillé et désirable ! 📸",
+  "Photo de ta nuque et de ton épaule dénudée — ma partie préférée de toi ! 📸",
+  "Selfie dans ta tenue la plus légère du moment — sois honnête(e) ! 📸",
+  "Photo de tes mains posées sur ton ventre — celles qui me manquent tant ! 📸",
+  "Selfie en mordant légèrement tes lèvres en regardant l'objectif ! 📸",
+  "Photo de toi dans ton lit, couverture à mi-corps, regard provocateur vers la caméra ! 📸",
+  "Selfie avec l'expression exacte que tu fais quand tu penses à moi la nuit ! 📸",
+  "Photo de ta silhouette en contre-jour depuis ton miroir ! 📸",
+  "Selfie avec les cheveux complètement défaits et le regard chaud — comme au réveil ! 📸",
+  "Photo de tes doigts posés sur tes lèvres — imagine que c'est ma main ! 📸",
+  "Selfie avec une main posée sur ta poitrine — là où je te manque le plus ! 📸",
+  "Photo de toi en sous-vêtements depuis ton reflet dans le miroir ! 📸",
+  "Selfie avec le regard que tu me lancerais si j'étais là en ce moment précis ! 📸",
+  "Photo de ton cou légèrement incliné — cette partie que j'adore embrasser ! 📸",
+  "Selfie en te soulevant les cheveux pour m'offrir ta nuque ! 📸",
+  "Photo de tes pieds nus dans ton lit — une intimité simple qui m'appartient ! 📸",
+  "Selfie les yeux à demi-fermés, comme si tu te perdais dans mes bras ! 📸",
+  "Photo de toi allongé(e) sur le ventre, regard caméra — pose lente et sensuelle ! 📸",
+  "Selfie dans ta tenue de nuit — celle que tu portes quand tu t'endors ! 📸",
+  "Photo de ta main posée sur ta cuisse — là où j'aimerais poser la mienne ! 📸",
+  "Selfie avec le sourire légèrement coquin de quelqu'un qui vient de penser à quelque chose d'interdit ! 📸",
+  "Photo depuis ton lit en regardant l'objectif — comme si tu me regardais rentrer ! 📸",
+  "Selfie avec tes cheveux mouillés juste après la douche — si naturel et si excitant ! 📸",
 
-  // ── TEXTES & DESSINS ──
-  "Écris 'je t'aime' sur ton bras et prends-le en photo ! 📸",
-  "Dessine notre portrait de couple et envoie la photo ! 📸",
-  "Écris 3 raisons pour lesquelles tu m'aimes sur un papier et envoie la photo ! 📸",
-  "Dessine un cœur avec nos initiales et envoie la photo ! 📸",
-  "Écris mon prénom de la plus belle façon possible et envoie la photo ! 📸",
-  "Écris une promesse pour moi sur un papier et envoie la photo ! 📸",
-  "Écris 'tu es à moi' en grand sur un papier et envoie la photo ! 📸",
-  "Crée une liste de 5 choses que tu adorerais faire avec moi et prends-la en photo ! 📸",
-  "Écris un haïku (3 lignes) sur nous et envoie la photo ! 📸",
-  "Dessine ce que tu imagines qu'on ferait ensemble ce soir et envoie la photo ! 📸",
-  "Écris la date de notre premier rendez-vous sur un papier et prends-le en photo ! 📸",
-  "Dessine notre animal préféré avec nos prénoms et envoie la photo ! 📸",
-  "Écris 'tu me manques' en autant de langues que possible sur un papier ! 📸",
-  "Fais un dessin qui représente nos 5 ans ensemble (rêvé ou réel) ! 📸",
-  "Écris ton plat préféré qu'on doit cuisiner ensemble, illustré ! 📸",
+  // ── VOCAUX SENSUELS & SECRETS ──
+  "Vocal de 20 secondes : chuchote-moi exactement ce que tu ferais si j'étais dans ton lit là maintenant ! (envoie dans la discussion 🎤)",
+  "Envoie un vocal en prononçant mon prénom de la façon la plus tendre et désirante possible ! (discussion 🎤)",
+  "Vocal de 15 secondes : dis tout haut ton fantasme le plus secret que tu n'as jamais encore avoué ! (discussion 🎤)",
+  "Enregistre ta façon de soupirer quand tu penses à moi intensément — juste ça ! (discussion 🎤)",
+  "Vocal de 20 secondes : décris en détail ce que tu aimerais qu'on se fasse cette nuit ! (discussion 🎤)",
+  "Envoie un vocal en murmurant 'je te veux' de la façon la plus sincère et troublante possible ! (discussion 🎤)",
+  "Vocal de 15 secondes : raconte le souvenir intime avec moi que tu revois le plus souvent dans ta tête ! (discussion 🎤)",
+  "Enregistre-toi en train de dire tout bas ce que tu ressentirais si je te touchais là maintenant ! (discussion 🎤)",
+  "Vocal de 20 secondes : dis-moi ce que tu imagines quand tu es seul(e) la nuit et tu penses à moi ! (discussion 🎤)",
+  "Envoie un vocal de 15 secondes où tu décris exactement où et comment tu aimerais que je te touche ! (discussion 🎤)",
+  "Vocal de 20 secondes : décris la façon dont je t'embrasse qui te fait perdre le contrôle ! (discussion 🎤)",
+  "Enregistre-toi en murmurant les 3 choses que tu adores dans notre intimité ! (discussion 🎤)",
+  "Vocal de 15 secondes : dis-moi le plus coquin que tu aies jamais pensé de moi sans me le dire ! (discussion 🎤)",
+  "Envoie un vocal en décrivant le fantasme que tu n'as encore jamais osé me proposer ! (discussion 🎤)",
+  "Vocal de 20 secondes : décris notre prochaine nuit ensemble avec tous les détails que tu imagines ! (discussion 🎤)",
+  "Enregistre-toi en train de dire 'tu me manques dans mon lit' — laisse les émotions parler ! (discussion 🎤)",
+  "Vocal de 15 secondes : chuchote mon prénom 3 fois — tendre, passionné(e), puis désespéré(e) ! (discussion 🎤)",
+  "Enregistre ce que tu aimerais que je te fasse en premier si j'arrivais chez toi maintenant ! (discussion 🎤)",
 
-  // ── DANSES & MOUVEMENTS ──
-  "Envoie une vidéo de 15 secondes en dansant ta danse préférée ! 🎥",
-  "Fais une vidéo de toi qui danse sur notre chanson coup de cœur ! 🎥",
-  "Vidéo de 10 secondes : danse en pyjama ou tenue de maison ! 🎥",
-  "Imite un danseur professionnel pendant 15 secondes en vidéo ! 🎥",
-  "Invente une danse spéciale dédiée à moi et envoie la vidéo ! 🎥",
-  "Fais 10 secondes de ta danse la plus ridicule en vidéo ! 🎥",
-  "Danse sur une musique classique pendant 15 secondes en vidéo ! 🎥",
-  "Fais une chorégraphie de 20 secondes sur la chanson de ton choix ! 🎥",
-  "Imite un robot qui danse pendant 15 secondes en vidéo ! 🎥",
+  // ── VIDÉOS SENSUELLES & PROVOCANTES ──
+  "Vidéo de 15 secondes : glisse lentement les mains dans tes cheveux en me regardant dans les yeux ! 🎥",
+  "Vidéo de 15 secondes : décoiffe-toi lentement face à la caméra sans rien dire ! 🎥",
+  "Vidéo de 15 secondes : enlève un vêtement lentement — juste un — en regardant l'objectif ! 🎥",
+  "Vidéo de 20 secondes : chuchote tout ce que tu veux qu'on se fasse la prochaine fois qu'on est ensemble ! 🎥",
+  "Vidéo de 10 secondes : mords-toi les lèvres en me regardant dans la caméra ! 🎥",
+  "Vidéo de 15 secondes : glisse doucement la bretelle de ton haut ou dégrafe quelque chose lentement ! 🎥",
+  "Vidéo de 20 secondes : décris exactement ce que tu ressentirais si je te touchais là maintenant ! 🎥",
+  "Vidéo de 15 secondes : montre-moi comment tu t'endors quand tu imagines que je suis à côté de toi ! 🎥",
+  "Vidéo de 15 secondes : passe lentement tes mains dans ton cou comme si c'était moi ! 🎥",
+  "Vidéo de 20 secondes : dis-moi ce que tu aimerais me faire si j'arrivais chez toi là maintenant ! 🎥",
+  "Vidéo de 20 secondes : allongé(e) sur ton lit, yeux fermés, laisse-toi aller en imaginant que je suis là ! 🎥",
+  "Vidéo de 15 secondes : montre-moi le geste exact que tu ferais pour m'attirer vers toi ! 🎥",
+  "Vidéo de 20 secondes : décris la partie de mon corps que tu as le plus envie de toucher là maintenant ! 🎥",
+  "Vidéo de 15 secondes : imite la façon dont tu m'embrasses — contre ton oreiller ! 🎥",
+  "Vidéo de 20 secondes : caresse-toi lentement le visage comme si c'était ma main ! 🎥",
+  "Vidéo de 15 secondes : danse contre moi — seul(e), mais comme si j'étais dans tes bras ! 🎥",
+  "Vidéo de 20 secondes : montre-moi comment tu réagirais si je te réveillais avec des bisous partout ! 🎥",
+  "Vidéo de 20 secondes : montre-moi ce que tu fais quand tu as vraiment envie de moi et que je ne suis pas là ! 🎥",
+  "Vidéo de 15 secondes : regarde-toi dans le miroir et dis-moi à voix haute ce que tu penses de toi quand tu sais que je te regarde ! 🎥",
+  "Vidéo de 20 secondes : montre-moi ta façon la plus sensuelle de t'habiller ou de te déshabiller lentement ! 🎥",
 
-  // ── CHANT & MUSIQUE ──
-  "Chante le refrain d'une chanson qui te fait penser à moi en vidéo ! 🎥",
-  "Siffle ou fredonne notre mélodie préférée en vidéo ! 🎥",
-  "Chante 'je t'aime' dans 3 langues différentes en vidéo ! 🎥",
-  "Invente une chanson sur nous de 20 secondes et envoie la vidéo ! 🎥",
-  "Bats un rythme sur la table et chante quelque chose pour moi ! 🎥",
-  "Imite ta chanteuse ou ton chanteur préféré en vidéo de 15 secondes ! 🎥",
-  "Chante 'happy birthday' à notre relation en vidéo ! 🎥",
-
-  // ── DÉCLARATIONS VIDÉO ──
-  "Fais une vidéo de 20 secondes pour me dire pourquoi tu m'aimes ! 🎥",
-  "Vidéo : raconte notre plus beau souvenir ensemble en 30 secondes ! 🎥",
-  "Dis-moi en vidéo ce que tu ferais si j'étais là maintenant ! 🎥",
-  "Envoie une vidéo de toi en train de me faire une déclaration d'amour ! 🎥",
-  "Fais une vidéo de 15 secondes : parle-moi comme si tu me voyais pour la première fois ! 🎥",
-  "Vidéo de 20 secondes : dis-moi ce qui me rend unique à tes yeux ! 🎥",
-  "Fais une vidéo de 15 secondes en imitant ma façon de parler ! 🎥",
-  "Vidéo : dis-moi ton endroit de rêve pour partir en vacances avec moi ! 🎥",
-  "Fais une vidéo de 20 secondes pour me dire ce que tu ferais si tu avais une baguette magique ! 🎥",
-  "Envoie une vidéo de toi en train de m'expliquer pourquoi tu es la/le meilleur(e) partenaire ! 🎥",
-  "Raconte en vidéo ce que tu ressentais le jour où tu as compris que tu m'aimais ! 🎥",
-
-  // ── DÉFIS CHEZ SOI ──
-  "Prends en photo la vue depuis ta fenêtre pour moi ! 📸",
-  "Photo de l'endroit le plus confortable de chez toi ! 📸",
-  "Prends en photo ton plat ou boisson du moment ! 📸",
-  "Photo de ton objet préféré chez toi ! 📸",
-  "Prends en photo quelque chose qui te fait penser à moi chez toi ! 📸",
-  "Photo d'un objet en forme de cœur que tu trouves autour de toi ! 📸",
-  "Prends en photo la chose la plus mignonne que tu as chez toi ! 📸",
-  "Photo de ta tasse ou verre préféré(e) ! 📸",
-  "Prends en photo un objet qui a une valeur sentimentale pour toi ! 📸",
-  "Selfie dans la pièce la plus lumineuse de chez toi ! 📸",
-  "Photo de tes pieds dans ta position la plus confortable ! 📸",
-  "Prends en photo ce que tu vois depuis là où tu es en ce moment ! 📸",
-  "Photo du coin le plus sympa de ta chambre ou salon ! 📸",
-
-  // ── DÉFIS CRÉATIFS ──
-  "Arrange des objets pour former le mot AMOUR et prends une photo ! 📸",
-  "Fais un bonhomme ou personnage avec de la nourriture et prends-le en photo ! 📸",
-  "Fais une œuvre d'art avec ce que tu as autour de toi et envoie la photo ! 📸",
-  "Crée un mini-autel avec des objets chez toi en mon honneur et prends-le en photo 😂 📸",
-  "Range des objets de 5 couleurs différentes côte à côte et prends-les en photo ! 📸",
-  "Fais une sculpture ou une tour avec tout ce que tu as à portée de main ! 📸",
-  "Écris mon prénom avec des objets du quotidien et prends-le en photo ! 📸",
-  "Crée un cadre photo imaginaire avec tes mains autour de quelque chose de beau ! 📸",
-
-  // ── TENDRESSE VIRTUELLE ──
-  "Enlace ton oreiller en t'imaginant que c'est moi et prends un selfie ! 📸",
-  "Fais semblant que le téléphone c'est moi et souffles-lui un bisou en vidéo ! 🎥",
-  "Prends un selfie au lit avec les couvertures remontées jusqu'au nez ! 📸",
-  "Vidéo de 15 secondes : dis-moi comment tu m'imaginais avant qu'on se rencontre ! 🎥",
-  "Fais la démonstration de comment tu réagirais si j'arrivais chez toi par surprise ! 🎥",
-
-  // ── AMUSANTS & RIGOLOS ──
-  "Imite un animal pendant 15 secondes en vidéo ! 🎥",
-  "Fais semblant d'être un présentateur de journal télévisé et parle de notre couple ! 🎥",
-  "Imite comment tu agis quand tu veux me convaincre de quelque chose en vidéo ! 🎥",
-  "Raconte une blague qui te fait mourir de rire en vidéo ! 🎥",
-  "Fais la démonstration de ta plus grande maladresse en 15 secondes de vidéo ! 🎥",
-  "Imite le meilleur acteur ou actrice que tu connais en vidéo de 15 secondes ! 🎥",
-  "Fais une publicité de 20 secondes pour notre couple comme si c'était un produit ! 🎥",
-  "Imite comment tu réagirais si je t'annonçais que je suis en bas de chez toi là maintenant ! 🎥",
-
-  // ── NOUVELLES DÉFIS INTIMES À DISTANCE ──
-  "Envoie un selfie dans ta tenue la plus confortable du moment ! 📸",
-  "Photo de tes lèvres en train de faire un bisou vers la caméra ! 📸",
-  "Selfie au lit avec le regard le plus ensommeillé et adorable possible ! 📸",
-  "Prends un selfie avec quelque chose qui représente comment tu te sens sans moi ! 📸",
-  "Envoie une vidéo de 10 secondes où tu me dis ce que tu ferais si j'étais là maintenant ! 🎥",
-  "Enregistre un vocal de 15 secondes où tu me chuchotes quelque chose que tu ne dirais qu'à moi ! 🎤",
-  "Photo de l'endroit exact où tu t'imagines nous deux ensemble ! 📸",
-  "Selfie avec ton meilleur sourire 'je pense à toi' ! 📸",
-  "Envoie une vidéo de toi en train de me souffler 3 bisous un par un en nommant où tu les poses ! 🎥",
-  "Photo de quelque chose de rouge que tu portes ou que tu tiens, pour que je pense à ta chaleur ! 📸",
-  "Enregistre ta voix en disant 'je t'aime' dans 5 langues différentes ! 🎤",
-  "Selfie en pyjama ou en sous-vêtements (acceptable !) sur ton lit ! 📸",
-  "Vidéo de toi en train de te préparer un café ou une boisson en imaginant que c'est pour nous deux ! 🎥",
-  "Envoie un selfie où tu tiens quelque chose de chaud contre ta joue — et imagine que c'est ma main ! 📸",
-  "Prends en photo le coin de ton lit de ton côté et explique-moi comment tu m'imagines dedans ! 📸",
-  "Fais une vidéo de 15 secondes en me lisant un poème ou une citation romantique ! 🎥",
-  "Envoie un selfie en soufflant sur tes mains pour les réchauffer — envoie-moi ta chaleur ! 📸",
-  "Vidéo de toi en train de chuchoter mon prénom 3 fois comme si j'étais juste à côté ! 🎥",
-  "Photo de ce que tu regardes quand tu penses à moi la nuit ! 📸",
-  "Enregistre ta façon de dire 'bonne nuit mon amour' comme si j'étais là ! 🎤",
-  "Selfie avec tes yeux fermés — imagine que tu m'attends pour un bisou ! 📸",
-  "Fais une vidéo de toi en train de danser lentement comme si j'étais dans tes bras ! 🎥",
-  "Prends un selfie dans le miroir avec l'expression 'je te veux près de moi maintenant' ! 📸",
-  "Enregistre un message vocal de 20 secondes pour me décrire comment tu m'imagines en ce moment ! 🎤",
-  "Fais une vidéo de 15 secondes en me disant tout ce qu'on ferait si on était ensemble ce soir ! 🎥",
+  // ── PHOTOS & MESSAGES INTIMES ──
+  "Écris sur ton bras ou ta main là où tu voudrais que je t'embrasse — et prends une photo ! 📸",
+  "Photo de ton oreiller que tu sers contre toi en imaginant que c'est moi ! 📸",
+  "Photo du vêtement exact que tu portes en ce moment — pour que j'imagine comment tu es ! 📸",
+  "Écris ce que tu voudrais me faire sur un papier, tiens-le sur ta peau — prends la photo ! 📸",
+  "Écris ton fantasme le plus secret sur un papier, pose-le contre ta bouche — et prends la photo ! 📸",
+  "Photo de toi depuis ton miroir en sous-vêtements ou dans la tenue la plus légère du moment ! 📸",
+  "Écris 'j'ai besoin de toi' avec ton doigt sur la buée du miroir ou une vitre — prends-le en photo ! 📸",
+  "Photo de la partie de ton corps que tu voudrais que je touche en premier si j'arrivais ! 📸",
+  "Photo de ton côté du lit vide avec le message 'ta place m'attend' — pour que j'y pense ! 📸",
+  "Écris ce que tu ressentirais si on se retrouvait là maintenant — sur papier, et prends en photo ! 📸",
+  "Photo de toi en position exactement comme tu es quand tu penses à moi de façon intime ! 📸",
+  "Photo de tes jambes croisées sur ton lit — une partie de toi qui m'appartient ! 📸",
+  "Écris la phrase que je dis qui te trouble le plus sur ta peau et prends-la en photo ! 📸",
+  "Photo de toi allongé(e), un seul vêtement légèrement décalé, regard vers l'objectif ! 📸",
+  "Photo de notre dernière photo ensemble sur ton téléphone — rappelle-moi pourquoi tu me manques ! 📸",
 ];
 
 const WHO_IS_MORE = [
@@ -2052,10 +1997,16 @@ export default function GamesScreen() {
     // 5. Écouter le signal "prêt pour le tour suivant" du partenaire
     const readyKey = `ready_next_tod_${todRound}`;
     const readyData = findPartnerData(readyKey);
-    if (readyData) {
-      if (todWaitingNextSync && !alreadyProcessed(`ready_${todRound}`)) {
+    if (readyData && !alreadyProcessed(`ready_${todRound}`)) {
+      if (todWaitingNextSync) {
+        // Je suis le questioner qui attendait la confirmation du répondeur → avancer
         console.log('✅ Partenaire prêt pour le tour suivant → on avance');
         advanceToNextTodRound();
+      } else if (todWaitingReaction) {
+        // Le questioner a sauté sa réaction (nextTodRound) sans réagir → débloquer le répondeur
+        console.log('✅ Questioner a sauté la réaction → répondeur avance aussi');
+        setTodWaitingReaction(false);
+        setTimeout(() => advanceToNextTodRound(), 400);
       }
     }
 
