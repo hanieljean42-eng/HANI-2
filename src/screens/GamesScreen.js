@@ -285,6 +285,160 @@ const QUIZ_QUESTIONS = [
     question: "Quelle est ma plus grosse dépense récente ?",
     type: "open",
   },
+  // Nouvelles questions 18+ & intimes
+  {
+    id: 51,
+    question: "Quel est l'endroit de mon corps que tu aimes caresser en secret ?",
+    type: "open",
+  },
+  {
+    id: 52,
+    question: "Quelle est la chose que je fais qui t'excite sans que je le sache ?",
+    type: "open",
+  },
+  {
+    id: 53,
+    question: "Quel est mon parfum ou mon odeur naturelle qui te plaît le plus ?",
+    type: "open",
+  },
+  {
+    id: 54,
+    question: "Comment je réagis quand on se dispute et que tu as raison ?",
+    type: "open",
+  },
+  {
+    id: 55,
+    question: "Quelle est la première chose que tu regardes chez moi le matin au réveil ?",
+    type: "open",
+  },
+  {
+    id: 56,
+    question: "Quel est mon plus grand défaut que tu trouves mignon malgré tout ?",
+    type: "open",
+  },
+  {
+    id: 57,
+    question: "Quelle est ma phrase préférée quand je veux quelque chose de toi ?",
+    type: "open",
+  },
+  {
+    id: 58,
+    question: "Quel est le son ou la voix que je fais qui te fait fondre ?",
+    type: "open",
+  },
+  {
+    id: 59,
+    question: "Quelle est mon heure préférée pour faire l'amour ?",
+    type: "choice",
+    options: ["Le matin", "L'après-midi", "Le soir", "La nuit", "N'importe quand"],
+  },
+  {
+    id: 60,
+    question: "Quel est le fantasme que tu penses que j'ai sans jamais te l'avoir dit ?",
+    type: "open",
+  },
+  {
+    id: 61,
+    question: "Comment je me comporte quand je suis timide devant toi ?",
+    type: "open",
+  },
+  {
+    id: 62,
+    question: "Quelle est ma position préférée pour dormir ?",
+    type: "choice",
+    options: ["Sur le dos", "Sur le ventre", "Sur le côté", "Collé(e) contre toi", "En étoile"],
+  },
+  {
+    id: 63,
+    question: "Quelle chose intime que j'aime et que tu n'aurais pas devinée ?",
+    type: "open",
+  },
+  {
+    id: 64,
+    question: "Quel est mon geste affectueux préféré pendant l'intimité ?",
+    type: "open",
+  },
+  {
+    id: 65,
+    question: "Qu'est-ce que je fais juste avant de m'endormir chaque soir ?",
+    type: "open",
+  },
+  {
+    id: 66,
+    question: "Quel est mon film ou série que je peux regarder en boucle ?",
+    type: "open",
+  },
+  {
+    id: 67,
+    question: "Quelle est ma réaction quand quelqu'un d'autre te regarde ?",
+    type: "open",
+  },
+  {
+    id: 68,
+    question: "Quel est le compliment qui me touche le plus venant de toi ?",
+    type: "open",
+  },
+  {
+    id: 69,
+    question: "Quelle est la chose que je dis toujours avant de t'embrasser ?",
+    type: "open",
+  },
+  {
+    id: 70,
+    question: "Quel est mon type de musique pour l'ambiance intime ?",
+    type: "choice",
+    options: ["R&B / Soul", "Rap doux", "Jazz", "Pop romantique", "Silence total", "Peu importe"],
+  },
+  {
+    id: 71,
+    question: "Comment je me comporte après une nuit torride avec toi ?",
+    type: "open",
+  },
+  {
+    id: 72,
+    question: "Quel est mon endroit préféré pour recevoir des bisous ?",
+    type: "open",
+  },
+  {
+    id: 73,
+    question: "Quelle est ma façon d'exprimer que j'ai envie de toi sans le dire ?",
+    type: "open",
+  },
+  {
+    id: 74,
+    question: "Quel est l'endroit le plus romantique où j'aimerais qu'on passe une nuit ?",
+    type: "open",
+  },
+  {
+    id: 75,
+    question: "Quelle est la tenue chez moi qui te rend fou/folle ?",
+    type: "open",
+  },
+  {
+    id: 76,
+    question: "Quel est mon rituel préféré après qu'on se réconcilie ?",
+    type: "open",
+  },
+  {
+    id: 77,
+    question: "Qu'est-ce que je fais quand j'essaie de te séduire mais que tu résistes ?",
+    type: "open",
+  },
+  {
+    id: 78,
+    question: "Quel est le mot doux que je te dis le plus souvent ?",
+    type: "open",
+  },
+  {
+    id: 79,
+    question: "Quelle est ma plus grande addiction liée à toi ?",
+    type: "open",
+  },
+  {
+    id: 80,
+    question: "Quel est le moment où tu me trouves le plus irrésistible ?",
+    type: "open",
+  },
 ];
 
 const TRUTH_OR_DARE = {
@@ -331,6 +485,29 @@ const TRUTH_OR_DARE = {
     "Tu préfères les préliminaires longs ou aller droit au but ?",
     "Quelle est ta position préférée avec moi ?",
     "Qu'est-ce qui t'a le plus surpris(e) chez moi intimement ?",
+    // Nouvelles vérités profondes
+    "Quel est le moment exact où tu as su que tu étais amoureux/se de moi ?",
+    "Qu'est-ce que je fais inconsciemment qui te rend fou/folle d'amour ?",
+    "Quelle est la chose la plus courageuse que tu aies faite pour moi ?",
+    "Si tu devais me décrire en 3 mots à quelqu'un qui ne me connaît pas, tu dirais quoi ?",
+    "Quel est le secret que tu gardes sur toi et que tu n'as jamais osé me dire ?",
+    "C'est quoi le plus beau rêve que tu as fait sur nous deux ?",
+    "Quel geste de ma part t'a le plus touché(e) sans que je l'aie réalisé ?",
+    "Si on devait rejouer notre première rencontre, tu changerais quoi ?",
+    "Quelle est la jalousie que tu as ressentie à mon sujet et que tu n'as jamais avouée ?",
+    "Quel est ton fantasme de couple que tu n'oses pas encore proposer ?",
+    // Nouvelles vérités intimes 18+
+    "Quelle est la partie de mon corps qui t'obsède le plus ?",
+    "Qu'est-ce que tu voudrais qu'on essaie ensemble qu'on n'a pas encore fait ?",
+    "Comment tu te sens quand on se frôle en public sans le montrer aux autres ?",
+    "Quel est le message le plus coquin que tu m'as envoyé et dont tu es encore fier/fière ?",
+    "C'est quoi l'endroit le plus excitant où tu voudrais qu'on soit intimes hors de la maison ?",
+    "Qu'est-ce que tu fais ou penses quand tu es seul(e) et que tu penses à moi intimement ?",
+    "Quel est le geste que je fais pendant l'intimité qui te fait perdre la tête ?",
+    "Si tu pouvais contrôler notre prochaine nuit ensemble de A à Z, ce serait comment ?",
+    "Quelle est la chose que j'ai portée (tenue, parfum...) qui t'a le plus excité(e) ?",
+    "C'est quoi le souvenir intime avec moi que tu revois le plus souvent dans ta tête ?",
+    "Qu'est-ce que tu murmures ou penses quand tu es à deux doigts de perdre le contrôle avec moi ?",
   ],
   dares: [
     // Actions Classiques Couple
@@ -374,6 +551,27 @@ const TRUTH_OR_DARE = {
     "Dis-moi ton plus grand désir avec moi ce soir.",
     "Mordille-moi légèrement l'oreille.",
     "Guide ma main où tu veux.",
+    // Nouvelles actions classiques
+    "Dis-moi ce que tu aimes le plus dans notre couple en une seule phrase.",
+    "Fais-moi une bise sur chaque joue puis sur le nez.",
+    "Écris un message doux et envoie-le à ma famille en mon nom.",
+    "Fais semblant de m'interviewer sur 'comment être le/la meilleur(e) partenaire'.",
+    "Chante 10 secondes d'une chanson qui te fait penser à moi.",
+    "Raconte-moi un souvenir avec moi qui te fait encore sourire maintenant.",
+    // Nouvelles actions intimes 18+
+    "Embrasse-moi lentement dans le cou pendant 30 secondes.",
+    "Dis-moi exactement ce que tu voudrais qu'on se fasse ce soir.",
+    "Retire doucement un vêtement sans rien dire.",
+    "Décris ma silhouette en me regardant droit dans les yeux.",
+    "Pose ta main là où tu as envie de me toucher sans bouger pendant 20 secondes.",
+    "Murmure à mon oreille le plus coquin que tu penses de moi en ce moment.",
+    "Regarde-moi avec le regard le plus séducteur possible pendant 30 secondes.",
+    "Trace lentement ton prénom sur ma peau avec ton doigt.",
+    "Montre-moi comment tu veux être réveillé(e) demain matin.",
+    "Fais-moi un bisou exactement là où tu sais que j'aime le plus.",
+    "Dis-moi en 3 mots ce que tu ressentirais si on passait une nuit entière à s'aimer.",
+    "Enlace-moi par derrière et chuchote quelque chose que tu n'as jamais osé dire.",
+    "Montre-moi le geste que tu fais naturellement quand tu as envie de moi.",
   ],
 };
 
@@ -491,6 +689,33 @@ const DISTANCE_DARES = [
   "Imite le meilleur acteur ou actrice que tu connais en vidéo de 15 secondes ! 🎥",
   "Fais une publicité de 20 secondes pour notre couple comme si c'était un produit ! 🎥",
   "Imite comment tu réagirais si je t'annonçais que je suis en bas de chez toi là maintenant ! 🎥",
+
+  // ── NOUVELLES DÉFIS INTIMES À DISTANCE ──
+  "Envoie un selfie dans ta tenue la plus confortable du moment ! 📸",
+  "Photo de tes lèvres en train de faire un bisou vers la caméra ! 📸",
+  "Selfie au lit avec le regard le plus ensommeillé et adorable possible ! 📸",
+  "Prends un selfie avec quelque chose qui représente comment tu te sens sans moi ! 📸",
+  "Envoie une vidéo de 10 secondes où tu me dis ce que tu ferais si j'étais là maintenant ! 🎥",
+  "Enregistre un vocal de 15 secondes où tu me chuchotes quelque chose que tu ne dirais qu'à moi ! 🎤",
+  "Photo de l'endroit exact où tu t'imagines nous deux ensemble ! 📸",
+  "Selfie avec ton meilleur sourire 'je pense à toi' ! 📸",
+  "Envoie une vidéo de toi en train de me souffler 3 bisous un par un en nommant où tu les poses ! 🎥",
+  "Photo de quelque chose de rouge que tu portes ou que tu tiens, pour que je pense à ta chaleur ! 📸",
+  "Enregistre ta voix en disant 'je t'aime' dans 5 langues différentes ! 🎤",
+  "Selfie en pyjama ou en sous-vêtements (acceptable !) sur ton lit ! 📸",
+  "Vidéo de toi en train de te préparer un café ou une boisson en imaginant que c'est pour nous deux ! 🎥",
+  "Envoie un selfie où tu tiens quelque chose de chaud contre ta joue — et imagine que c'est ma main ! 📸",
+  "Prends en photo le coin de ton lit de ton côté et explique-moi comment tu m'imagines dedans ! 📸",
+  "Fais une vidéo de 15 secondes en me lisant un poème ou une citation romantique ! 🎥",
+  "Envoie un selfie en soufflant sur tes mains pour les réchauffer — envoie-moi ta chaleur ! 📸",
+  "Vidéo de toi en train de chuchoter mon prénom 3 fois comme si j'étais juste à côté ! 🎥",
+  "Photo de ce que tu regardes quand tu penses à moi la nuit ! 📸",
+  "Enregistre ta façon de dire 'bonne nuit mon amour' comme si j'étais là ! 🎤",
+  "Selfie avec tes yeux fermés — imagine que tu m'attends pour un bisou ! 📸",
+  "Fais une vidéo de toi en train de danser lentement comme si j'étais dans tes bras ! 🎥",
+  "Prends un selfie dans le miroir avec l'expression 'je te veux près de moi maintenant' ! 📸",
+  "Enregistre un message vocal de 20 secondes pour me décrire comment tu m'imagines en ce moment ! 🎤",
+  "Fais une vidéo de 15 secondes en me disant tout ce qu'on ferait si on était ensemble ce soir ! 🎥",
 ];
 
 const WHO_IS_MORE = [
@@ -616,6 +841,29 @@ const WHO_IS_MORE = [
   "Qui est le plus susceptible de lancer un jeu amoureux ?",
   "Qui est le plus susceptible de garder un souvenir d'un baiser ?",
   "Qui est le plus susceptible de rêver de nous en train de faire l'amour ?",
+  // Nouvelles questions 18+ & intimes
+  "Qui initie le plus souvent l'intimité ?",
+  "Qui est le plus expressif/ve pendant un baiser passionné ?",
+  "Qui est le plus susceptible de rougir pendant un moment intime ?",
+  "Qui prend le plus son temps pendant les préliminaires ?",
+  "Qui est le plus joueur/joueuse au lit ?",
+  "Qui est le plus susceptible de proposer quelque chose de nouveau intimement ?",
+  "Qui est le plus difficile à satisfaire ?",
+  "Qui est le plus susceptible de câliner après l'amour ?",
+  "Qui a le plus de self-control face à l'autre ?",
+  "Qui est le plus accro aux bisous dans le cou ?",
+  "Qui est le plus bruyant/bruyante pendant l'intimité ?",
+  "Qui serait le plus à l'aise pour parler ouvertement de ses désirs ?",
+  "Qui est le plus susceptible d'envoyer un message coquin en pleine journée ?",
+  "Qui a plus de mal à résister quand l'autre est séducteur/séductrice ?",
+  "Qui est le plus tendre après une nuit torride ?",
+  "Qui est le plus susceptible d'avoir un fantasme inavoué ?",
+  "Qui est le plus à l'aise pour parler de sexualité ouvertement ?",
+  "Qui est le plus susceptible d'attirer le regard des autres dans la rue ?",
+  "Qui est le plus attachant/attachante émotionnellement ?",
+  "Qui est le plus susceptible de pleurer de bonheur pendant un moment fort entre nous ?",
+  "Qui est le plus tactile dans les moments de tendresse ?",
+  "Qui est le plus curieux/curieuse des préférences intimes de l'autre ?",
 ];
 
 const WOULD_YOU_RATHER = [
@@ -887,6 +1135,87 @@ const WOULD_YOU_RATHER = [
   {
     option1: "Qu'on se déguise ensemble pour Halloween",
     option2: "Qu'on fasse un costume coordonné pour le carnaval",
+  },
+  // Nouvelles questions romantiques & 18+
+  {
+    option1: "Qu'on passe une nuit torride mais courte",
+    option2: "Qu'on passe une longue nuit de tendresse et de câlins",
+  },
+  {
+    option1: "Que je te réveille avec des bisous partout",
+    option2: "Que je te prépare le petit-déjeuner parfait au lit",
+  },
+  {
+    option1: "Qu'on soit inséparables même en public",
+    option2: "Qu'on garde notre complicité secrète pour nous deux",
+  },
+  {
+    option1: "Que je te dise exactement ce que je veux au lit",
+    option2: "Que tu devines tout ce que je veux sans que je le dise",
+  },
+  {
+    option1: "Qu'on passe une nuit dans un hôtel 5 étoiles",
+    option2: "Qu'on dorme sous les étoiles ensemble en camping",
+  },
+  {
+    option1: "Que je sois totalement passionné(e) mais imprévisible",
+    option2: "Que je sois attentionné(e) et toujours prévisible",
+  },
+  {
+    option1: "Qu'on ait des moments intimes courts mais intenses chaque jour",
+    option2: "Qu'on ait de longs moments passionnés chaque semaine",
+  },
+  {
+    option1: "Que je sois le genre à t'embrasser devant tout le monde",
+    option2: "Que je réserve mes baisers uniquement pour toi en privé",
+  },
+  {
+    option1: "Qu'on explore un nouveau fantasme ensemble",
+    option2: "Qu'on perfectionne ce qu'on sait déjà que l'on aime",
+  },
+  {
+    option1: "Que je sois audacieux/audacieuse et prenne toujours l'initiative",
+    option2: "Que tu prennes toujours l'initiative et je suis toujours partant(e)",
+  },
+  {
+    option1: "Qu'on parle ouvertement de nos désirs les plus secrets",
+    option2: "Qu'on se découvre mutuellement par surprise",
+  },
+  {
+    option1: "Que notre intimité soit douce et romantique",
+    option2: "Que notre intimité soit passionnée et sauvage",
+  },
+  {
+    option1: "Qu'on fasse l'amour en plein air en toute discrétion",
+    option2: "Qu'on s'enferme chez nous tout un week-end",
+  },
+  {
+    option1: "Que je te surprenne avec un massage sensuel un soir",
+    option2: "Que tu me surprennes avec un moment complètement inattendu",
+  },
+  {
+    option1: "Qu'on partage tous nos fantasmes sans tabou",
+    option2: "Qu'on garde chacun un petit jardin secret qui pimente les choses",
+  },
+  {
+    option1: "Que notre vie intime reste toujours aussi intense qu'au début",
+    option2: "Qu'elle évolue avec le temps vers quelque chose de plus profond",
+  },
+  {
+    option1: "Qu'on joue à un jeu de séduction inventé par nous deux",
+    option2: "Qu'on suive les règles d'un jeu de couple classique",
+  },
+  {
+    option1: "Que je sois accro à ton regard",
+    option2: "Que je sois accro à ton toucher",
+  },
+  {
+    option1: "Qu'on se fasse des massages mutuels chaque dimanche",
+    option2: "Qu'on se fasse un bain chaud ensemble chaque samedi",
+  },
+  {
+    option1: "Que notre première fois ait été encore plus mémorable",
+    option2: "Que notre prochaine fois soit la plus belle qu'on ait jamais vécue",
   },
 ];
 
@@ -2321,6 +2650,7 @@ export default function GamesScreen() {
 
             {/* ══════ REVEAL (online + local) ══════ */}
             {wyrPhase === 'reveal' && (
+              <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View style={styles.quizRevealContainer}>
                 <Text style={styles.quizRevealTitle}>🔮 Révélation !</Text>
                 
@@ -2396,6 +2726,7 @@ export default function GamesScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+              </ScrollView>
             )}
 
             {/* ══════ MODE ONLINE: En attente que le partenaire clique Suivant ══════ */}
@@ -3989,6 +4320,7 @@ export default function GamesScreen() {
 
             {/* ══════ REVEAL (online + local) ══════ */}
             {wimPhase === 'reveal' && (
+              <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View style={styles.quizRevealContainer}>
                 <Text style={styles.quizRevealTitle}>🔮 Révélation !</Text>
                 
@@ -4074,7 +4406,7 @@ export default function GamesScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-              </View>
+              </ScrollView>
             )}
 
             {/* ══════ MODE ONLINE: En attente que le partenaire clique Suivant ══════ */}
@@ -5790,7 +6122,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginVertical: 10,
     width: '100%',
+    maxHeight: 300,
     overflow: 'hidden',
+    flexShrink: 1,
   },
   discussPanelHeader: {
     flexDirection: 'row',
@@ -5802,7 +6136,7 @@ const styles = StyleSheet.create({
   },
   discussPanelTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
   discussPanelClose: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-  discussMsgList: { maxHeight: 220, paddingHorizontal: 10 },
+  discussMsgList: { flex: 1, maxHeight: 170, minHeight: 60, paddingHorizontal: 10 },
   discussMsgEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center', paddingVertical: 10, fontStyle: 'italic' },
   discussMsgBubble: {
     maxWidth: '80%',

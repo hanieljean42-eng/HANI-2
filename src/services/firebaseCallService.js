@@ -223,25 +223,6 @@ class FirebaseCallService {
     }
   }
 
-  // ✅ Toggle haut-parleur
-  toggleSpeaker() {
-    this._isSpeaker = !this._isSpeaker;
-    console.log(`🔊 Haut-parleur ${this._isSpeaker ? 'activé' : 'désactivé'}`);
-    Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: !this._isSpeaker,
-    }).catch(() => {});
-    return this._isSpeaker;
-  }
-
-  // ✅ Vérifier si haut-parleur actif
-  get isSpeaker() {
-    return this._isSpeaker;
-  }
-
   // ✅ Envoyer un chunk audio vers Firebase (non-bloquant)
   async _sendChunkAsync(uri) {
     try {
@@ -395,11 +376,11 @@ class FirebaseCallService {
     }
     this._partnerListeners = [];
 
-    // Nettoyer les données audio sur Firebase
-    if (this.coupleId && database) {
+    // Nettoyer uniquement MON stream audio sur Firebase (pas celui du partenaire)
+    if (this.coupleId && this.userId && database) {
       try {
-        const streamRef = ref(database, `couples/${this.coupleId}/calls/audioStream`);
-        await set(streamRef, null);
+        const myStreamRef = ref(database, `couples/${this.coupleId}/calls/audioStream/${this.userId}`);
+        await set(myStreamRef, null);
       } catch (e) { /* ignore */ }
     }
 
