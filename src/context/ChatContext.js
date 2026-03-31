@@ -30,6 +30,7 @@ export function ChatProvider({ children }) {
   const listenerRef = useRef(null);
   const isCallerRef = useRef(false);
   const pendingOfferListenerRef = useRef(null);
+  const webrtcStartedRef = useRef(false); // ✅ éviter double-appel startWebRTCCall
   const lastMessageTimestampRef = useRef(null); // Pour détecter les NOUVEAUX messages
   const isChatActiveRef = useRef(false); // true si l'utilisateur est sur l'écran chat
 
@@ -208,12 +209,14 @@ export function ChatProvider({ children }) {
             .catch(e => console.log('⚠️ WebRTC call error:', e));
         } else if (callData.status === 'rejected') {
           console.log('📵 Appel rejeté par le partenaire');
+          webrtcStartedRef.current = false;
           setIncomingCall(null);
           setActiveCall(prev => prev ? { ...prev, status: 'rejected' } : null);
           setWebrtcState(null);
           setIsCallScreenActive(false);
           webrtcService.cleanup().catch(() => {});
         } else if (callData.status === 'ended') {
+          webrtcStartedRef.current = false;
           setIncomingCall(null);
           setActiveCall(null);
           setWebrtcState(null);
@@ -222,6 +225,7 @@ export function ChatProvider({ children }) {
         }
       } else {
         // Noeud supprimé = appel terminé (l'autre côté a raccroché)
+        webrtcStartedRef.current = false;
         setIncomingCall(null);
         setActiveCall(null);
         setWebrtcState(null);
@@ -407,6 +411,12 @@ export function ChatProvider({ children }) {
 
   // ─── WebRTC : démarrer un appel full-duplex (cross-réseau via STUN/TURN) ───
   const startWebRTCCall = async (coupleId, userId, callType, isInitiator) => {
+    // ✅ Guard : ne démarrer qu'une seule fois par appel
+    if (webrtcStartedRef.current) {
+      console.log('⚠️ startWebRTCCall déjà lancé, skip');
+      return;
+    }
+    webrtcStartedRef.current = true;
     try {
       setWebrtcState('connecting');
       webrtcService.init(coupleId, userId);
@@ -414,7 +424,15 @@ export function ChatProvider({ children }) {
       webrtcService.onRemoteStream = (stream) => setRemoteStream(stream);
       webrtcService.onConnectionStateChange = (state) => setWebrtcState(state);
 
-      await webrtcService.getLocalStream(callType);
+      const stream = await webrtcService.getLocalStream(callType);
+      // ✅ Si le stream est null (permission refusée ou WebRTC absent), arrêter
+      if (!stream) {
+        console.log('❌ getLocalStream a échoué — permissions ou WebRTC indisponible');
+        setWebrtcState('disconnected');
+        webrtcStartedRef.current = false;
+        return;
+      }
+
       webrtcService.createPeerConnection();
 
       if (isInitiator) {
@@ -439,6 +457,7 @@ export function ChatProvider({ children }) {
     } catch (e) {
       console.log('⚠️ WebRTC startCall error:', e.message);
       setWebrtcState('disconnected');
+      webrtcStartedRef.current = false;
     }
   };
 
@@ -519,6 +538,7 @@ export function ChatProvider({ children }) {
   const rejectCall = async () => {
     if (!couple?.id) return;
     try {
+      webrtcStartedRef.current = false;
       webrtcService.cleanup().catch(() => {});
       setWebrtcState(null);
       setIsCallScreenActive(false);
@@ -539,6 +559,7 @@ export function ChatProvider({ children }) {
   const endCall = async () => {
     if (!couple?.id) return;
     try {
+      webrtcStartedRef.current = false;
       await webrtcService.cleanup();
       if (pendingOfferListenerRef.current) {
         pendingOfferListenerRef.current();

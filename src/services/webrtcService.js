@@ -94,11 +94,29 @@ class WebRTCService {
   }
 
   init(coupleId, userId) {
+    // ✅ Fermer l'ancienne connexion + délistener avant de réinitialiser
+    if (this._iceCandidateListener) {
+      try { this._iceCandidateListener(); } catch(e) {}
+      this._iceCandidateListener = null;
+    }
+    if (this._answerListener) {
+      try { this._answerListener(); } catch(e) {}
+      this._answerListener = null;
+    }
+    if (this.peerConnection) {
+      try { this.peerConnection.close(); } catch(e) {}
+      this.peerConnection = null;
+    }
+    if (this.localStream) {
+      try { this.localStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+      this.localStream = null;
+    }
+    this.remoteStream = null;
     this.coupleId = coupleId;
     this.userId = userId;
     this._isMuted = false;
     this._isCameraOff = false;
-    this._isSpeaker = true;  // ✅ Haut-parleur par défaut
+    this._isSpeaker = true;
     this._cachedIceServers = null;
     this._pendingCandidates = [];
     this._addedCandidates = new Set();
