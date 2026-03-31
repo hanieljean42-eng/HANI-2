@@ -621,6 +621,145 @@ const QUIZ_QUESTIONS = [
     question: "Quelle est la partie de mon corps dont je suis le plus fier/fière et que tu adores ?",
     type: "open",
   },
+  // ── Très très intimes pour couples à distance ──
+  {
+    id: 114,
+    question: "Quelle est la partie précise de mon corps que tu as le plus envie de toucher en ce moment ?",
+    type: "open",
+  },
+  {
+    id: 115,
+    question: "Est-ce que j'aime que tu me touche avant même qu'on s'embrasse ?",
+    type: "choice",
+    options: ["Oui, j'adore les caresses d'abord", "Non, commence par m'embrasser", "Les deux en même temps", "J'aime que tu décides toi-même"],
+  },
+  {
+    id: 116,
+    question: "Quelle partie de mon corps devient la plus sensible quand tu me touches lentement ?",
+    type: "open",
+  },
+  {
+    id: 117,
+    question: "Est-ce que je préfère qu'on se regarde dans les yeux pendant nos moments les plus intenses ?",
+    type: "choice",
+    options: ["Oui, le regard me fait tout perdre", "Non, je ferme les yeux pour ressentir", "Les deux selon l'intensité", "Je m'abandonne totalement, peu importe"],
+  },
+  {
+    id: 118,
+    question: "Est-ce que je préfère qu'on soit nus dès le départ ou garder certains vêtements au début ?",
+    type: "choice",
+    options: ["Nus dès le départ", "Quelques vêtements au début", "Tout enlever très lentement l'un l'autre", "Toi tu décides, j'aime la surprise"],
+  },
+  {
+    id: 119,
+    question: "Quelle est ma réaction exacte quand tu me susurres quelque chose à l'oreille au moment le plus intense ?",
+    type: "open",
+  },
+  {
+    id: 120,
+    question: "Est-ce que j'aimerais recevoir une vidéo très intime de toi quand tu es seul(e) et que tu penses à moi ?",
+    type: "choice",
+    options: ["Oui, envoie sans hésiter", "Oui mais seulement quand je suis seul(e)", "Ça dépend de l'heure et du lieu", "Toujours, ne te retiens jamais pour moi"],
+  },
+  {
+    id: 121,
+    question: "Quel est l'endroit précis de ton corps où un simple baiser inattendu me fait perdre tout contrôle ?",
+    type: "open",
+  },
+  {
+    id: 122,
+    question: "Est-ce que je préfère qu'on se parle ou qu'on soit silencieux pendant nos moments intimes ?",
+    type: "choice",
+    options: ["Je préfère qu'on se parle", "Le silence total me rend fou/folle", "Des chuchotements seulement", "Commence en silence puis laisse parler le désir"],
+  },
+  {
+    id: 123,
+    question: "Qu'est-ce que j'aime que tu fasses avec tes mains pendant qu'on s'embrasse ?",
+    type: "open",
+  },
+  {
+    id: 124,
+    question: "Quel est mon rythme préféré dans l'intimité ?",
+    type: "choice",
+    options: ["Lent et sensuel du début à la fin", "Rapide et intense", "Lent au début, intense à la fin", "Je suis ton rythme et je m'adapte"],
+  },
+  {
+    id: 125,
+    question: "Serais-je à l'aise pour un appel vidéo intime sans aucun vêtement ?",
+    type: "choice",
+    options: ["Oui sans hésitation aucune", "Oui si c'est toi qui le proposes", "Peut-être selon l'humeur du soir", "Oui et j'attends que tu proposes"],
+  },
+  {
+    id: 126,
+    question: "Quelle est la chose précise que tu fais sur mon corps qui me rend complètement fou/folle à chaque fois ?",
+    type: "open",
+  },
+  {
+    id: 127,
+    question: "Est-ce que j'aime qu'on s'envoie des messages ou photos très intimes pour anticiper nos retrouvailles ?",
+    type: "choice",
+    options: ["Oui, ça rend les retrouvailles explosive", "Oui mais modérément", "J'adore quand tu le fais sans prévenir", "Toujours, c'est ce qui me tient en vie à distance"],
+  },
+  {
+    id: 128,
+    question: "Quel est le fantasme précis que j'ai le plus souvent et que je n'ai pas encore réalisé avec toi ?",
+    type: "open",
+  },
+  {
+    id: 129,
+    question: "Est-ce que j'aime qu'on se raconte en détail ce qu'on veut se faire avant de se retrouver ?",
+    type: "choice",
+    options: ["Oui, ça m'excite énormément", "Oui mais en vocal, pas en texte", "Parfois, selon notre humeur", "Toujours, les mots sont une forme d'intimité"],
+  },
+  {
+    id: 130,
+    question: "Quel endroit de mon corps tu n'as pas encore vraiment exploré et que j'aimerais que tu découvres ?",
+    type: "open",
+  },
+  {
+    id: 131,
+    question: "Est-ce que j'aime les petites marques qui montrent que tu étais là (suçons, griffures légères) ?",
+    type: "choice",
+    options: ["Oui j'adore les petites marques", "Non, je préfère sans", "Seulement aux endroits cachés", "Oui, ça me rappelle toi tout la journée"],
+  },
+  {
+    id: 132,
+    question: "Dans quelle tenue exacte tu m'imagines le plus souvent de façon intime à distance ?",
+    type: "open",
+  },
+  {
+    id: 133,
+    question: "Est-ce que j'ai déjà eu envie de toi dans un endroit ou moment totalement inapproprié ?",
+    type: "choice",
+    options: ["Oui, souvent et c'est gênant", "Oui une fois mémorable", "Pratiquement tout le temps", "Constamment, tu occupes mes pensées partout"],
+  },
+  {
+    id: 134,
+    question: "Est-ce que j'aime qu'on s'embrasse longtemps et tendrement juste avant ou juste après ?",
+    type: "choice",
+    options: ["Avant — les baisers mettent le feu", "Après — les baisers post-intimité sont les meilleurs", "Les deux absolument", "Je veux que ça dure toujours"],
+  },
+  {
+    id: 135,
+    question: "Qu'est-ce qui doit absolument se passer lors de notre prochaine nuit ensemble ?",
+    type: "open",
+  },
+  {
+    id: 136,
+    question: "Est-ce que j'aimerais qu'on se prenne en photo lors d'un de nos moments les plus intimes ?",
+    type: "choice",
+    options: ["Oui, pour garder ce souvenir rien que pour nous", "Non, certains moments sont sacrés", "Peut-être, si l'ambiance est parfaite", "Oui, juste pour se les renvoyer après"],
+  },
+  {
+    id: 137,
+    question: "Quel est le geste de mon corps qui t'attire le plus instinctivement ?",
+    type: "open",
+  },
+  {
+    id: 138,
+    question: "Si je t'envoyais un selfie très intime sans prévenir là maintenant, quelle serait ta réaction exacte ?",
+    type: "open",
+  },
 ];
 
 const TRUTH_OR_DARE = {
@@ -710,6 +849,37 @@ const TRUTH_OR_DARE = {
     "Qu'est-ce que je pourrais dire ou écrire qui te ferait complètement perdre le contrôle ?",
     "Est-ce que tu te souviens de la dernière fois que tu as pensé à moi de façon vraiment intense la nuit ? C'était quoi ?",
     "Quelle est la chose que tu adores dans notre intimité et que tu n'oserais jamais dire à voix haute normalement ?",
+    // ── Vérités très très intimes pour couples à distance ──
+    "Quelle est la partie précise de mon corps que tu as le plus envie d'embrasser en ce moment même ?",
+    "Décris exactement comment ton corps réagit quand tu reçois un message vocal sensuel de moi.",
+    "Quel est le souvenir intime avec moi qui te revient le plus souvent le soir avant de t'endormir ?",
+    "Qu'est-ce que tu fais seul(e) quand le manque physique de moi devient vraiment insupportable ?",
+    "Si tu pouvais me voir une heure ce soir sans qu'on dorme, qu'est-ce qu'on ferait exactement ?",
+    "Comment tu réagirais si je t'envoyais une photo de moi dans mon lit en sous-vêtements là maintenant ?",
+    "Quelle est la position que tu veux absolument essayer lors de nos prochaines retrouvailles ?",
+    "Décris en détail ce que tu ressentirais si je glissais ma main dans la tienne en ce moment.",
+    "Quelle est la phrase la plus coquine que tu aimerais m'envoyer mais que tu n'oses toujours pas ?",
+    "Comment tu te sens physiquement quand on parle tard la nuit et que nos voix deviennent plus douces ?",
+    "Qu'est-ce que tu imagines exactement qu'on se fait lors de nos retrouvailles dans les premières minutes ?",
+    "Est-ce qu'il t'arrive de t'imaginer dans mon lit en te réveillant ? Décris exactement ce que tu vois.",
+    "Quelle est la chose la plus torride que tu aies jamais pensée de moi et que tu n'as jamais dite ?",
+    "Si je t'appelais ce soir en chuchotant ton prénom, qu'est-ce que tu ressentirais physiquement ?",
+    "Quelle est la partie de ton corps que tu aimerais que j'explore davantage et que je ne connais pas encore ?",
+    "Qu'est-ce qui t'excite le plus chez moi : mon regard, ma voix, mes mains ou ma façon de t'embrasser ?",
+    "Décris le baiser parfait que tu voudrais que je te fasse lors de notre prochaine rencontre.",
+    "Comment tu réagis en secret quand tu reçois une photo de moi qui te plaît vraiment physiquement ?",
+    "Si on pouvait se voir en appel vidéo maintenant en étant tous les deux au lit, tu ferais quoi ?",
+    "Quelle est la phrase exacte que tu dirais pour me faire comprendre que tu as besoin de moi ce soir ?",
+    "Qu'est-ce que tu rêves qu'on fasse ensemble qu'on n'a encore jamais osé essayer ?",
+    "Si ton corps pouvait me parler directement en ce moment, qu'est-ce qu'il me dirait ?",
+    "Quel est l'endroit exact où si je te touchais là maintenant par surprise, tu ne pourrais pas résister ?",
+    "Quel est le rôle que tu aimes le plus tenir quand on est intimes : actif(ve) ou passif(ve) ?",
+    "Si je t'envoyais un message à 2h du matin disant 'j'ai envie de toi', tu répondrais quoi exactement ?",
+    "Quelle est la chose la plus intime que tu as faite seul(e) en pensant à moi sans me le dire ?",
+    "Décris le moment exact où tu as réalisé que tu avais envie de moi pour la première fois.",
+    "Qu'est-ce que je fais avec ma voix qui te touche le plus profondément ?",
+    "Quelle est la chose que tu voudrais qu'on se dise à voix haute pendant nos moments les plus intenses ?",
+    "Si on devait s'envoyer des messages intimes pendant une heure ce soir sans aucune limite, comment ça commencerait ?",
   ],
   dares: [
     // Actions Classiques Couple
@@ -863,6 +1033,37 @@ const DISTANCE_DARES = [
   "Écris la phrase que je dis qui te trouble le plus sur ta peau et prends-la en photo ! 📸",
   "Photo de toi allongé(e), un seul vêtement légèrement décalé, regard vers l'objectif ! 📸",
   "Photo de notre dernière photo ensemble sur ton téléphone — rappelle-moi pourquoi tu me manques ! 📸",
+  // ── Défis très très intimes distance ──
+  "Photo de ton corps vu de haut depuis ton lit — pour que j'imagine être là au-dessus de toi ! 📸",
+  "Selfie en trempant légèrement tes lèvres avec ta langue, regard fixé dans l'objectif ! 📸",
+  "Photo de ton ventre légèrement découvert — juste une partie, à moi d'imaginer le reste ! 📸",
+  "Vidéo de 15 secondes : montre-moi comment tu te déhanches lentement quand tu penses à moi ! 🎥",
+  "Vocal de 20 secondes : dis-moi en détail ce que tu aimerais que je te fasse avec ma bouche ce soir ! (discussion 🎤)",
+  "Photo de ta main posée sur ton ventre, légèrement sous la ceinture — juste l'indication... ! 📸",
+  "Selfie allongé(e) sur le dos vue de haut, regard vers le plafond comme si tu attendais que j'arrive ! 📸",
+  "Vidéo de 15 secondes : montre-moi comment tu te retournes dans ton lit vers moi — comme si j'étais là ! 🎥",
+  "Vocal de 20 secondes : lis-moi à voix haute le message intime le plus fort que tu m'aies jamais envoyé ! (discussion 🎤)",
+  "Photo de ton dos légèrement nu depuis le miroir — la partie que j'adore toucher ! 📸",
+  "Selfie avec un doigt posé sur tes lèvres et le regard qui dit tout ce que tu ne dis pas ! 📸",
+  "Vidéo de 15 secondes : montre-moi comment tu réagirais si je t'embrassais dans le cou sans prévenir ! 🎥",
+  "Vocal de 20 secondes : dis-moi le fantasme que tu n'oses jamais écrire mais que tu peux chuchoter ! (discussion 🎤)",
+  "Photo de toi avec les draps remontés à mi-corps, comme si tu m'attendais dans ton lit ! 📸",
+  "Selfie en mordant légèrement ta lèvre inférieure avec le regard le plus provocateur que tu aies ! 📸",
+  "Vidéo de 20 secondes : décris ce que tu ressens à l'endroit exact de ton corps où tu me manques le plus ! 🎥",
+  "Photo du bas de ton dos légèrement découvert — la partie que mes mains connaissent le mieux ! 📸",
+  "Selfie tête légèrement rejetée en arrière, yeux fermés comme si tu vivais un moment intense ! 📸",
+  "Vocal de 15 secondes : dis mon prénom 3 fois de suite — de plus en plus bas, de plus en plus intense ! (discussion 🎤)",
+  "Photo de tes mains sur ta poitrine en te regardant dans les yeux à travers la caméra ! 📸",
+  "Vidéo de 15 secondes : montre-moi ton étirement au réveil — celui que j'adorerais voir en vrai ! 🎥",
+  "Photo de toi à genoux sur ton lit regard vers l'objectif — exactement comme dans ma tête ! 📸",
+  "Vocal de 20 secondes : décris ce que tu ferais si tu avais mes mains disponibles là maintenant ! (discussion 🎤)",
+  "Selfie en te passant lentement la langue sur les lèvres en fixant la caméra ! 📸",
+  "Vidéo de 20 secondes : montre-moi comment tu te prépares pour aller au lit comme si j'allais arriver ! 🎥",
+  "Photo de ta cuisse légèrement exposée depuis ton lit — là où j'aimerais poser ma main ! 📸",
+  "Vocal de 20 secondes : dis-moi exactement à quel endroit de ton corps tu voudrais sentir mes lèvres là maintenant ! (discussion 🎤)",
+  "Vidéo de 15 secondes : allongé(e), tire les draps sur toi lentement comme si tu te blottissais contre moi ! 🎥",
+  "Selfie en posant ta main sur ta hanche dans le miroir — pour que je ne rêve que de ça cette nuit ! 📸",
+  "Photo de toi depuis l'angle exact que tu aurais si je te regardais de mon côté du lit ! 📸",
 ];
 
 const WHO_IS_MORE = [
@@ -1033,6 +1234,22 @@ const WHO_IS_MORE = [
   "Qui est le plus capable de faire craquer l'autre avec un seul regard ?",
   "Qui aurait le plus du mal à se retenir lors d'un appel vidéo sensuel ?",
   "Qui a le plus de patience lors de longs préliminaires ?",
+  // ── Très très intimes distance ──
+  "Qui aime le plus se faire embrasser dans le cou ?",
+  "Qui a la réaction la plus intense quand l'autre touche son point sensible ?",
+  "Qui prendrait l'initiative d'un appel vidéo sensuel en premier ?",
+  "Qui supporterait le moins longtemps sans toucher l'autre ?",
+  "Qui a le regard le plus troublant au moment du désir ?",
+  "Qui serait le plus à l'aise nu(e) devant l'autre sans complexe ?",
+  "Qui aime le plus se faire masser lentement dans le silence ?",
+  "Qui est le plus capable de faire perdre la tête à l'autre avec ses seules mains ?",
+  "Qui ose le plus envoyer une photo très intime spontanément ?",
+  "Qui est le plus capable de rendre l'autre fou/folle avec juste un regard ?",
+  "Qui serait le plus insatiable lors de nos prochaines retrouvailles ?",
+  "Qui a le plus envie de l'autre en ce moment précis ?",
+  "Qui est le plus capable d'exciter l'autre uniquement avec des mots ou des vocaux ?",
+  "Qui aurait le plus de mal à rester habillé(e) si l'autre commençait à le/la séduire ?",
+  "Qui pense le plus souvent à nos futurs moments intimes quand on est séparés ?",
 ];
 
 const WOULD_YOU_RATHER = [
@@ -1447,6 +1664,67 @@ const WOULD_YOU_RATHER = [
   {
     option1: "Qu'on se dise exactement ce qu'on veut faire l'un à l'autre lors des retrouvailles",
     option2: "Que tout reste une surprise et qu'on improvise au moment où on se voit",
+  },
+  // ── Très très intimes distance ──
+  {
+    option1: "Que je te fasse un massage du corps entier dans le noir sans un mot",
+    option2: "Qu'on reste sous les draps à se chuchoter des choses toute la nuit",
+  },
+  {
+    option1: "Recevoir un vocal intime de moi à 2h du matin",
+    option2: "Me voir en appel vidéo en sous-vêtements sans prévenir",
+  },
+  {
+    option1: "Que je t'embrasse partout sauf les lèvres pendant 10 minutes entières",
+    option2: "Qu'on s'embrasse passionnément sur les lèvres pendant 10 minutes sans jamais s'arrêter",
+  },
+  {
+    option1: "Que je glisse un message très intime dans ta poche sans te le dire",
+    option2: "Que je t'envoie une vidéo de moi que personne d'autre ne verra jamais",
+  },
+  {
+    option1: "Que tu découvres ce que je veux cette nuit et que tu l'exécutes parfaitement",
+    option2: "Que je t'obéisse complètement sans poser de questions pendant une nuit",
+  },
+  {
+    option1: "Qu'on fasse un appel vidéo entièrement nus ensemble pour la première fois",
+    option2: "Qu'on passe une nuit de messages intimes écrits sans aucun appel",
+  },
+  {
+    option1: "Que je te réveille avec mes mains qui te caressent doucement",
+    option2: "Que je te réveille avec mes lèvres posées sur ton cou en silence",
+  },
+  {
+    option1: "Qu'on soit lents, qu'on s'arrête pour se regarder dans les yeux",
+    option2: "Qu'on soit intenses et qu'on ne s'arrête que quand on n'en peut vraiment plus",
+  },
+  {
+    option1: "Que je t'envoie une photo de moi dans la position que tu préfères",
+    option2: "Que tu m'envoies une vidéo de ce que tu ferais si j'étais là en ce moment",
+  },
+  {
+    option1: "Qu'on se dise nos fantasmes les plus secrets pendant 1 heure",
+    option2: "Qu'on se montre silencieusement ce qu'on veut à travers l'écran pendant 1 heure",
+  },
+  {
+    option1: "Que je te touche exactement là où tu le veux le plus",
+    option2: "Que tu ne saches pas où je vais te toucher et que tu te laisses surprendre",
+  },
+  {
+    option1: "Qu'on reste enlacés toute la nuit sans rien faire d'autre",
+    option2: "Qu'on passe une nuit entière à tout explorer sans aucune limite",
+  },
+  {
+    option1: "Que notre prochaine nuit soit filmée juste pour nous deux",
+    option2: "Que notre prochaine nuit reste un secret absolu que personne ne saura jamais",
+  },
+  {
+    option1: "Que je t'enregistre un vocal très intime juste pour toi cette nuit",
+    option2: "Que je t'envoie une photo de moi que tu gardes précieusement rien que pour toi",
+  },
+  {
+    option1: "Qu'on se fasse une déclaration très intime au téléphone dans le noir complet",
+    option2: "Qu'on s'écrive un long message vocal de 5 minutes sur ce qu'on ressent physiquement l'un pour l'autre",
   },
 ];
 
