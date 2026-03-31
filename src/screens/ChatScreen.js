@@ -32,6 +32,9 @@ import { useNotifyPartner } from '../hooks/useNotifyPartner';
 import { useData } from '../context/DataContext';
 import { uploadToCloudinary, uploadAudioToCloudinary } from '../utils/uploadToCloudinary';
 
+let RTCView = null;
+try { RTCView = require('react-native-webrtc').RTCView; } catch (e) {}
+
 const { width, height } = Dimensions.get('window');
 
 const MAX_IMAGE_WIDTH = width * 0.65;
@@ -1243,131 +1246,138 @@ export default function ChatScreen({ navigation, route }) {
         animationType="slide"
         onRequestClose={handleEndCall}
       >
-        <LinearGradient
-          colors={
-            (activeCall?.type || incomingCall?.type) === 'video'
-              ? ['#1a0a2e', '#2d1b69', '#441188']
-              : ['#1a1a2e', '#16213e', '#0f3460']
-          }
-          style={styles.callScreenContainer}
-        >
-          <StatusBar backgroundColor="#1a1a2e" barStyle="light-content" />
+        {(() => {
+          const isVideoCall = (activeCall?.type || incomingCall?.type) === 'video';
+          const hasRemoteVideo = isVideoCall && !!remoteStream && RTCView;
+          return (
+            <LinearGradient
+              colors={isVideoCall ? ['#0a0a0a', '#0a0a1a'] : ['#1a1a2e', '#16213e', '#0f3460']}
+              style={styles.callScreenContainer}
+            >
+              <StatusBar backgroundColor="#000" barStyle="light-content" />
 
-          {/* Info partenaire */}
-          <View style={styles.callPartnerInfo}>
-              <View style={[
-                styles.callTypeIcon,
-                (activeCall?.type || incomingCall?.type) === 'video' && styles.callTypeIconVideo
-              ]}>
-                <Ionicons 
-                  name={(activeCall?.type || incomingCall?.type) === 'video' ? 'videocam' : 'call'} 
-                  size={24} 
-                  color="#fff" 
+              {/* ══ VIDÉO DISTANTE plein écran ══ */}
+              {hasRemoteVideo && (
+                <RTCView
+                  streamURL={remoteStream.toURL()}
+                  style={styles.remoteVideo}
+                  objectFit="cover"
+                  mirror={false}
+                  zOrder={0}
                 />
-              </View>
-              
-              <View style={[
-                styles.callAvatar,
-                (activeCall?.type || incomingCall?.type) === 'video' && styles.callAvatarVideo
-              ]}>
-                {partner?.profilePhoto ? (
-                  <Image source={{ uri: partner.profilePhoto }} style={styles.callAvatarImage} />
-                ) : (
-                  <Text style={styles.callAvatarText}>{partner?.avatar || '💕'}</Text>
+              )}
+
+              {/* ══ VIDÉO LOCALE miniature coin haut-droit ══ */}
+              {isVideoCall && localStream && !isCameraOff && RTCView && (
+                <View style={styles.localVideoContainer}>
+                  <RTCView
+                    streamURL={localStream.toURL()}
+                    style={styles.localVideo}
+                    objectFit="cover"
+                    mirror={true}
+                    zOrder={1}
+                  />
+                </View>
+              )}
+
+              {/* ══ OVERLAY nom + timer (appel vidéo connecté) ══ */}
+              {hasRemoteVideo && (
+                <View style={styles.videoCallInfoOverlay}>
+                  <Text style={styles.videoCallName}>{partner?.name || 'Mon amour'}</Text>
+                  <Text style={styles.videoCallTimer}>
+                    {webrtcState === 'connected' ? formatCallTimer(callTimer) : '🔄 Connexion...'}
+                  </Text>
+                </View>
+              )}
+
+              {/* ══ INFO PARTENAIRE (audio ou vidéo en attente) ══ */}
+              {!hasRemoteVideo && (
+                <View style={styles.callPartnerInfo}>
+                  <View style={[styles.callTypeIcon, isVideoCall && styles.callTypeIconVideo]}>
+                    <Ionicons name={isVideoCall ? 'videocam' : 'call'} size={24} color="#fff" />
+                  </View>
+                  <View style={[styles.callAvatar, isVideoCall && styles.callAvatarVideo]}>
+                    {partner?.profilePhoto ? (
+                      <Image source={{ uri: partner.profilePhoto }} style={styles.callAvatarImage} />
+                    ) : (
+                      <Text style={styles.callAvatarText}>{partner?.avatar || '💕'}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.callPartnerName}>{partner?.name || 'Mon amour'}</Text>
+                  <Text style={styles.callStatus}>
+                    {activeCall?.status === 'accepted'
+                      ? (webrtcState === 'connected'
+                          ? formatCallTimer(callTimer)
+                          : isVideoCall ? '� Connexion vidéo...' : '�🔄 Connexion audio...')
+                      : activeCall?.status === 'ringing' ? '📞 Appel en cours...'
+                      : '⏳ Connexion...'}
+                  </Text>
+                  <Text style={styles.callType}>
+                    {isVideoCall ? '🎥 Appel vidéo' : '📞 Appel vocal'}
+                  </Text>
+                </View>
+              )}
+
+              {/* ══ Animation ondulation (audio uniquement) ══ */}
+              {!isVideoCall && (
+                <View style={styles.callWaveContainer}>
+                  {[1, 2, 3].map((i) => (
+                    <View key={i} style={[
+                      styles.callWave,
+                      { width: 120 + i*40, height: 120 + i*40, borderRadius: 60 + i*20,
+                        opacity: 0.15 / i, borderColor: 'rgba(255,255,255,0.3)' }
+                    ]} />
+                  ))}
+                </View>
+              )}
+
+              {/* ══ BOUTONS DE CONTRÔLE ══ */}
+              <View style={[styles.callControls, hasRemoteVideo && styles.callControlsVideo]}>
+                <TouchableOpacity
+                  style={[styles.callControlButton, isMuted && styles.callControlActive]}
+                  onPress={() => { const m = webrtcToggleMute(); setIsMuted(m); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                >
+                  <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={26} color="#fff" />
+                  <Text style={styles.callControlLabel}>{isMuted ? 'Activer' : 'Muet'}</Text>
+                </TouchableOpacity>
+
+                {isVideoCall && (
+                  <TouchableOpacity
+                    style={[styles.callControlButton, isCameraOff && styles.callControlActive]}
+                    onPress={() => { const c = webrtcToggleCamera(); setIsCameraOff(c); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                  >
+                    <Ionicons name={isCameraOff ? 'videocam-off' : 'videocam'} size={26} color="#fff" />
+                    <Text style={styles.callControlLabel}>{isCameraOff ? 'Caméra' : 'Off'}</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity style={styles.callEndButton} onPress={handleEndCall}>
+                  <Ionicons name="call" size={32} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+                </TouchableOpacity>
+
+                {isVideoCall && (
+                  <TouchableOpacity
+                    style={styles.callControlButton}
+                    onPress={() => { switchCamera(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                  >
+                    <Ionicons name="camera-reverse" size={26} color="#fff" />
+                    <Text style={styles.callControlLabel}>Retourner</Text>
+                  </TouchableOpacity>
+                )}
+
+                {!isVideoCall && (
+                  <TouchableOpacity
+                    style={[styles.callControlButton, isSpeaker && styles.callControlActive]}
+                    onPress={() => { const s = webrtcToggleSpeaker(); setIsSpeaker(s); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                  >
+                    <Ionicons name={isSpeaker ? 'volume-high' : 'volume-medium'} size={26} color="#fff" />
+                    <Text style={styles.callControlLabel}>{isSpeaker ? 'Écouteur' : 'HP'}</Text>
+                  </TouchableOpacity>
                 )}
               </View>
-              <Text style={styles.callPartnerName}>{partner?.name || 'Mon amour'}</Text>
-              <Text style={styles.callStatus}>
-                {activeCall?.status === 'accepted'
-                  ? (webrtcState === 'connected' ? formatCallTimer(callTimer) : '🔄 Connexion...')
-                  : activeCall?.status === 'ringing'
-                    ? '📞 Appel en cours...'
-                    : '⏳ Connexion...'}
-              </Text>
-              <Text style={styles.callType}>
-                {(activeCall?.type || incomingCall?.type) === 'video' ? '🎥 Appel vidéo' : '📞 Appel vocal'}
-              </Text>
-          </View>
-
-          {/* Animation ondulation */}
-          <View style={styles.callWaveContainer}>
-              {[1, 2, 3].map((i) => (
-                <View key={i} style={[
-                  styles.callWave,
-                  { 
-                    width: 120 + i * 40, 
-                    height: 120 + i * 40, 
-                    borderRadius: 60 + i * 20, 
-                    opacity: 0.15 / i,
-                    borderColor: (activeCall?.type || incomingCall?.type) === 'video' 
-                      ? 'rgba(168,85,247,0.4)' 
-                      : 'rgba(255,255,255,0.3)',
-                  }
-                ]} />
-              ))}            </View>
-
-          {/* Boutons de contrôle */}
-          <View style={styles.callControls}>
-            <TouchableOpacity
-              style={[styles.callControlButton, isMuted && styles.callControlActive]}
-              onPress={() => { 
-                const muted = webrtcToggleMute();
-                setIsMuted(muted); 
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); 
-              }}
-            >
-              <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={26} color="#fff" />
-              <Text style={styles.callControlLabel}>{isMuted ? 'Activer' : 'Muet'}</Text>
-            </TouchableOpacity>
-
-            {/* Bouton caméra (uniquement pour appel vidéo) */}
-            {(activeCall?.type === 'video') && (
-              <TouchableOpacity
-                style={[styles.callControlButton, isCameraOff && styles.callControlActive]}
-                onPress={() => { 
-                  const camOff = webrtcToggleCamera();
-                  setIsCameraOff(camOff); 
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); 
-                }}
-              >
-                <Ionicons name={isCameraOff ? 'videocam-off' : 'videocam'} size={26} color="#fff" />
-                <Text style={styles.callControlLabel}>{isCameraOff ? 'Caméra' : 'Off'}</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.callEndButton}
-              onPress={handleEndCall}
-            >
-              <Ionicons name="call" size={32} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-            </TouchableOpacity>
-
-            {/* Bouton retourner caméra (uniquement pour appel vidéo) */}
-            {(activeCall?.type === 'video') && (
-              <TouchableOpacity
-                style={styles.callControlButton}
-                onPress={() => { switchCamera(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-              >
-                <Ionicons name="camera-reverse" size={26} color="#fff" />
-                <Text style={styles.callControlLabel}>Retourner</Text>
-              </TouchableOpacity>
-            )}
-
-            {(activeCall?.type !== 'video') && (
-              <TouchableOpacity
-                style={[styles.callControlButton, isSpeaker && styles.callControlActive]}
-                onPress={() => { 
-                  const speaker = webrtcToggleSpeaker();
-                  setIsSpeaker(speaker); 
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); 
-                }}
-              >
-                <Ionicons name={isSpeaker ? 'volume-high' : 'volume-medium'} size={26} color="#fff" />
-                <Text style={styles.callControlLabel}>{isSpeaker ? 'Écouteur' : 'HP'}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </LinearGradient>
+            </LinearGradient>
+          );
+        })()}
       </Modal>
 
       {/* Appel entrant géré par IncomingCallOverlay global (App.js) */}
@@ -2059,6 +2069,16 @@ const styles = StyleSheet.create({
   },
   callControlActive: {
     backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  callControlsVideo: {
+    position: 'absolute',
+    bottom: 50,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 24,
+    marginHorizontal: 20,
+    paddingVertical: 14,
   },
   callControlLabel: {
     color: 'rgba(255,255,255,0.7)',
