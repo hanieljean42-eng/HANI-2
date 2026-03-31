@@ -4995,6 +4995,7 @@ Patiente, ça va arriver !`}
                     </TouchableOpacity>
                   )}
                 </View>
+              </View>
               </ScrollView>
             )}
 
