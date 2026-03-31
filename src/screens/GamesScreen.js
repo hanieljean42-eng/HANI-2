@@ -4563,60 +4563,60 @@ export default function GamesScreen() {
                   }
                 </Text>
 
-                {/* Dare+fait et preuve pas encore reçue → message d'attente */}
+                {/* Dare+fait et preuve pas encore reçue → bloquer toute interaction */}
                 {truthOrDare?.type === 'dare' && todPartnerResponse?.actionChoice === 'fait' && !todPartnerProofReceived ? (
                   <View style={styles.todBottomWait}>
                     <ActivityIndicator size="small" color="#FF6B9D" />
                     <Text style={styles.todBottomWaitText}>
-                      {`👀 ${partnerName} prépare les preuves...
-Patiente, ça va arriver !`}
+                      {`👀 ${partnerName} prépare les preuves...\nPatiente, ça va arriver !`}
                     </Text>
                   </View>
                 ) : (
-                  // Panneau discussion — toujours ouvert (vérité, passe, ou preuve reçue)
-                  <View style={[styles.discussPanel, { marginBottom: 8 }]}>
-                    <View style={styles.discussPanelHeader}>
-                      <Text style={styles.discussPanelTitle}>💬 Discussion</Text>
+                  <>
+                    {/* Panneau discussion — visible après preuve reçue, vérité ou passe */}
+                    <View style={[styles.discussPanel, { marginBottom: 8 }]}>
+                      <View style={styles.discussPanelHeader}>
+                        <Text style={styles.discussPanelTitle}>💬 Discussion</Text>
+                      </View>
+                      <ScrollView ref={discussScrollRef} style={styles.discussMsgList} contentContainerStyle={{ paddingBottom: 6 }} nestedScrollEnabled onContentSizeChange={() => discussScrollRef.current?.scrollToEnd({ animated: true })}>
+                        {discussMessages.length === 0 && <Text style={styles.discussMsgEmpty}>Discutez ensemble... 💕</Text>}
+                        {discussMessages.map((msg, i) => (
+                          <View key={msg._id || i} style={[styles.discussMsgBubble, msg.player === (user?.name || 'Moi') ? styles.discussMsgMine : styles.discussMsgTheirs]}>
+                            <Text style={styles.discussMsgName}>{msg.player}</Text>
+                            {msg.type === 'text' && <Text style={styles.discussMsgText}>{msg.text}</Text>}
+                            {msg.type === 'image' && (
+                              <Pressable onPress={() => setFullScreenImg(msg.uri)} style={styles.discussMsgImgWrapper}>
+                                <Image source={{ uri: msg.uri }} style={styles.discussMsgImg} resizeMode="cover" />
+                              </Pressable>
+                            )}
+                            {msg.type === 'audio' && (
+                              <TouchableOpacity style={styles.discussAudioBtn} onPress={() => playDiscussAudio(msg.uri)}>
+                                <Text style={styles.discussAudioBtnText}>{playingAudioUri === msg.uri ? '⏹ Stop' : '▶ Écouter'}</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        ))}
+                      </ScrollView>
+                      <View style={styles.discussInputBar}>
+                        <TextInput style={styles.discussTextInput} value={discussInput} onChangeText={setDiscussInput} placeholder="Écris quelque chose..." placeholderTextColor="rgba(255,255,255,0.5)" multiline maxLength={300} />
+                        <TouchableOpacity style={styles.discussSendBtn} onPress={sendDiscussMessage} disabled={!discussInput.trim() || discussUploading}><Text style={styles.discussSendBtnText}>→</Text></TouchableOpacity>
+                        <TouchableOpacity style={[styles.discussVoiceBtn, discussIsRecording && styles.discussVoiceBtnRec]} onPress={discussIsRecording ? stopDiscussRecording : startDiscussRecording} disabled={discussUploading}><Text style={styles.discussVoiceBtnText}>{discussIsRecording ? `⏹ ${recordingSeconds}s` : '🎤'}</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.discussImgBtn} onPress={pickDiscussImage} disabled={discussUploading}><Text style={styles.discussImgBtnText}>📸</Text></TouchableOpacity>
+                      </View>
                     </View>
-                    <ScrollView ref={discussScrollRef} style={styles.discussMsgList} contentContainerStyle={{ paddingBottom: 6 }} nestedScrollEnabled onContentSizeChange={() => discussScrollRef.current?.scrollToEnd({ animated: true })}>
-                      {discussMessages.length === 0 && <Text style={styles.discussMsgEmpty}>Discutez ensemble... 💕</Text>}
-                      {discussMessages.map((msg, i) => (
-                        <View key={msg._id || i} style={[styles.discussMsgBubble, msg.player === (user?.name || 'Moi') ? styles.discussMsgMine : styles.discussMsgTheirs]}>
-                          <Text style={styles.discussMsgName}>{msg.player}</Text>
-                          {msg.type === 'text' && <Text style={styles.discussMsgText}>{msg.text}</Text>}
-                          {msg.type === 'image' && (
-                            <Pressable onPress={() => setFullScreenImg(msg.uri)} style={styles.discussMsgImgWrapper}>
-                              <Image source={{ uri: msg.uri }} style={styles.discussMsgImg} resizeMode="cover" />
-                            </Pressable>
-                          )}
-                          {msg.type === 'audio' && (
-                            <TouchableOpacity style={styles.discussAudioBtn} onPress={() => playDiscussAudio(msg.uri)}>
-                              <Text style={styles.discussAudioBtnText}>{playingAudioUri === msg.uri ? '⏹ Stop' : '▶ Écouter'}</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
+                    {/* Réactions emoji — uniquement quand preuve reçue / vérité / passe */}
+                    <View style={styles.todReactionRow}>
+                      {['👍', '😂', '😱', '🥰', '🔥', '💀', '👏', '😏'].map((emoji) => (
+                        <TouchableOpacity key={emoji} style={styles.todReactionBtn} onPress={() => reactAndNextRound(emoji)}>
+                          <Text style={styles.todReactionEmoji}>{emoji}</Text>
+                        </TouchableOpacity>
                       ))}
-                    </ScrollView>
-                    <View style={styles.discussInputBar}>
-                      <TextInput style={styles.discussTextInput} value={discussInput} onChangeText={setDiscussInput} placeholder="Écris quelque chose..." placeholderTextColor="rgba(255,255,255,0.5)" multiline maxLength={300} />
-                      <TouchableOpacity style={styles.discussSendBtn} onPress={sendDiscussMessage} disabled={!discussInput.trim() || discussUploading}><Text style={styles.discussSendBtnText}>→</Text></TouchableOpacity>
-                      <TouchableOpacity style={[styles.discussVoiceBtn, discussIsRecording && styles.discussVoiceBtnRec]} onPress={discussIsRecording ? stopDiscussRecording : startDiscussRecording} disabled={discussUploading}><Text style={styles.discussVoiceBtnText}>{discussIsRecording ? `⏹ ${recordingSeconds}s` : '🎤'}</Text></TouchableOpacity>
-                      <TouchableOpacity style={styles.discussImgBtn} onPress={pickDiscussImage} disabled={discussUploading}><Text style={styles.discussImgBtnText}>📸</Text></TouchableOpacity>
                     </View>
-                  </View>
-                )}
-
-                {/* Réactions emoji — toujours visibles */}
-                <View style={styles.todReactionRow}>
-                  {['👍', '😂', '😱', '🥰', '🔥', '💀', '👏', '😏'].map((emoji) => (
-                    <TouchableOpacity key={emoji} style={styles.todReactionBtn} onPress={() => reactAndNextRound(emoji)}>
-                      <Text style={styles.todReactionEmoji}>{emoji}</Text>
+                    <TouchableOpacity style={styles.todSkipReactBtn} onPress={nextTodRound}>
+                      <Text style={styles.todSkipReactText}>➡️ Tour suivant</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-                <TouchableOpacity style={styles.todSkipReactBtn} onPress={nextTodRound}>
-                  <Text style={styles.todSkipReactText}>➡️ Tour suivant</Text>
-                </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
 
@@ -6712,9 +6712,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginVertical: 10,
     width: '100%',
-    maxHeight: 300,
     overflow: 'hidden',
-    flexShrink: 1,
   },
   discussPanelHeader: {
     flexDirection: 'row',
@@ -6726,7 +6724,7 @@ const styles = StyleSheet.create({
   },
   discussPanelTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
   discussPanelClose: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-  discussMsgList: { flex: 1, maxHeight: 170, minHeight: 60, paddingHorizontal: 10 },
+  discussMsgList: { height: 130, paddingHorizontal: 10 },
   discussMsgEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center', paddingVertical: 10, fontStyle: 'italic' },
   discussMsgBubble: {
     maxWidth: '80%',

@@ -24,6 +24,7 @@ export function ChatProvider({ children }) {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [webrtcState, setWebrtcState] = useState(null); // 'connecting', 'connected', 'disconnected'
+  const [isCallScreenActive, setIsCallScreenActive] = useState(false);
   
   const typingTimeoutRef = useRef(null);
   const listenerRef = useRef(null);
@@ -174,6 +175,7 @@ export function ChatProvider({ children }) {
       if (snapshot.exists()) {
         const callData = snapshot.val();
         if (callData.status === 'ringing' && callData.callerId !== user.id) {
+          setIsCallScreenActive(false);
           // ✅ Gestion appels simultanés : si j'ai aussi un appel 'ringing' en cours
           // Le premier appel (createdAt le plus ancien) gagne
           if (isCallerRef.current && activeCall?.status === 'ringing' && activeCall?.callerId === user.id) {
@@ -197,11 +199,10 @@ export function ChatProvider({ children }) {
           // Appel entrant normal pour moi
           setIncomingCall(callData);
         } else if (callData.status === 'accepted') {
-          // Appel accepté — mettre à jour activeCall pour les DEUX côtés
           setActiveCall(callData);
           setIncomingCall(null);
+          setIsCallScreenActive(true);
           
-          // Démarrer l'appel WebRTC full-duplex (fonctionne sur tous les réseaux)
           const isInitiator = isCallerRef.current && callData.callerId === user.id;
           startWebRTCCall(couple.id, user.id, callData.type || 'audio', isInitiator)
             .catch(e => console.log('⚠️ WebRTC call error:', e));
@@ -210,18 +211,21 @@ export function ChatProvider({ children }) {
           setIncomingCall(null);
           setActiveCall(prev => prev ? { ...prev, status: 'rejected' } : null);
           setWebrtcState(null);
+          setIsCallScreenActive(false);
           webrtcService.cleanup().catch(() => {});
         } else if (callData.status === 'ended') {
           setIncomingCall(null);
           setActiveCall(null);
           setWebrtcState(null);
+          setIsCallScreenActive(false);
           webrtcService.cleanup().catch(() => {});
         }
       } else {
-        // Noeud supprimé = appel terminé
+        // Noeud supprimé = appel terminé (l'autre côté a raccroché)
         setIncomingCall(null);
         setActiveCall(null);
         setWebrtcState(null);
+        setIsCallScreenActive(false);
         webrtcService.cleanup().catch(() => {});
       }
     });
@@ -473,7 +477,6 @@ export function ChatProvider({ children }) {
       createdAt: Date.now(), // ✅ Timestamp numérique pour résoudre les conflits
     };
     try {
-      // Nettoyer les anciennes données SDP/ICE
       const sdpCleanRef = ref(database, `couples/${couple.id}/calls/sdp`);
       const iceCleanRef = ref(database, `couples/${couple.id}/calls/ice`);
       await set(sdpCleanRef, null);
@@ -482,6 +485,7 @@ export function ChatProvider({ children }) {
       await set(callRef, callData);
       setActiveCall(callData);
       isCallerRef.current = true;
+      setIsCallScreenActive(true);
 
       return roomId;
     } catch (error) {
@@ -512,12 +516,12 @@ export function ChatProvider({ children }) {
     }
   };
 
-  // Rejeter un appel entrant
   const rejectCall = async () => {
     if (!couple?.id) return;
     try {
       webrtcService.cleanup().catch(() => {});
       setWebrtcState(null);
+      setIsCallScreenActive(false);
       const callRef = ref(database, `couples/${couple.id}/calls/active`);
       // Écrire 'rejected' pour que le caller détecte le refus
       if (incomingCall) {
@@ -532,7 +536,6 @@ export function ChatProvider({ children }) {
     }
   };
 
-  // Terminer un appel
   const endCall = async () => {
     if (!couple?.id) return;
     try {
@@ -544,6 +547,7 @@ export function ChatProvider({ children }) {
       setLocalStream(null);
       setRemoteStream(null);
       setWebrtcState(null);
+      setIsCallScreenActive(false);
       isCallerRef.current = false;
       const callRef = ref(database, `couples/${couple.id}/calls/active`);
       await set(callRef, null);
@@ -601,6 +605,7 @@ export function ChatProvider({ children }) {
     localStream,
     remoteStream,
     webrtcState,
+    isCallScreenActive,
     sendMessage,
     markAsRead,
     addReaction,

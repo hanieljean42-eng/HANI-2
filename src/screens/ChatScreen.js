@@ -122,6 +122,7 @@ export default function ChatScreen({ navigation, route }) {
     localStream,
     remoteStream,
     webrtcState,
+    isCallScreenActive,
     toggleMute: webrtcToggleMute,
     toggleSpeaker: webrtcToggleSpeaker,
     toggleCamera: webrtcToggleCamera,
@@ -214,21 +215,23 @@ export default function ChatScreen({ navigation, route }) {
     }
   }, [route?.params?.autoCall]);
 
-  // Si navigué depuis IncomingCallOverlay après acceptation, afficher l'écran d'appel
-  const fromOverlayHandled = useRef(false);
+  // Synchroniser l'écran d'appel avec le state context (fiable pour caller ET callee)
   useEffect(() => {
-    if (route?.params?.fromCallOverlay && activeCall && !fromOverlayHandled.current) {
-      fromOverlayHandled.current = true;
+    if (isCallScreenActive) {
       setShowCallScreen(true);
       setCallTimer(0);
       setIsMuted(false);
       setIsSpeaker(false);
+      setIsCameraOff(false);
+    } else {
+      setShowCallScreen(false);
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+      setCallTimer(0);
     }
-    // Reset le flag quand l'appel se termine
-    if (!activeCall) {
-      fromOverlayHandled.current = false;
-    }
-  }, [route?.params?.fromCallOverlay, activeCall]);
+  }, [isCallScreenActive]);
 
   // Marquer comme lu à l'ouverture + notifier le partenaire
   const hasNotifiedReadRef = React.useRef(false);
