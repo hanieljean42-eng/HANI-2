@@ -880,6 +880,22 @@ const TRUTH_OR_DARE = {
     "Qu'est-ce que je fais avec ma voix qui te touche le plus profondément ?",
     "Quelle est la chose que tu voudrais qu'on se dise à voix haute pendant nos moments les plus intenses ?",
     "Si on devait s'envoyer des messages intimes pendant une heure ce soir sans aucune limite, comment ça commencerait ?",
+    // ── Vérités osées et très intimes (inspirées jeu Action/Vérité) ──
+    "Tu préfères passer 2 ans sans sexe ou 2 ans sans internet ?",
+    "Quelle célébrité tu trouves la plus attirante sexuellement et pourquoi ?",
+    "À quel âge as-tu perdu ta virginité et c'était comment exactement ?",
+    "T'as déjà eu une pensée très perverse sur moi dans un endroit totalement inapproprié ?",
+    "Si je t'envoyais une photo très intime de moi là maintenant, tu ferais exactement quoi ?",
+    "Quel est le truc le plus osé que tu aies jamais fait sexuellement ?",
+    "Quel est le truc le plus pervers que tu aies jamais pensé de moi sans me le dire ?",
+    "T'as déjà fait semblant de dormir pour éviter quelque chose avec quelqu'un ?",
+    "T'as déjà regardé quelqu'un d'autre de façon très intime alors qu'on était ensemble ?",
+    "Si tu devais me décrire en détail ton fantasme le plus honteux, tu dirais quoi ?",
+    "Quel est le son ou la réaction que tu fais pendant l'amour que tu n'assumes pas toujours ?",
+    "T'as déjà envoyé une photo ou vidéo intime à quelqu'un ? Décris le contexte.",
+    "Si je te demandais de m'exciter uniquement avec des mots pendant 5 minutes, par où tu commencerais ?",
+    "Quelle est la chose la plus folle que tu serais prêt(e) à faire pour me séduire ce soir à distance ?",
+    "T'as déjà eu envie de quelqu'un que tu n'aurais pas dû désirer ? C'était qui et comment tu as géré ?",
   ],
   dares: [
     // Actions Classiques Couple
@@ -1064,6 +1080,22 @@ const DISTANCE_DARES = [
   "Vidéo de 15 secondes : allongé(e), tire les draps sur toi lentement comme si tu te blottissais contre moi ! 🎥",
   "Selfie en posant ta main sur ta hanche dans le miroir — pour que je ne rêve que de ça cette nuit ! 📸",
   "Photo de toi depuis l'angle exact que tu aurais si je te regardais de mon côté du lit ! 📸",
+  // ── Défis osés et très intimes (inspirés jeu Action/Vérité) ──
+  "Habille-toi de la façon la plus sexy et provocante possible — envoie un selfie complet dans la discussion ! 📸",
+  "Fais le bruit exact que tu fais quand tu atteins le plaisir — enregistre-le en vocal et envoie-le moi ! (discussion 🎤)",
+  "Drague-moi uniquement avec des mots pendant 3 minutes dans la discussion — commence MAINTENANT ! 💬",
+  "Écris mon prénom sur la partie de ton corps que tu préfères et envoie la photo ! 📸",
+  "Mets ta tenue la plus coquine et fais une vidéo de 20 secondes en te montrant sous tous les angles ! 🎥",
+  "Ordonne-moi de faire quelque chose de très intime — c'est toi qui commandes, j'obéis ! 🔥",
+  "Fais-moi une déclaration d'amour très intense et très intime en vocal comme si c'était la dernière fois ! (discussion 🎤)",
+  "Excite-moi uniquement en 5 messages dans la discussion — tu as 5 minutes, GO ! 💬",
+  "Écris mon prénom sur ton ventre et envoie la photo ! 📸",
+  "Enregistre un vocal de 30 secondes où tu me décris exactement ce que tu me ferais si j'étais là maintenant ! (discussion 🎤)",
+  "Pose dans ta tenue la plus légère ou la plus sexy — selfie miroir complet ! 📸",
+  "Fais une vidéo de 15 secondes en portant uniquement ce que tu mets pour dormir — montre-moi ! 🎥",
+  "Drague-moi comme si on ne se connaissait pas, tu dois absolument me conquérir en 3 messages ! 💬",
+  "Écris sur un papier la chose la plus perverse que tu veux me faire — tiens-le et prends la photo ! 📸",
+  "Fais le son que tu fais quand tu reçois un baiser dans le cou — en vocal ! (discussion 🎤)",
 ];
 
 const WHO_IS_MORE = [
