@@ -80,21 +80,24 @@ class WebRTCService {
     this.remoteStream = null;
     this.coupleId = null;
     this.userId = null;
+    this.roomId = null;          // ✅ Session unique — isole chaque appel
     this.callType = null;
     this.onRemoteStream = null;
     this.onLocalStream = null;
     this.onConnectionStateChange = null;
     this._isMuted = false;
     this._isCameraOff = false;
-    this._isSpeaker = true;  // ✅ Haut-parleur par défaut
+    this._isSpeaker = true;
     this._iceCandidateListener = null;
-    this._pendingCandidates = []; // ✅ Buffer ICE candidates avant remoteDescription
-    this._addedCandidates = new Set(); // ✅ Éviter les doublons
-    this._cachedIceServers = null; // ✅ Cache des serveurs ICE (chargés avant l'appel)
+    this._answerListener = null;
+    this._pendingCandidates = [];
+    this._addedCandidates = new Set();
+    this._cachedIceServers = null;
+    this._iceRestartCount = 0;
   }
 
-  init(coupleId, userId) {
-    // ✅ Fermer l'ancienne connexion + délistener avant de réinitialiser
+  // roomId OBLIGATOIRE : isole chaque session d'appel dans Firebase
+  init(coupleId, userId, roomId) {
     if (this._iceCandidateListener) {
       try { this._iceCandidateListener(); } catch(e) {}
       this._iceCandidateListener = null;
@@ -114,6 +117,7 @@ class WebRTCService {
     this.remoteStream = null;
     this.coupleId = coupleId;
     this.userId = userId;
+    this.roomId = roomId;  // ✅ Clé d'isolation de session
     this._isMuted = false;
     this._isCameraOff = false;
     this._isSpeaker = true;
@@ -190,12 +194,12 @@ class WebRTCService {
         }
       };
 
-      // Envoyer les ICE candidates via Firebase
+      // Envoyer les ICE candidates via Firebase — path scopé à la session
       pc.onicecandidate = (event) => {
-        if (event.candidate && isConfigured && database && this.coupleId) {
-          const iceRef = ref(database, `couples/${this.coupleId}/calls/ice/${this.userId}`);
-          const newCandidateRef = push(iceRef);
-          set(newCandidateRef, event.candidate.toJSON()).catch(e =>
+        if (event.candidate && isConfigured && database && this.coupleId && this.roomId) {
+          const iceRef = ref(database,
+            `couples/${this.coupleId}/calls/sessions/${this.roomId}/ice/${this.userId}`);
+          push(iceRef, event.candidate.toJSON()).catch(e =>
             console.log('⚠️ ICE send error:', e.message)
           );
         }
@@ -273,10 +277,10 @@ class WebRTCService {
   }
 
   _listenForRemoteICECandidates() {
-    if (!isConfigured || !database || !this.coupleId || !this.userId) return;
-    
-    // Écouter les candidates de CHAQUE autre utilisateur
-    const iceRef = ref(database, `couples/${this.coupleId}/calls/ice`);
+    if (!isConfigured || !database || !this.coupleId || !this.userId || !this.roomId) return;
+    // Path scopé à la session — impossible de lire des ICE d'un autre appel
+    const iceRef = ref(database,
+      `couples/${this.coupleId}/calls/sessions/${this.roomId}/ice`);
     this._iceCandidateListener = onValue(iceRef, (snapshot) => {
       if (!snapshot.exists() || !this.peerConnection) return;
       const iceData = snapshot.val();
@@ -293,24 +297,26 @@ class WebRTCService {
   }
 
   async createOffer() {
-    if (!this.peerConnection || !isConfigured || !database || !this.coupleId) return;
+    if (!this.peerConnection || !isConfigured || !database || !this.coupleId || !this.roomId) return;
     try {
       const offer = await this.peerConnection.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: this.callType === 'video',
       });
       await this.peerConnection.setLocalDescription(offer);
-      const sdpRef = ref(database, `couples/${this.coupleId}/calls/sdp/offer`);
+      // Path scopé à la session
+      const sdpRef = ref(database,
+        `couples/${this.coupleId}/calls/sessions/${this.roomId}/sdp/offer`);
       await set(sdpRef, { type: offer.type, sdp: offer.sdp });
-      console.log('📤 Offre SDP envoyée');
+      console.log(`📤 Offre SDP envoyée [session: ${this.roomId}]`);
 
-      // Écouter la réponse SDP du partenaire (cleanup ancien listener si existant)
       if (this._answerListener) {
         this._answerListener();
         this._answerListener = null;
       }
-      const answerRef = ref(database, `couples/${this.coupleId}/calls/sdp/answer`);
-      const answerListener = onValue(answerRef, async (snap) => {
+      const answerRef = ref(database,
+        `couples/${this.coupleId}/calls/sessions/${this.roomId}/sdp/answer`);
+      this._answerListener = onValue(answerRef, async (snap) => {
         if (snap.exists() && this.peerConnection && !this.peerConnection.remoteDescription) {
           try {
             await this.handleAnswer(snap.val());
@@ -319,8 +325,6 @@ class WebRTCService {
           }
         }
       });
-      // Stocker pour cleanup
-      this._answerListener = answerListener;
     } catch (error) {
       console.log('⚠️ Erreur createOffer:', error.message);
     }
@@ -336,7 +340,8 @@ class WebRTCService {
       const answer = await this.peerConnection.createAnswer();
       await this.peerConnection.setLocalDescription(answer);
       if (isConfigured && database && this.coupleId) {
-        const sdpRef = ref(database, `couples/${this.coupleId}/calls/sdp/answer`);
+        const sdpRef = ref(database,
+          `couples/${this.coupleId}/calls/sessions/${this.roomId}/sdp/answer`);
         await set(sdpRef, { type: answer.type, sdp: answer.sdp });
         console.log('� Réponse SDP envoyée');
       }
@@ -396,8 +401,7 @@ class WebRTCService {
   }
 
   async cleanup() {
-    console.log('🧹 WebRTC cleanup');
-    // ✅ Réinitialiser le mode audio
+    console.log(`🧹 WebRTC cleanup [session: ${this.roomId}]`);
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -409,28 +413,28 @@ class WebRTCService {
     } catch (e) { /* ignore */ }
 
     if (this._iceCandidateListener) {
-      this._iceCandidateListener();
+      try { this._iceCandidateListener(); } catch(e) {}
       this._iceCandidateListener = null;
     }
     if (this._answerListener) {
-      this._answerListener();
+      try { this._answerListener(); } catch(e) {}
       this._answerListener = null;
     }
     if (this.localStream) {
-      this.localStream.getTracks().forEach(track => track.stop());
+      try { this.localStream.getTracks().forEach(track => track.stop()); } catch(e) {}
       this.localStream = null;
     }
     this.remoteStream = null;
     if (this.peerConnection) {
-      this.peerConnection.close();
+      try { this.peerConnection.close(); } catch(e) {}
       this.peerConnection = null;
     }
-    if (isConfigured && database && this.coupleId) {
+    // Nettoyer UNIQUEMENT la session courante — les autres sessions ne sont pas touchées
+    if (isConfigured && database && this.coupleId && this.roomId) {
       try {
-        const sdpRef = ref(database, `couples/${this.coupleId}/calls/sdp`);
-        const iceRef = ref(database, `couples/${this.coupleId}/calls/ice`);
-        await set(sdpRef, null);
-        await set(iceRef, null);
+        const sessionRef = ref(database,
+          `couples/${this.coupleId}/calls/sessions/${this.roomId}`);
+        await set(sessionRef, null);
       } catch (e) {
         console.log('⚠️ WebRTC cleanup error:', e.message);
       }
@@ -439,6 +443,7 @@ class WebRTCService {
     this.onLocalStream = null;
     this.onConnectionStateChange = null;
     this.callType = null;
+    this.roomId = null;
     this._isMuted = false;
     this._isCameraOff = false;
     this._pendingCandidates = [];

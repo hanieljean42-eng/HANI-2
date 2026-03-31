@@ -205,7 +205,8 @@ export function ChatProvider({ children }) {
           setIsCallScreenActive(true);
           
           const isInitiator = isCallerRef.current && callData.callerId === user.id;
-          startWebRTCCall(couple.id, user.id, callData.type || 'audio', isInitiator)
+          // roomId transmis — isole SDP/ICE dans sessions/{roomId}
+          startWebRTCCall(couple.id, user.id, callData.type || 'audio', isInitiator, callData.roomId)
             .catch(e => console.log('⚠️ WebRTC call error:', e));
         } else if (callData.status === 'rejected') {
           console.log('📵 Appel rejeté par le partenaire');
@@ -410,22 +411,25 @@ export function ChatProvider({ children }) {
   };
 
   // ─── WebRTC : démarrer un appel full-duplex (cross-réseau via STUN/TURN) ───
-  const startWebRTCCall = async (coupleId, userId, callType, isInitiator) => {
-    // ✅ Guard : ne démarrer qu'une seule fois par appel
+  const startWebRTCCall = async (coupleId, userId, callType, isInitiator, roomId) => {
     if (webrtcStartedRef.current) {
       console.log('⚠️ startWebRTCCall déjà lancé, skip');
+      return;
+    }
+    if (!roomId) {
+      console.log('❌ roomId manquant — impossible de démarrer le WebRTC');
       return;
     }
     webrtcStartedRef.current = true;
     try {
       setWebrtcState('connecting');
-      webrtcService.init(coupleId, userId);
+      // roomId isole complètement cette session dans Firebase
+      webrtcService.init(coupleId, userId, roomId);
       webrtcService.onLocalStream  = (stream) => setLocalStream(stream);
       webrtcService.onRemoteStream = (stream) => setRemoteStream(stream);
       webrtcService.onConnectionStateChange = (state) => setWebrtcState(state);
 
       const stream = await webrtcService.getLocalStream(callType);
-      // ✅ Si le stream est null (permission refusée ou WebRTC absent), arrêter
       if (!stream) {
         console.log('❌ getLocalStream a échoué — permissions ou WebRTC indisponible');
         setWebrtcState('disconnected');
@@ -436,15 +440,15 @@ export function ChatProvider({ children }) {
       webrtcService.createPeerConnection();
 
       if (isInitiator) {
-        // Appelant : créer et envoyer l'offre SDP
         await webrtcService.createOffer();
       } else {
-        // Receveur : écouter l'offre SDP et répondre
         if (pendingOfferListenerRef.current) {
           pendingOfferListenerRef.current();
           pendingOfferListenerRef.current = null;
         }
-        const offerRef = ref(database, `couples/${coupleId}/calls/sdp/offer`);
+        // Path scopé à la session — jamais de collision avec un autre appel
+        const offerRef = ref(database,
+          `couples/${coupleId}/calls/sessions/${roomId}/sdp/offer`);
         const unsub = onValue(offerRef, async (snap) => {
           if (snap.exists() && webrtcService.peerConnection && !webrtcService.peerConnection.remoteDescription) {
             await webrtcService.handleOffer(snap.val()).catch(e =>
@@ -496,11 +500,7 @@ export function ChatProvider({ children }) {
       createdAt: Date.now(), // ✅ Timestamp numérique pour résoudre les conflits
     };
     try {
-      const sdpCleanRef = ref(database, `couples/${couple.id}/calls/sdp`);
-      const iceCleanRef = ref(database, `couples/${couple.id}/calls/ice`);
-      await set(sdpCleanRef, null);
-      await set(iceCleanRef, null);
-
+      // Chaque appel utilise un roomId unique — pas besoin de nettoyer les anciennes sessions
       await set(callRef, callData);
       setActiveCall(callData);
       isCallerRef.current = true;
