@@ -55,7 +55,7 @@
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_CONNECT"
       ],
-      "newArchEnabled": false
+      "newArchEnabled": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
