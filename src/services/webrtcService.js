@@ -6,7 +6,7 @@
 
 import { Audio } from 'expo-av';
 import { database, isConfigured } from '../config/firebase';
-import { ref, set, get, push, onValue, onChildAdded, off } from 'firebase/database';
+import { ref, set, push, onValue } from 'firebase/database';
 
 let RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices;
 try {

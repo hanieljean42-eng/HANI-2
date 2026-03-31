@@ -176,12 +176,19 @@ export default function IncomingCallOverlay() {
   const handleAccept = async () => {
     Vibration.cancel();
     await stopRinging();
-    // ✅ Demander la permission micro avant d'accepter (callee)
+    // Demander les permissions nécessaires
     try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const { status: micStatus } = await Audio.requestPermissionsAsync();
+      if (micStatus !== 'granted') {
         Alert.alert('🎤 Permission requise', 'L\'accès au microphone est nécessaire pour répondre à l\'appel.');
         return;
+      }
+      // Demander la permission caméra pour les appels vidéo
+      if (incomingCall?.type === 'video') {
+        try {
+          const { Camera } = require('expo-camera');
+          await Camera.requestCameraPermissionsAsync();
+        } catch (e) { /* getUserMedia demandera automatiquement */ }
       }
     } catch (e) { /* continue */ }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
