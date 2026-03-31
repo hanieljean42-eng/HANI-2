@@ -144,10 +144,22 @@
                                                                                  ".read":  "auth != null",
                                                                                  ".write":  "auth != null"
                                                                              },
-                                                                  "audioStream":  {
-                                                                                     ".read":  "auth != null",
-                                                                                     ".write":  "auth != null"
-                                                                                 },
+                                                                  "sessions":  {
+                                                                                   "$roomId":  {
+                                                                                                   ".read":  "auth != null",
+                                                                                                   ".write":  "auth != null",
+                                                                                                   "sdp":  {
+                                                                                                               ".read":  "auth != null",
+                                                                                                               ".write":  "auth != null"
+                                                                                                           },
+                                                                                                   "ice":  {
+                                                                                                               "$userId":  {
+                                                                                                                               ".read":  "auth != null",
+                                                                                                                               ".write":  "auth != null"
+                                                                                                                           }
+                                                                                                           }
+                                                                                               }
+                                                                               },
                                                                   "sdp":  {
                                                                               ".read":  "auth != null",
                                                                               ".write":  "auth != null"
