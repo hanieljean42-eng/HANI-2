@@ -402,15 +402,26 @@ export default function ChatScreen({ navigation, route }) {
     return () => stopCallerRinging();
   }, [showCallScreen, activeCall?.status, activeCall?.callerId]);
 
-  // Lancer un appel audio in-app via Firebase Relay
+  // Lancer un appel audio ou vidéo via WebRTC (cross-réseau via STUN/TURN)
   const handleCall = async (type) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    // Demander la permission micro avant de lancer l'appel
+    // Demander les permissions nécessaires
     try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const { status: micStatus } = await Audio.requestPermissionsAsync();
+      if (micStatus !== 'granted') {
         Alert.alert('🎤 Permission requise', 'L\'accès au microphone est nécessaire pour passer un appel.');
         return;
+      }
+      // Demander la permission caméra pour les appels vidéo
+      if (type === 'video') {
+        try {
+          const { Camera } = require('expo-camera');
+          const { status: camStatus } = await Camera.requestCameraPermissionsAsync();
+          if (camStatus !== 'granted') {
+            Alert.alert('📷 Permission caméra requise', 'L\'accès à la caméra est nécessaire pour les appels vidéo.');
+            return;
+          }
+        } catch (e) { /* expo-camera absent, getUserMedia demandera la permission automatiquement */ }
       }
     } catch (e) { /* continue */ }
     const roomId = await initiateCall(type);
