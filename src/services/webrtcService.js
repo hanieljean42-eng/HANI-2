@@ -19,58 +19,35 @@ try {
   console.warn('⚠️ react-native-webrtc non disponible:', e.message);
 }
 
-// ============================================================
-// Configuration TURN — OBLIGATOIRE pour appels entre réseaux
-// différents (4G ↔ WiFi, deux opérateurs différents).
-//
-// ⚠️  Pour activer le TURN dynamique (recommandé) :
-//  1. Créer un compte GRATUIT sur https://www.metered.ca/stun-turn
-//  2. Créer une app (ex: "hani2")
-//  3. Copier l'API key depuis le dashboard
-//  4. Renseigner METERED_APP et METERED_API_KEY ci-dessous
-// ============================================================
-
-const METERED_APP = 'hani-2';                          // Nom de l'app sur Metered.ca
-const METERED_API_KEY = '69c9499c6a209cb238ff409d';    // API key Metered.ca
-
-// Serveurs STUN Google (toujours disponibles, gratuits)
-// + freestun.net (TURN public gratuit, supporte les NAT symétriques)
-const FALLBACK_ICE_SERVERS = [
+// ✅ OpenRelay — TURN public gratuit, fiable, sans compte nécessaire
+// Source : https://www.metered.ca/tools/openrelay/
+const ICE_SERVERS = [
+  // STUN Google (détection IP publique)
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
-  { urls: 'stun:stun4.l.google.com:19302' },
-  // FreeTURN — serveur TURN public gratuit (freestun.net)
-  { urls: 'stun:freestun.net:3478' },
+  { urls: 'stun:openrelay.metered.ca:80' },
+  // TURN OpenRelay — relay obligatoire pour NAT symétrique (4G ↔ WiFi)
+  { urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject' },
+  { urls: 'turns:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject' },
+  // freestun.net — backup supplémentaire
   { urls: 'turn:freestun.net:3478',  username: 'free', credential: 'free' },
-  { urls: 'turn:freestun.net:3479',  username: 'free', credential: 'free' },
   { urls: 'turns:freestun.net:5349', username: 'free', credential: 'free' },
 ];
 
-// Récupère des credentials TURN frais depuis Metered.ca (ne jamais expirer)
 async function fetchIceServers() {
-  if (!METERED_API_KEY) {
-    console.log('⚠️  TURN: utilisation du fallback freestun.net (configurez Metered.ca pour plus de fiabilité)');
-    return FALLBACK_ICE_SERVERS;
-  }
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-    const response = await fetch(
-      `https://${METERED_APP}.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`,
-      { signal: controller.signal }
-    );
-    clearTimeout(timeoutId);
-    const servers = await response.json();
-    if (Array.isArray(servers) && servers.length > 0) {
-      console.log('✅ TURN credentials Metered.ca obtenus (' + servers.length + ' serveurs)');
-      return [...FALLBACK_ICE_SERVERS.slice(0, 5), ...servers];
-    }
-  } catch (e) {
-    console.log('⚠️  Metered.ca indisponible, fallback freestun.net');
-  }
-  return FALLBACK_ICE_SERVERS;
+  // OpenRelay fonctionne sans API key — utilisé directement
+  console.log('✅ Serveurs ICE chargés (' + ICE_SERVERS.length + ' entrées STUN/TURN)');
+  return ICE_SERVERS;
 }
 
 class WebRTCService {
